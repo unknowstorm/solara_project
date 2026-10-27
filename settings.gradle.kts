@@ -1,4 +1,4 @@
-rootProject.name = "Solana"
+rootProject.name = "Solara"
 
 pluginManagement {
     repositories {
