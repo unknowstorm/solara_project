@@ -29,7 +29,7 @@ class JamendoProvider(
                 parameter("namesearch", query)
             }
         }.body()
-        return response.results.map { it.toTrack() }
+        return response.results.filter { !it.audio.isNullOrBlank() }.map { it.toTrack() }
     }
 
     override suspend fun resolveStream(track: Track): String {
