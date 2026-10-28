@@ -27,7 +27,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
     private val handler = Handler(Looper.getMainLooper())
     private var controller: MediaController? = null
-    private var pendingItem: MediaItem? = null
+    private var pendingQueue: Pair<List<MediaItem>, Int>? = null
     private var released = false
     private var lastError: String? = null
 
@@ -38,7 +38,16 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e("Solara", "player error: ${error.errorCodeName}", error)
-            lastError = "Трек недоступен (${error.errorCodeName})"
+            val c = controller ?: return
+            if (c.hasNextMediaItem()) {
+                // Битый трек (например, 404): переходим к следующему
+                lastError = "Трек недоступен, пропускаю (${error.errorCodeName})"
+                c.seekToNextMediaItem()
+                c.prepare()
+                c.play()
+            } else {
+                lastError = "Трек недоступен (${error.errorCodeName})"
+            }
             publish()
         }
     }
@@ -68,32 +77,38 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             }
             controller = connected
             connected.addListener(listener)
-            pendingItem?.let { start(connected, it) }
-            pendingItem = null
+            pendingQueue?.let { (items, index) -> start(connected, items, index) }
+            pendingQueue = null
             publish()
         }, ContextCompat.getMainExecutor(appContext))
         handler.post(ticker)
     }
 
-    override fun play(track: Track, streamUrl: String) {
+    override fun playQueue(tracks: List<Track>, startIndex: Int) {
         lastError = null
-        val item = MediaItem.Builder()
-            .setMediaId(track.id)
-            .setUri(streamUrl)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(track.title)
-                    .setArtist(track.artist)
-                    .setArtworkUri(track.artworkUrl?.let { Uri.parse(it) })
-                    .build()
-            )
-            .build()
+        val playable = tracks.filter { !it.streamUrl.isNullOrBlank() }
+        val startId = tracks.getOrNull(startIndex)?.id
+        val index = playable.indexOfFirst { it.id == startId }.coerceAtLeast(0)
+        if (playable.isEmpty()) return
+        val items = playable.map { it.toMediaItem() }
         val current = controller
-        if (current == null) pendingItem = item else start(current, item)
+        if (current == null) pendingQueue = items to index else start(current, items, index)
     }
 
-    private fun start(c: MediaController, item: MediaItem) {
-        c.setMediaItem(item)
+    private fun Track.toMediaItem() = MediaItem.Builder()
+        .setMediaId(id)
+        .setUri(streamUrl)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(title)
+                .setArtist(artist)
+                .setArtworkUri(artworkUrl?.let { Uri.parse(it) })
+                .build()
+        )
+        .build()
+
+    private fun start(c: MediaController, items: List<MediaItem>, index: Int) {
+        c.setMediaItems(items, index, 0L)
         c.prepare()
         c.play()
     }
@@ -104,6 +119,16 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
     override fun resume() {
         controller?.play()
+    }
+
+    override fun next() {
+        lastError = null
+        controller?.seekToNextMediaItem()
+    }
+
+    override fun previous() {
+        lastError = null
+        controller?.seekToPreviousMediaItem()
     }
 
     override fun seekTo(positionMs: Long) {
@@ -132,6 +157,8 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             positionMs = c.currentPosition.coerceAtLeast(0L),
             durationMs = duration,
             error = lastError,
+            hasNext = c.hasNextMediaItem(),
+            hasPrevious = c.hasPreviousMediaItem(),
         )
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,8 +48,14 @@ fun NowPlayingBar(audio: AudioBackend, modifier: Modifier = Modifier) {
                         Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                     }
                 }
+                TextButton(onClick = { audio.previous() }, enabled = state.hasPrevious) {
+                    Text("⏮")
+                }
                 Button(onClick = { if (showPause) audio.pause() else audio.resume() }) {
                     Text(if (showPause) "Pause" else "Play")
+                }
+                TextButton(onClick = { audio.next() }, enabled = state.hasNext) {
+                    Text("⏭")
                 }
             }
             Slider(

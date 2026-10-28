@@ -21,7 +21,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -30,7 +29,6 @@ import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 @Composable
 fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
@@ -38,7 +36,6 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
     var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
     val playback by audio.state.collectAsState()
 
     LaunchedEffect(query) {
@@ -99,17 +96,9 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
                         }
                     ),
                     modifier = Modifier.clickable {
-                        scope.launch {
-                            try {
-                                audio.play(track, provider.resolveStream(track))
-                                error = null
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                println("Solara: play failed: ${e.stackTraceToString()}")
-                                error = "Ошибка: ${e.message}"
-                            }
-                        }
+                        val playable = tracks.filter { !it.streamUrl.isNullOrBlank() }
+                        val index = playable.indexOfFirst { it.id == track.id }
+                        if (index >= 0) audio.playQueue(playable, index)
                     }
                 )
             }
