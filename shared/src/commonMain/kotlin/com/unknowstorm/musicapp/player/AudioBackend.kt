@@ -14,14 +14,20 @@ data class PlaybackState(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val error: String? = null,
+    val hasNext: Boolean = false,
+    val hasPrevious: Boolean = false,
 )
 
 /** Воспроизведение звука. На каждой платформе своя реализация. */
 interface AudioBackend {
     val state: StateFlow<PlaybackState>
-    fun play(track: Track, streamUrl: String)
+
+    /** Ставит список в очередь и начинает с трека под номером startIndex. */
+    fun playQueue(tracks: List<Track>, startIndex: Int)
     fun pause()
     fun resume()
+    fun next()
+    fun previous()
     fun seekTo(positionMs: Long)
     fun release()
 }
