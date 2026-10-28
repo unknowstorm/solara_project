@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.LinearProgressIndicator
@@ -49,13 +50,14 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            println("Solara: search failed: ${e.stackTraceToString()}")
             error = "Ошибка загрузки: ${e.message}"
         } finally {
             loading = false
         }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -68,10 +70,17 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
 
-        error?.let {
+        (error ?: playback.error)?.let {
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+
+        if (!loading && error == null && tracks.isEmpty()) {
+            Text(
+                text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
@@ -97,6 +106,7 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Exception) {
+                                println("Solara: play failed: ${e.stackTraceToString()}")
                                 error = "Ошибка: ${e.message}"
                             }
                         }

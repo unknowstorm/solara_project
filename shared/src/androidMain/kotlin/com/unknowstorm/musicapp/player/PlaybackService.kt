@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -32,17 +33,24 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .build()
-        mediaSession = MediaSession.Builder(this, player).build()
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val builder = MediaSession.Builder(this, player)
+        if (launchIntent != null) {
+            builder.setSessionActivity(
+                PendingIntent.getActivity(
+                    this, 0, launchIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            )
+        }
+        mediaSession = builder.build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = mediaSession?.player
-        if (player == null || !player.playWhenReady || player.mediaItemCount == 0) {
-            stopSelf()
-        }
+        pauseAllPlayersAndStopSelf()
     }
 
     override fun onDestroy() {
