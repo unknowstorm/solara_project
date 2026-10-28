@@ -3,28 +3,28 @@ package com.unknowstorm.musicapp.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.player.AudioBackend
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NowPlayingBar(audio: AudioBackend, modifier: Modifier = Modifier) {
     val state by audio.state.collectAsState()
+    var dragValue by remember { mutableStateOf<Float?>(null) }
     val title = state.title ?: return
     val showPause = state.isPlaying || state.isBuffering
     val progress = if (state.durationMs > 0) {
@@ -32,6 +32,7 @@ fun NowPlayingBar(audio: AudioBackend, modifier: Modifier = Modifier) {
     } else {
         0f
     }
+    val shownPositionMs = dragValue?.let { (it * state.durationMs).toLong() } ?: state.positionMs
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -50,14 +51,18 @@ fun NowPlayingBar(audio: AudioBackend, modifier: Modifier = Modifier) {
                     Text(if (showPause) "Pause" else "Play")
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            LinearWavyProgressIndicator(
-                progress = { progress },
-                amplitude = { if (state.isPlaying) 1f else 0f },
+            Slider(
+                value = dragValue ?: progress,
+                onValueChange = { dragValue = it },
+                onValueChangeFinished = {
+                    dragValue?.let { audio.seekTo((it * state.durationMs).toLong()) }
+                    dragValue = null
+                },
+                enabled = state.durationMs > 0,
                 modifier = Modifier.fillMaxWidth(),
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTime(state.positionMs), style = MaterialTheme.typography.labelSmall)
+                Text(formatTime(shownPositionMs), style = MaterialTheme.typography.labelSmall)
                 Text(formatTime(state.durationMs), style = MaterialTheme.typography.labelSmall)
             }
         }

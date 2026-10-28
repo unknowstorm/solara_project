@@ -5,10 +5,12 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -27,9 +29,16 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     private var controller: MediaController? = null
     private var pendingItem: MediaItem? = null
     private var released = false
+    private var lastError: String? = null
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
+            publish()
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Log.e("Solara", "player error: ${error.errorCodeName}", error)
+            lastError = "Трек недоступен (${error.errorCodeName})"
             publish()
         }
     }
@@ -67,6 +76,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     }
 
     override fun play(track: Track, streamUrl: String) {
+        lastError = null
         val item = MediaItem.Builder()
             .setMediaId(track.id)
             .setUri(streamUrl)
@@ -121,6 +131,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             isBuffering = c.playbackState == Player.STATE_BUFFERING,
             positionMs = c.currentPosition.coerceAtLeast(0L),
             durationMs = duration,
+            error = lastError,
         )
     }
 }

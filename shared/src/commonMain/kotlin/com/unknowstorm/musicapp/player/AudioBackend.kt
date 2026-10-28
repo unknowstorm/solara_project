@@ -13,6 +13,7 @@ data class PlaybackState(
     val isBuffering: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
+    val error: String? = null,
 )
 
 /** Воспроизведение звука. На каждой платформе своя реализация. */
