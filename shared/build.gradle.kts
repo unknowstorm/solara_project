@@ -70,3 +70,6 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
+compose.resources {
+    packageOfResClass = "com.unknowstorm.musicapp.resources"
+}
