@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,7 +32,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 @Composable
-fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
+fun TrackListScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -85,8 +86,9 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
         LazyColumn(Modifier.weight(1f)) {
             items(tracks, key = { "${it.provider}:${it.id}" }) { track ->
                 ListItem(
-                    headlineContent = { Text(track.title) },
-                    supportingContent = { Text(track.artist) },
+                    leadingContent = { CoverImage(track.artworkUrl, Modifier.size(52.dp)) },
+                    headlineContent = { Text(track.title, maxLines = 1) },
+                    supportingContent = { Text(track.artist, maxLines = 1) },
                     trailingContent = { Text(formatDuration(track.durationMs)) },
                     colors = ListItemDefaults.colors(
                         containerColor = if (playback.mediaId == track.id) {
@@ -104,7 +106,7 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
             }
         }
 
-        NowPlayingBar(audio, Modifier.padding(8.dp).navigationBarsPadding())
+        NowPlayingBar(audio, onOpenPlayer, Modifier.padding(8.dp).navigationBarsPadding())
     }
 }
 

@@ -64,7 +64,7 @@ class JamendoProvider(
         provider = ProviderId.JAMENDO,
         title = name,
         artist = artistName,
-        artworkUrl = image?.secure(),
+        artworkUrl = image?.secure()?.replace("width=300", "width=600"),
         durationMs = (duration.toLongOrNull() ?: 0L) * 1000,
         licenseUrl = licenseUrl,
         streamUrl = audio?.secure()
