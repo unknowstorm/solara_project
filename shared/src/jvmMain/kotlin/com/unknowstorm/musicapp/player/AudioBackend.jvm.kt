@@ -14,6 +14,8 @@ class StubAudioBackend : AudioBackend {
 
     private var queue: List<Track> = emptyList()
     private var index = 0
+    private var repeat = RepeatMode.OFF
+    private var shuffle = false
 
     override fun playQueue(tracks: List<Track>, startIndex: Int) {
         queue = tracks
@@ -32,6 +34,8 @@ class StubAudioBackend : AudioBackend {
             durationMs = track.durationMs,
             hasNext = index < queue.lastIndex,
             hasPrevious = index > 0,
+            repeatMode = repeat,
+            shuffle = shuffle,
         )
     }
 
@@ -59,6 +63,26 @@ class StubAudioBackend : AudioBackend {
 
     override fun seekTo(positionMs: Long) {
         _state.value = _state.value.copy(positionMs = positionMs)
+    }
+
+    override fun stop() {
+        queue = emptyList()
+        index = 0
+        _state.value = PlaybackState(repeatMode = repeat, shuffle = shuffle)
+    }
+
+    override fun cycleRepeat() {
+        repeat = when (repeat) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+        _state.value = _state.value.copy(repeatMode = repeat)
+    }
+
+    override fun toggleShuffle() {
+        shuffle = !shuffle
+        _state.value = _state.value.copy(shuffle = shuffle)
     }
 
     override fun release() {}

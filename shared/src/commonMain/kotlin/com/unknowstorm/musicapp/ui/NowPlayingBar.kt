@@ -1,31 +1,30 @@
 package com.unknowstorm.musicapp.ui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.player.AudioBackend
 
+/** Мини-плеер: обложка, название, пауза и закрытие. Тап открывает полный экран. */
 @Composable
-fun NowPlayingBar(audio: AudioBackend, modifier: Modifier = Modifier) {
+fun NowPlayingBar(audio: AudioBackend, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val state by audio.state.collectAsState()
-    var dragValue by remember { mutableStateOf<Float?>(null) }
     val title = state.title ?: return
     val showPause = state.isPlaying || state.isBuffering
     val progress = if (state.durationMs > 0) {
@@ -33,50 +32,61 @@ fun NowPlayingBar(audio: AudioBackend, modifier: Modifier = Modifier) {
     } else {
         0f
     }
-    val shownPositionMs = dragValue?.let { (it * state.durationMs).toLong() } ?: state.positionMs
 
     Surface(
+        onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.secondaryContainer,
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                CoverImage(state.artworkUrl, Modifier.size(52.dp))
+                Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     state.artist?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-                TextButton(onClick = { audio.previous() }, enabled = state.hasPrevious) {
-                    Text("⏮")
+                IconButton(
+                    onClick = { audio.previous() },
+                    enabled = state.hasPrevious,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    SkipIcon(next = false, modifier = Modifier.size(22.dp))
                 }
-                Button(onClick = { if (showPause) audio.pause() else audio.resume() }) {
-                    Text(if (showPause) "Pause" else "Play")
+                IconButton(
+                    onClick = { if (showPause) audio.pause() else audio.resume() },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    PlayPauseIcon(showPause)
                 }
-                TextButton(onClick = { audio.next() }, enabled = state.hasNext) {
-                    Text("⏭")
+                IconButton(
+                    onClick = { audio.next() },
+                    enabled = state.hasNext,
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    SkipIcon(next = true, modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = { audio.stop() }, modifier = Modifier.size(40.dp)) {
+                    CloseIcon()
                 }
             }
-            Slider(
-                value = dragValue ?: progress,
-                onValueChange = { dragValue = it },
-                onValueChangeFinished = {
-                    dragValue?.let { audio.seekTo((it * state.durationMs).toLong()) }
-                    dragValue = null
-                },
-                enabled = state.durationMs > 0,
-                modifier = Modifier.fillMaxWidth(),
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 8.dp),
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatTime(shownPositionMs), style = MaterialTheme.typography.labelSmall)
-                Text(formatTime(state.durationMs), style = MaterialTheme.typography.labelSmall)
-            }
         }
     }
-}
-
-private fun formatTime(ms: Long): String {
-    val totalSeconds = ms / 1000
-    return "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
 }

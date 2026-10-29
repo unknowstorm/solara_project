@@ -30,17 +30,24 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     private var pendingQueue: Pair<List<MediaItem>, Int>? = null
     private var released = false
     private var lastError: String? = null
+    private var errorStreak = 0
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             publish()
         }
 
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) errorStreak = 0
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             Log.e("Solara", "player error: ${error.errorCodeName}", error)
             val c = controller ?: return
-            if (c.hasNextMediaItem()) {
-                // Битый трек (например, 404): переходим к следующему
+            errorStreak++
+            // При повторе одного трека «следующий» это он же, поэтому повтор выключаем
+            if (c.repeatMode == Player.REPEAT_MODE_ONE) c.repeatMode = Player.REPEAT_MODE_OFF
+            if (errorStreak < c.mediaItemCount && c.hasNextMediaItem()) {
                 lastError = "Трек недоступен, пропускаю (${error.errorCodeName})"
                 c.seekToNextMediaItem()
                 c.prepare()
@@ -86,6 +93,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
     override fun playQueue(tracks: List<Track>, startIndex: Int) {
         lastError = null
+        errorStreak = 0
         val playable = tracks.filter { !it.streamUrl.isNullOrBlank() }
         val startId = tracks.getOrNull(startIndex)?.id
         val index = playable.indexOfFirst { it.id == startId }.coerceAtLeast(0)
@@ -135,6 +143,28 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         controller?.seekTo(positionMs)
     }
 
+    override fun stop() {
+        lastError = null
+        controller?.let {
+            it.stop()
+            it.clearMediaItems()
+        }
+        publish()
+    }
+
+    override fun cycleRepeat() {
+        val c = controller ?: return
+        c.repeatMode = when (c.repeatMode) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+            else -> Player.REPEAT_MODE_OFF
+        }
+    }
+
+    override fun toggleShuffle() {
+        controller?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
+    }
+
     override fun release() {
         released = true
         handler.removeCallbacks(ticker)
@@ -159,6 +189,12 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             error = lastError,
             hasNext = c.hasNextMediaItem(),
             hasPrevious = c.hasPreviousMediaItem(),
+            repeatMode = when (c.repeatMode) {
+                Player.REPEAT_MODE_ONE -> RepeatMode.ONE
+                Player.REPEAT_MODE_ALL -> RepeatMode.ALL
+                else -> RepeatMode.OFF
+            },
+            shuffle = c.shuffleModeEnabled,
         )
     }
 }
