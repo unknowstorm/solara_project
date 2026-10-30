@@ -71,7 +71,7 @@ fun NowPlayingBar(audio: AudioBackend, onOpen: () -> Unit, modifier: Modifier = 
                     onClick = { if (showPause) audio.pause() else audio.resume() },
                     modifier = Modifier.size(40.dp),
                 ) {
-                    if (rememberDelayedBuffering(state.isBuffering)) {
+                    if (rememberDelayedFlag(state.isBuffering && !state.isPlaying, SPINNER_DELAY_MS, state.mediaId)) {
                         CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                     } else {
                         PlayPauseIcon(showPause)
