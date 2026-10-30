@@ -38,6 +38,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.draw.blur
@@ -58,6 +71,14 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
     var dragValue by remember { mutableStateOf<Float?>(null) }
     var liked by remember(state.mediaId) { mutableStateOf(false) } // пока только визуально
     var showDetails by remember { mutableStateOf(false) }
+
+    // Наклон обложки: tiltX/tiltY от -1 до 1 (положение пальца), press от 0 до 1 (удержание)
+    val scope = rememberCoroutineScope()
+    val tiltX = remember { Animatable(0f) }
+    val tiltY = remember { Animatable(0f) }
+    val press = remember { Animatable(0f) }
+    val followSpec = remember { spring<Float>(Spring.DampingRatioNoBouncy, Spring.StiffnessMedium) }
+    val releaseSpec = remember { spring<Float>(dampingRatio = 0.5f, stiffness = 220f) }
 
     // Нажали ✕ в мини-плеере или очередь закончилась: закрываем экран
     LaunchedEffect(state.title) { if (state.title == null) onClose() }
@@ -82,7 +103,16 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
         RetryAsyncImage(
             url = state.artworkUrl,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().blur(48.dp).alpha(0.5f),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = 1.15f
+                    scaleY = 1.15f
+                    translationX = -tiltX.value * 18.dp.toPx()
+                    translationY = -tiltY.value * 18.dp.toPx()
+                    alpha = 0.5f + 0.12f * press.value
+                }
+                .blur(48.dp),
         )
         Box(
             Modifier.fillMaxSize()
@@ -106,8 +136,54 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
 
             // Обложка по макету: квадрат, в углу значок сервиса
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Box(Modifier.aspectRatio(1f)) {
+                Box(
+                    Modifier
+                        .aspectRatio(1f)
+                        // pointerInput стоит до graphicsLayer, чтобы координаты не искажались поворотом
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown(requireUnconsumed = false)
+                                fun follow(pos: Offset) {
+                                    val nx = (pos.x / size.width * 2f - 1f).coerceIn(-1f, 1f)
+                                    val ny = (pos.y / size.height * 2f - 1f).coerceIn(-1f, 1f)
+                                    scope.launch { tiltX.animateTo(nx, followSpec) }
+                                    scope.launch { tiltY.animateTo(ny, followSpec) }
+                                }
+                                scope.launch { press.animateTo(1f, followSpec) }
+                                follow(down.position)
+                                do {
+                                    val event = awaitPointerEvent()
+                                    event.changes.firstOrNull()?.let { follow(it.position) }
+                                } while (event.changes.any { it.pressed })
+                                scope.launch { press.animateTo(0f, releaseSpec) }
+                                scope.launch { tiltX.animateTo(0f, releaseSpec) }
+                                scope.launch { tiltY.animateTo(0f, releaseSpec) }
+                            }
+                        }
+                        .graphicsLayer {
+                            rotationY = tiltX.value * 10f
+                            rotationX = -tiltY.value * 10f
+                            cameraDistance = 14f * density
+                            val k = 1f - 0.04f * press.value
+                            scaleX = k
+                            scaleY = k
+                        }
+                ) {
                     CoverImage(state.artworkUrl, Modifier.fillMaxSize(), RoundedCornerShape(28.dp))
+                    Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
+                        // Блик уходит на сторону, противоположную пальцу, как отражение света
+                        val center = Offset(
+                            size.width * (1f - tiltX.value) / 2f,
+                            size.height * (1f - tiltY.value) / 2f,
+                        )
+                        drawRect(
+                            Brush.radialGradient(
+                                colors = listOf(Color.White.copy(alpha = 0.32f * press.value), Color.Transparent),
+                                center = center,
+                                radius = size.minDimension * 0.75f,
+                            )
+                        )
+                    }
                     Surface(
                         modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(36.dp),
                         shape = CircleShape,
