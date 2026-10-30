@@ -19,10 +19,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
+import androidx.compose.foundation.background
 
 enum class Tab(val label: String) {
     HOME("Главная"),
@@ -36,7 +38,6 @@ fun MainScreen(providers: List<MusicProvider>, audio: AudioBackend, onOpenPlayer
     var tab by remember { mutableStateOf(Tab.HOME) }
     var service by remember { mutableStateOf(Service.ALL) }
 
-    // Источник сопоставляется с чипом по имени: ProviderId.JAMENDO <-> Service.JAMENDO
     val feeds = remember(providers) {
         providers.mapNotNull { provider ->
             val s = Service.entries.firstOrNull { it.name == provider.id.toString() }
@@ -47,7 +48,8 @@ fun MainScreen(providers: List<MusicProvider>, audio: AudioBackend, onOpenPlayer
         if (service == Service.ALL) feeds else feeds.filter { it.service == service }
     }
 
-    Column(Modifier.fillMaxSize()) {
+    // Делаем фон колонки прозрачным (чтобы не было черных полос)
+    Column(Modifier.fillMaxSize().background(Color.Transparent)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 Tab.HOME -> HomeScreen(shownFeeds, service, { service = it }, audio)
@@ -60,10 +62,20 @@ fun MainScreen(providers: List<MusicProvider>, audio: AudioBackend, onOpenPlayer
             }
         }
 
-        // Мини-плеер лежит над нижней панелью, как на наброске
-        NowPlayingBar(audio, onOpenPlayer, Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+        // Мини-плеер лежит над нижней панелью
+        NowPlayingBar(
+            audio = audio,
+            onOpen = onOpenPlayer,
+            // Убираем лишние отступы, чтобы плеер прилегал вплотную
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
 
-        NavigationBar {
+        // ИСПРАВЛЕНИЕ: Убираем тень у NavigationBar и делаем его прозрачным
+        NavigationBar(
+            containerColor = MaterialTheme.colorScheme.background,
+            tonalElevation = 0.dp, // Убирает черную тень!
+            modifier = Modifier.background(Color.Transparent)
+        ) {
             Tab.entries.forEach { item ->
                 NavigationBarItem(
                     selected = tab == item,
