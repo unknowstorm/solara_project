@@ -1,15 +1,13 @@
 package com.unknowstorm.musicapp
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,10 +20,12 @@ import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.provider.audius.AudiusProvider
 import com.unknowstorm.musicapp.provider.jamendo.JamendoProvider
 import com.unknowstorm.musicapp.theme.SolaraTheme
-import com.unknowstorm.musicapp.ui.PlayerScreen
-import com.unknowstorm.musicapp.ui.SplashScreen
+import com.unknowstorm.musicapp.ui.LocalMiniPlayerAnchor
 import com.unknowstorm.musicapp.ui.MainScreen
+import com.unknowstorm.musicapp.ui.MiniPlayerAnchor
+import com.unknowstorm.musicapp.ui.SplashScreen
 import kotlinx.coroutines.delay
+import com.unknowstorm.musicapp.ui.ExpandablePlayer
 
 @Composable
 fun App() {
@@ -40,6 +40,7 @@ fun App() {
             val audio = rememberAudioBackend()
             var showSplash by remember { mutableStateOf(true) }
             var showPlayer by remember { mutableStateOf(false) }
+            val miniAnchor = remember { MiniPlayerAnchor() }
             val focusManager = LocalFocusManager.current
             // Снимаем фокус с поля поиска, иначе его «капля» остаётся поверх плеера
             LaunchedEffect(showPlayer) { if (showPlayer) focusManager.clearFocus() }
@@ -47,24 +48,18 @@ fun App() {
                 delay(1600)
                 showSplash = false
             }
-            Box(Modifier.fillMaxSize()) {
-                MainScreen(providers, audio, onOpenPlayer = { showPlayer = true })
-                AnimatedVisibility(
-                    visible = showPlayer,
-                    // Появление: выезжает снизу вверх
-                    enter = slideInVertically { it },
-                    // Исчезновение: PlayerScreen сам анимирует свайп вниз и вызывает onClose.
-                    // Здесь мы просто убираем его из композиции без дополнительной анимации,
-                    // чтобы не было "двойного" уезда.
-                    exit = ExitTransition.None,
-                ) {
-                    PlayerScreen(
+            CompositionLocalProvider(LocalMiniPlayerAnchor provides miniAnchor) {
+                Box(Modifier.fillMaxSize()) {
+                    MainScreen(providers, audio, onOpenPlayer = { showPlayer = true })
+                    // Мини-плеер и полный плеер — один компонент: плавно перетекает из одного в другой
+                    ExpandablePlayer(
                         audio = audio,
-                        onClose = { showPlayer = false }
+                        expanded = showPlayer,
+                        onExpandedChange = { showPlayer = it },
                     )
-                }
-                AnimatedVisibility(visible = showSplash, exit = fadeOut(tween(400))) {
-                    SplashScreen()
+                    AnimatedVisibility(visible = showSplash, exit = fadeOut(tween(400))) {
+                        SplashScreen()
+                    }
                 }
             }
         }
