@@ -60,7 +60,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
                 .firstOrNull()?.responseCode
             // 4xx (кроме 408 и 429) повтором не лечится
-            val permanent = httpCode != null && httpCode in 400..499 && httpCode != 408 && httpCode != 429
+            val permanent = httpCode != null && httpCode in 400..499 && httpCode != 408 && httpCode != 429 && httpCode != 401 && httpCode != 403
             val id = c.currentMediaItem?.mediaId
             if (httpCode == 404 || httpCode == 410) {
                 val dead = c.currentMediaItem?.mediaMetadata?.extras?.getString("provider")
@@ -210,6 +210,14 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         controller = null
     }
 
+    private fun slowSeekHint(c: MediaController, item: MediaItem?): String? {
+        val id = item?.mediaId ?: return null
+        val slow = RangeSupport.isNoRange("AUDIUS:$id") &&
+            c.playbackState == Player.STATE_BUFFERING &&
+            c.currentPosition > 15_000
+        return if (slow) "Audius отдаёт этот трек только целиком, перемотка займёт до минуты" else null
+    }
+
     private fun publish() {
         val c = controller ?: return
         val item = c.currentMediaItem
@@ -223,7 +231,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             isBuffering = c.playbackState == Player.STATE_BUFFERING,
             positionMs = c.currentPosition.coerceAtLeast(0L),
             durationMs = duration,
-            error = lastError,
+            error = lastError ?: slowSeekHint(c, item),
             hasNext = c.hasNextMediaItem(),
             hasPrevious = c.hasPreviousMediaItem(),
             repeatMode = when (c.repeatMode) {

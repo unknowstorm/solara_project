@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.text.font.FontWeight
@@ -43,13 +44,16 @@ fun ServiceLogo(
         service == Service.ALL -> GlobeIcon(modifier, tint)
         else -> {
             val path = remember(service) {
-                LOGO_PATHS[service.name]?.let { data ->
+                logoPathData(service.name)?.let { data ->
                     runCatching { PathParser().parsePathString(data).toPath() }.getOrNull()
                 }
             }
             if (path != null) {
                 Canvas(modifier) {
-                    scale(size.width / 24f, pivot = Offset.Zero) { drawPath(path, tint) }
+                    val origin = logoOrigin(service.name)
+                    scale(size.width / logoBox(service.name), pivot = Offset.Zero) {
+                        translate(-origin.x, -origin.y) { drawPath(path, tint) }
+                    }
                 }
             } else {
                 BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {

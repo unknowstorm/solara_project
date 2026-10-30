@@ -13,6 +13,7 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import java.net.HttpURLConnection
@@ -34,6 +35,7 @@ class PlaybackService : MediaSessionService() {
             dataSourceFactory,
             ResolvingDataSource.Resolver { spec ->
                 val uri = spec.uri
+                android.util.Log.i("Solara", "open pos=${spec.position} len=${spec.length} ${uri.host}${uri.path}")
                 if (uri.host == "api.audius.co" && uri.path.orEmpty().endsWith("/stream")) {
                     val key = uri.toString()
                     val target = resolvedUrls[key]
@@ -47,7 +49,10 @@ class PlaybackService : MediaSessionService() {
         )
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(
-                DefaultMediaSourceFactory(this).setDataSourceFactory(resolvingFactory)
+                DefaultMediaSourceFactory(
+                    this,
+                    DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true),
+                ).setDataSourceFactory(resolvingFactory)
             )
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -59,6 +64,26 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .build()
         player.addListener(object : Player.Listener {
+            private var seekAt = 0L
+
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int,
+            ) {
+                if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                    seekAt = android.os.SystemClock.elapsedRealtime()
+                    android.util.Log.i("Solara", "seek to ${newPosition.positionMs} ms")
+                }
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY && seekAt != 0L) {
+                    android.util.Log.i("Solara", "seek ready after ${android.os.SystemClock.elapsedRealtime() - seekAt} ms")
+                    seekAt = 0L
+                }
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 resolvedUrls.clear() // адрес мог устареть, при повторе разрешим заново
                 val http = generateSequence<Throwable>(error) { it.cause }
@@ -98,7 +123,13 @@ class PlaybackService : MediaSessionService() {
                     val location = conn.getHeaderField("Location") ?: return null
                     current = URL(current, location)
                 } else {
-                    return if (code == 200 || code == 206) Uri.parse(current.toString()) else null
+                    if (code == 200 || code == 206) {
+                        // 200 на запрос части файла: сервер отдаёт файл только целиком
+                        val id = start.pathSegments.getOrNull(start.pathSegments.size - 2)
+                        RangeSupport.set("AUDIUS:$id", code == 200)
+                        return Uri.parse(current.toString())
+                    }
+                    return null
                 }
             } catch (e: Exception) {
                 return null
