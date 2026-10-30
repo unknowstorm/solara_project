@@ -46,18 +46,12 @@ fun MainScreen(providers: List<MusicProvider>, audio: AudioBackend, onOpenPlayer
     val shownFeeds = remember(feeds, service) {
         if (service == Service.ALL) feeds else feeds.filter { it.service == service }
     }
-    val searchProviders = remember(providers, service) {
-        providers.filter { service == Service.ALL || it.id.toString() == service.name }
-            .ifEmpty { providers }
-    }
-    val searchLabel = if (searchProviders.size == 1) searchProviders.first().id.toString().lowercase()
-        .replaceFirstChar { it.uppercase() } else "все источники"
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 Tab.HOME -> HomeScreen(shownFeeds, service, { service = it }, audio)
-                Tab.SEARCH -> TrackListScreen(searchProviders, searchLabel, audio)
+                Tab.SEARCH -> TrackListScreen(providers, audio)
                 Tab.QUEUE -> InfoScreen(
                     "Очередь",
                     "Здесь будет текущая очередь: удаление треков, шафл и повтор списка. Следующий этап.",
