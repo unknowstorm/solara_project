@@ -108,7 +108,7 @@ private val FullCoverCorner = 28.dp
 /** Примерная высота блока «название … кнопки», который идёт под обложкой. */
 private val BelowCoverBlock = 340.dp
 private val ScreenSideMargin = 24.dp
-
+private val CoverDownShift = 40.dp
 /**
  * Сюда старый [NowPlayingBar] (теперь невидимая «метка») сообщает, где в MainScreen
  * должен стоять мини-плеер. ExpandablePlayer рисует мини-плеер ровно в этом месте.
@@ -230,7 +230,7 @@ fun ExpandablePlayer(
         val miniWidthDp = with(density) { miniNow.width.toDp() }
 
         // --- Геометрия полного экрана (в dp) ---
-        val coverTop = topInset + 32.dp
+        val coverTop = topInset + 32.dp + CoverDownShift
         val coverSize = maxOf(160.dp, minOf(maxWidth - ScreenSideMargin * 2f, maxHeight - coverTop - bottomInset - BelowCoverBlock))
         val coverTopPx = with(density) { coverTop.toPx() }
         val coverSizePx = with(density) { coverSize.toPx() }
@@ -713,29 +713,29 @@ private fun FullContent(
                 Spacer(Modifier.weight(1f))
 
                 Row(
-                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 80.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = { audio.previous() }, enabled = state.hasPrevious, modifier = Modifier.size(56.dp)) {
-                        SkipIcon(next = false, modifier = Modifier.size(32.dp))
+                    IconButton(onClick = { audio.previous() }, enabled = state.hasPrevious, modifier = Modifier.size(60.dp)) {
+                        SkipIcon(next = false, modifier = Modifier.size(36.dp))
                     }
                     FilledIconButton(
                         onClick = { if (showPause) audio.pause() else audio.resume() },
-                        modifier = Modifier.size(80.dp),
+                        modifier = Modifier.size(86.dp),
                     ) {
                         if (rememberDelayedFlag(state.isBuffering && !state.isPlaying, SPINNER_DELAY_MS, state.mediaId)) {
                             CircularProgressIndicator(
-                                Modifier.size(32.dp),
+                                Modifier.size(40.dp),
                                 color = LocalContentColor.current,
                                 strokeWidth = 3.dp,
                             )
                         } else {
-                            PlayPauseIcon(showPause, Modifier.size(40.dp))
+                            PlayPauseIcon(showPause, Modifier.size(48.dp))
                         }
                     }
-                    IconButton(onClick = { audio.next() }, enabled = state.hasNext, modifier = Modifier.size(56.dp)) {
-                        SkipIcon(next = true, modifier = Modifier.size(32.dp))
+                    IconButton(onClick = { audio.next() }, enabled = state.hasNext, modifier = Modifier.size(60.dp)) {
+                        SkipIcon(next = true, modifier = Modifier.size(36.dp))
                     }
                 }
             }
