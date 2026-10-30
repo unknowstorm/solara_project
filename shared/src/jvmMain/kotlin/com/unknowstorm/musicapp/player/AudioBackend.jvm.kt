@@ -36,6 +36,7 @@ class StubAudioBackend : AudioBackend {
             hasPrevious = index > 0,
             repeatMode = repeat,
             shuffle = shuffle,
+            provider = track.provider,
         )
     }
 

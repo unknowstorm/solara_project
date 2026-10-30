@@ -2,9 +2,9 @@ package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -16,6 +16,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -23,52 +24,99 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.unknowstorm.musicapp.model.Track
+import com.unknowstorm.musicapp.model.ProviderId
+import com.unknowstorm.musicapp.model.Service
+import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.player.AudioBackend
+import com.unknowstorm.musicapp.player.DeadTracks
+import com.unknowstorm.musicapp.provider.MusicHub
 import com.unknowstorm.musicapp.provider.MusicProvider
-import kotlinx.coroutines.CancellationException
+import com.unknowstorm.musicapp.provider.SourceResult
+import com.unknowstorm.musicapp.provider.interleave
 import kotlinx.coroutines.delay
 
 @Composable
-fun TrackListScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: () -> Unit) {
+fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
     var query by remember { mutableStateOf("") }
-    var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var selected by remember { mutableStateOf(Service.ALL) }
+    var retry by remember { mutableStateOf(0) }
+    var results by remember { mutableStateOf<Map<ProviderId, SourceResult>>(emptyMap()) }
     var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     val playback by audio.state.collectAsState()
+    val hub = remember(providers) { MusicHub(providers) }
 
-    LaunchedEffect(query) {
+    // ALL ищет во всех подключённых источниках, остальные чипы только в своём
+    val sourceId = ProviderId.entries.firstOrNull { it.name == selected.name }
+    val canSearch = selected == Service.ALL ||
+        (selected.ready && providers.any { it.id == sourceId })
+
+    LaunchedEffect(query, selected, retry, hub) {
+        if (!canSearch) {
+            results = emptyMap()
+            loading = false
+            return@LaunchedEffect
+        }
         delay(400)
         loading = true
-        error = null
+        val fresh = mutableMapOf<ProviderId, SourceResult>()
         try {
-            tracks = provider.search(query)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            println("Solara: search failed: ${e.stackTraceToString()}")
-            error = "Ошибка загрузки: ${e.message}"
+            val sources = sourceId?.let { setOf(it) } ?: emptySet()
+            hub.search(query, sources).collect { result ->
+                fresh[result.provider] = result
+                results = fresh.toMap() // новые треки появляются, как только ответил любой источник
+            }
         } finally {
             loading = false
         }
     }
 
+    val visible = interleave(providers.mapNotNull { results[it.id]?.tracks })
+        .filterNot { DeadTracks.isDead(it) }
+    val failed = providers.mapNotNull { p -> results[p.id]?.takeIf { it.error != null } }
+
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Поиск (Jamendo)") },
+            label = { Text("Поиск") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         )
+
+        ServiceTray(selected, { selected = it }, Modifier.padding(bottom = 8.dp))
 
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
 
-        (error ?: playback.error)?.let {
+        if (!canSearch) {
+            Text(
+                text = "${selected.title} скоро появится. ${selected.note}.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+
+        // Ошибка одного источника не мешает остальным
+        failed.forEach { result ->
+            Row(
+                Modifier.padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${result.provider.toService()?.title ?: result.provider.name}: ${result.error}",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = { retry++ }) { Text("Повторить") }
+            }
+        }
+
+        playback.error?.let {
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.error,
@@ -76,7 +124,7 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: 
             )
         }
 
-        if (!loading && error == null && tracks.isEmpty()) {
+        if (canSearch && !loading && results.isNotEmpty() && visible.isEmpty() && failed.isEmpty()) {
             Text(
                 text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -84,29 +132,31 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: 
         }
 
         LazyColumn(Modifier.weight(1f)) {
-            items(tracks, key = { "${it.provider}:${it.id}" }) { track ->
+            items(visible, key = { "${it.provider}:${it.id}" }) { track ->
                 ListItem(
-                    leadingContent = { CoverImage(track.artworkUrl, Modifier.size(52.dp)) },
+                    leadingContent = {
+                        TrackCover(track, Modifier.size(52.dp), badge = true, badgeSize = 18.dp)
+                    },
                     headlineContent = { Text(track.title, maxLines = 1) },
                     supportingContent = { Text(track.artist, maxLines = 1) },
                     trailingContent = { Text(formatDuration(track.durationMs)) },
                     colors = ListItemDefaults.colors(
-                        containerColor = if (playback.mediaId == track.id) {
+                        containerColor = if (playback.mediaId == track.id && playback.provider == track.provider) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
                             MaterialTheme.colorScheme.surface
                         }
                     ),
                     modifier = Modifier.clickable {
-                        val playable = tracks.filter { !it.streamUrl.isNullOrBlank() }
-                        val index = playable.indexOfFirst { it.id == track.id }
+                        val playable = visible.filter { !it.streamUrl.isNullOrBlank() }
+                        val index = playable.indexOfFirst {
+                            it.id == track.id && it.provider == track.provider
+                        }
                         if (index >= 0) audio.playQueue(playable, index)
                     }
                 )
             }
         }
-
-        NowPlayingBar(audio, onOpenPlayer, Modifier.padding(8.dp).navigationBarsPadding())
     }
 }
 

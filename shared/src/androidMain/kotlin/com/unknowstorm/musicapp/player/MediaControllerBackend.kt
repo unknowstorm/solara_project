@@ -3,6 +3,7 @@ package com.unknowstorm.musicapp.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -12,8 +13,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +34,11 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     private var released = false
     private var lastError: String? = null
     private var errorStreak = 0
+    private var retriedMediaId: String? = null
+    private val clearError = Runnable {
+        lastError = null
+        publish()
+    }
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
@@ -38,22 +46,43 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) errorStreak = 0
+            if (isPlaying) {
+                errorStreak = 0
+                retriedMediaId = null
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e("Solara", "player error: ${error.errorCodeName}", error)
             val c = controller ?: return
+            // Первый сбой трека: тихо пробуем ещё раз с того же места
+            val httpCode = generateSequence<Throwable>(error) { it.cause }
+                .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+                .firstOrNull()?.responseCode
+            // 4xx (кроме 408 и 429) повтором не лечится
+            val permanent = httpCode != null && httpCode in 400..499 && httpCode != 408 && httpCode != 429 && httpCode != 401 && httpCode != 403
+            val id = c.currentMediaItem?.mediaId
+            if (httpCode == 404 || httpCode == 410) {
+                val dead = c.currentMediaItem?.mediaMetadata?.extras?.getString("provider")
+                    ?.let { n -> ProviderId.entries.firstOrNull { it.name == n } }
+                if (id != null && dead != null) DeadTracks.mark(dead, id)
+            }
+            if (!permanent && id != null && retriedMediaId != id) {
+                retriedMediaId = id
+                c.prepare()
+                c.play()
+                return
+            }
             errorStreak++
             // При повторе одного трека «следующий» это он же, поэтому повтор выключаем
             if (c.repeatMode == Player.REPEAT_MODE_ONE) c.repeatMode = Player.REPEAT_MODE_OFF
             if (errorStreak < c.mediaItemCount && c.hasNextMediaItem()) {
-                lastError = "Трек недоступен, пропускаю (${error.errorCodeName})"
+                showError("Трек недоступен, включаю следующий")
                 c.seekToNextMediaItem()
                 c.prepare()
                 c.play()
             } else {
-                lastError = "Трек недоступен (${error.errorCodeName})"
+                showError("Трек недоступен")
             }
             publish()
         }
@@ -111,6 +140,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 .setTitle(title)
                 .setArtist(artist)
                 .setArtworkUri(artworkUrl?.let { Uri.parse(it) })
+                .setExtras(Bundle().apply { putString("provider", provider.name) })
                 .build()
         )
         .build()
@@ -165,12 +195,27 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         controller?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
     }
 
+    private fun showError(text: String) {
+        lastError = text
+        handler.removeCallbacks(clearError)
+        handler.postDelayed(clearError, 4000)
+    }
+
     override fun release() {
         released = true
         handler.removeCallbacks(ticker)
+        handler.removeCallbacks(clearError)
         controller?.removeListener(listener)
         MediaController.releaseFuture(controllerFuture)
         controller = null
+    }
+
+    private fun slowSeekHint(c: MediaController, item: MediaItem?): String? {
+        val id = item?.mediaId ?: return null
+        val slow = RangeSupport.isNoRange("AUDIUS:$id") &&
+            c.playbackState == Player.STATE_BUFFERING &&
+            c.currentPosition > 15_000
+        return if (slow) "Audius отдаёт этот трек только целиком, перемотка займёт до минуты" else null
     }
 
     private fun publish() {
@@ -186,7 +231,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             isBuffering = c.playbackState == Player.STATE_BUFFERING,
             positionMs = c.currentPosition.coerceAtLeast(0L),
             durationMs = duration,
-            error = lastError,
+            error = lastError ?: slowSeekHint(c, item),
             hasNext = c.hasNextMediaItem(),
             hasPrevious = c.hasPreviousMediaItem(),
             repeatMode = when (c.repeatMode) {
@@ -195,6 +240,8 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 else -> RepeatMode.OFF
             },
             shuffle = c.shuffleModeEnabled,
+            provider = item?.mediaMetadata?.extras?.getString("provider")
+                ?.let { name -> ProviderId.entries.firstOrNull { it.name == name } },
         )
     }
 }
