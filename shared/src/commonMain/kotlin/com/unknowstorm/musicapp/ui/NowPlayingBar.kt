@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -70,7 +71,11 @@ fun NowPlayingBar(audio: AudioBackend, onOpen: () -> Unit, modifier: Modifier = 
                     onClick = { if (showPause) audio.pause() else audio.resume() },
                     modifier = Modifier.size(40.dp),
                 ) {
-                    PlayPauseIcon(showPause)
+                    if (rememberDelayedBuffering(state.isBuffering)) {
+                        CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                    } else {
+                        PlayPauseIcon(showPause)
+                    }
                 }
                 IconButton(
                     onClick = { audio.next() },

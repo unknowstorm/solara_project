@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.RepeatMode
 
@@ -113,7 +116,7 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
                     ) {
                         // Временный значок: потом заменим логотипом сервиса
                         Box(contentAlignment = Alignment.Center) {
-                            Text("J", style = MaterialTheme.typography.labelLarge)
+                            ServiceLogo(state.provider?.toService(), Modifier.size(20.dp))
                         }
                     }
                 }
@@ -199,7 +202,15 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
                     onClick = { if (showPause) audio.pause() else audio.resume() },
                     modifier = Modifier.size(80.dp),
                 ) {
-                    PlayPauseIcon(showPause, Modifier.size(40.dp))
+                    if (rememberDelayedBuffering(state.isBuffering)) {
+                        CircularProgressIndicator(
+                            Modifier.size(32.dp),
+                            color = LocalContentColor.current,
+                            strokeWidth = 3.dp,
+                        )
+                    } else {
+                        PlayPauseIcon(showPause, Modifier.size(40.dp))
+                    }
                 }
                 IconButton(onClick = { audio.next() }, enabled = state.hasNext, modifier = Modifier.size(56.dp)) {
                     SkipIcon(next = true, modifier = Modifier.size(32.dp))
@@ -213,7 +224,7 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
             onDismissRequest = { showDetails = false },
             confirmButton = { TextButton(onClick = { showDetails = false }) { Text("Закрыть") } },
             title = { Text(state.title ?: "") },
-            text = { Text("Исполнитель: ${state.artist ?: "—"}\nИсточник: Jamendo") },
+            text = { Text("Исполнитель: ${state.artist ?: "—"}\nИсточник: ${state.provider?.toService()?.title ?: "—"}") },
         )
     }
 }

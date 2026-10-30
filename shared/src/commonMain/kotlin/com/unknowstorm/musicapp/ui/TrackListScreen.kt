@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.player.AudioBackend
+import com.unknowstorm.musicapp.player.DeadTracks
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -38,6 +39,7 @@ fun TrackListScreen(providers: List<MusicProvider>, sourceName: String, audio: A
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val playback by audio.state.collectAsState()
+    val visible = tracks.filterNot { DeadTracks.isDead(it) }
 
     LaunchedEffect(query, providers) {
         delay(400)
@@ -76,7 +78,7 @@ fun TrackListScreen(providers: List<MusicProvider>, sourceName: String, audio: A
             )
         }
 
-        if (!loading && error == null && tracks.isEmpty()) {
+        if (!loading && error == null && visible.isEmpty()) {
             Text(
                 text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -84,21 +86,21 @@ fun TrackListScreen(providers: List<MusicProvider>, sourceName: String, audio: A
         }
 
         LazyColumn(Modifier.weight(1f)) {
-            items(tracks, key = { "${it.provider}:${it.id}" }) { track ->
+            items(visible, key = { "${it.provider}:${it.id}" }) { track ->
                 ListItem(
-                    leadingContent = { CoverImage(track.artworkUrl, Modifier.size(52.dp)) },
+                    leadingContent = { TrackCover(track, Modifier.size(52.dp), badge = providers.size > 1, badgeSize = 18.dp) },
                     headlineContent = { Text(track.title, maxLines = 1) },
                     supportingContent = { Text(track.artist, maxLines = 1) },
                     trailingContent = { Text(formatDuration(track.durationMs)) },
                     colors = ListItemDefaults.colors(
-                        containerColor = if (playback.mediaId == track.id) {
+                        containerColor = if (playback.mediaId == track.id && playback.provider == track.provider) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
                             MaterialTheme.colorScheme.surface
                         }
                     ),
                     modifier = Modifier.clickable {
-                        val playable = tracks.filter { !it.streamUrl.isNullOrBlank() }
+                        val playable = visible.filter { !it.streamUrl.isNullOrBlank() }
                         val index = playable.indexOfFirst { it.id == track.id }
                         if (index >= 0) audio.playQueue(playable, index)
                     }

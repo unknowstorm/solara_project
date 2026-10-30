@@ -21,3 +21,6 @@ enum class Service(
     YOUTUBE("YouTube", PlaybackKind.EMBEDDED, false, "Режим видео, без фонового воспроизведения"),
     DEEZER("Deezer", PlaybackKind.PREVIEW, false, "Каталог и 30-секундные превью"),
 }
+
+/** Источник трека как значок/чип интерфейса. */
+fun ProviderId.toService(): Service? = Service.entries.firstOrNull { it.name == name }

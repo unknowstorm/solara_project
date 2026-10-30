@@ -1,6 +1,7 @@
 package com.unknowstorm.musicapp.player
 
 import androidx.compose.runtime.Composable
+import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,6 +21,7 @@ data class PlaybackState(
     val hasPrevious: Boolean = false,
     val repeatMode: RepeatMode = RepeatMode.OFF,
     val shuffle: Boolean = false,
+    val provider: ProviderId? = null,
 )
 
 /** Воспроизведение звука. На каждой платформе своя реализация. */

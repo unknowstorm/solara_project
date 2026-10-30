@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,12 +29,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.player.AudioBackend
+import com.unknowstorm.musicapp.player.DeadTracks
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -106,6 +112,30 @@ class HomeFeed(
     }
 }
 
+private data class FeedRow(val key: String, val title: String, val service: Service?, val tracks: List<Track>)
+
+private fun <T> roundRobin(lists: List<List<T>>): List<T> {
+    val result = mutableListOf<T>()
+    val longest = lists.maxOfOrNull { it.size } ?: 0
+    for (i in 0 until longest) {
+        for (list in lists) list.getOrNull(i)?.let(result::add)
+    }
+    return result
+}
+
+/** Собирает ряды главной. На вкладке «Все» источники чередуются, а сверху идёт общий микс. */
+private fun buildRows(feeds: List<HomeFeed>, mixed: Boolean): List<FeedRow> {
+    val perFeed = feeds.map { feed ->
+        feed.sections.map { FeedRow("${feed.service.name}:${it.title}", it.title, feed.service, it.tracks.filterNot { t -> DeadTracks.isDead(t) }) }
+    }
+    val rows = roundRobin(perFeed)
+    if (!mixed) return rows
+    val firstRows = perFeed.mapNotNull { it.firstOrNull() }
+    if (firstRows.size < 2) return rows
+    val mix = roundRobin(firstRows.map { it.tracks }).take(16)
+    return listOf(FeedRow("mix", "Микс из всех источников", Service.ALL, mix)) + rows
+}
+
 @Composable
 fun HomeScreen(
     feeds: List<HomeFeed>,
@@ -115,6 +145,8 @@ fun HomeScreen(
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
+    val mixed = service == Service.ALL
+    val rows = buildRows(feeds, mixed)
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         ServiceTray(service, onServiceChange, Modifier.padding(vertical = 8.dp))
@@ -143,36 +175,46 @@ fun HomeScreen(
                         }
                     }
                 }
-                feed.sections.forEach { section ->
-                    val label = if (feeds.size > 1) "${feed.service.title} · ${section.title}" else section.title
-                    val key = "${feed.service.name}:${section.title}"
-                    item(key = "label:$key") {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
-                        )
-                    }
-                    item(key = "row:$key") {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            items(section.tracks, key = { "${it.provider}:${it.id}" }) { track ->
-                                TrackCard(track) {
-                                    audio.playQueue(section.tracks, section.tracks.indexOf(track))
-                                }
+            }
+            rows.forEach { row ->
+                item(key = "label:${row.key}") { RowLabel(row, mixed) }
+                item(key = "row:${row.key}") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(row.tracks, key = { "${it.provider}:${it.id}" }) { track ->
+                            TrackCard(track, showBadge = mixed) {
+                                audio.playQueue(row.tracks, row.tracks.indexOf(track))
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
                     }
+                    Spacer(Modifier.height(12.dp))
                 }
             }
 
             item { SectionTitle("Ваши плейлисты") }
             item { HintCard("Плейлисты появятся вместе с аккаунтом. Это следующий этап.") }
         }
+    }
+}
+
+@Composable
+private fun RowLabel(row: FeedRow, withService: Boolean) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (withService && row.service != null) {
+            ServiceLogo(row.service, Modifier.size(16.dp), color)
+            Spacer(Modifier.width(6.dp))
+        }
+        val prefix = row.service
+            ?.takeIf { withService && it != Service.ALL }
+            ?.let { "${it.title} · " }
+            ?: ""
+        Text(prefix + row.title, style = MaterialTheme.typography.labelLarge, color = color)
     }
 }
 
@@ -187,16 +229,23 @@ private fun ServiceTray(selected: Service, onSelect: (Service) -> Unit, modifier
             FilterChip(
                 selected = service == selected,
                 onClick = { onSelect(service) },
-                label = { Text(if (service.ready) service.title else "${service.title} · скоро") },
+                label = {
+                    ServiceLogo(
+                        service,
+                        Modifier.padding(horizontal = 4.dp).size(22.dp),
+                        LocalContentColor.current.copy(alpha = if (service.ready) 1f else 0.45f),
+                    )
+                },
+                modifier = Modifier.semantics { contentDescription = service.title },
             )
         }
     }
 }
 
 @Composable
-private fun TrackCard(track: Track, onClick: () -> Unit) {
+private fun TrackCard(track: Track, showBadge: Boolean, onClick: () -> Unit) {
     Column(Modifier.width(132.dp).clickable(onClick = onClick)) {
-        CoverImage(track.artworkUrl, Modifier.size(132.dp))
+        TrackCover(track, Modifier.size(132.dp), badge = showBadge, badgeSize = 24.dp)
         Spacer(Modifier.height(6.dp))
         Text(
             track.title,
