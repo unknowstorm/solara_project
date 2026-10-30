@@ -1,6 +1,14 @@
 package com.unknowstorm.musicapp.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,18 +22,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,26 +42,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import kotlinx.coroutines.launch
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +62,8 @@ import coil3.compose.AsyncImage
 import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.RepeatMode
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -72,8 +74,15 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
     var liked by remember(state.mediaId) { mutableStateOf(false) } // пока только визуально
     var showDetails by remember { mutableStateOf(false) }
 
-    // Наклон обложки: tiltX/tiltY от -1 до 1 (положение пальца), press от 0 до 1 (удержание)
+    // Анимации для свайпа (сдвиг, уменьшение, прозрачность)
+    val offsetY = remember { Animatable(0f) }
+    val scale = remember { Animatable(1f) }
+    val alpha = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
+
+    // Наклон обложки: tiltX/tiltY от -1 до 1, press от 0 до 1
+    // Активируется только после долгого нажатия (1.5 сек)
+    var isTilting by remember { mutableStateOf(false) }
     val tiltX = remember { Animatable(0f) }
     val tiltY = remember { Animatable(0f) }
     val press = remember { Animatable(0f) }
@@ -95,11 +104,59 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
     val inactive = MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
-        Modifier.fillMaxSize()
+        Modifier
+            .fillMaxSize()
+            // Применяем и сдвиг вниз, и уменьшение размера, и прозрачность
+            .graphicsLayer {
+                translationY = offsetY.value
+                scaleX = scale.value
+                scaleY = scale.value
+                this.alpha = alpha.value
+            }
             .background(MaterialTheme.colorScheme.background)
             // Не пускаем касания к списку под плеером
             .pointerInput(Unit) { detectTapGestures { } }
+            // Свайп вниз для закрытия
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (offsetY.value > 150f) {
+                            scope.launch {
+                                // Плавно уезжаем вниз, уменьшаемся и растворяемся
+                                launch { offsetY.animateTo(1000f, tween(300)) }
+                                launch { scale.animateTo(0.5f, tween(300)) }
+                                launch { alpha.animateTo(0f, tween(300)) }
+                                // Ждем завершения анимации и закрываем
+                                delay(300)
+                                onClose()
+                                // Возвращаем значения (на случай повторного открытия)
+                                offsetY.snapTo(0f)
+                                scale.snapTo(1f)
+                                alpha.snapTo(1f)
+                            }
+                        } else {
+                            // Пружина возвращает всё на место
+                            scope.launch { offsetY.animateTo(0f, spring()) }
+                            scope.launch { scale.animateTo(1f, spring()) }
+                            scope.launch { alpha.animateTo(1f, spring()) }
+                        }
+                    },
+                    onVerticalDrag = { _, dragAmount ->
+                        if (dragAmount > 0 || offsetY.value > 0) {
+                            scope.launch {
+                                offsetY.snapTo(offsetY.value + dragAmount)
+                                // Уменьшаем и делаем прозрачнее в зависимости от сдвига
+                                val newScale = (1f - (offsetY.value / 2000f)).coerceIn(0.5f, 1f)
+                                val newAlpha = (1f - (offsetY.value / 1000f)).coerceIn(0f, 1f)
+                                scale.snapTo(newScale)
+                                alpha.snapTo(newAlpha)
+                            }
+                        }
+                    }
+                )
+            }
     ) {
+        // Размытый фон
         RetryAsyncImage(
             url = state.artworkUrl,
             contentScale = ContentScale.Crop,
@@ -108,9 +165,7 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
                 .graphicsLayer {
                     scaleX = 1.15f
                     scaleY = 1.15f
-                    translationX = -tiltX.value * 18.dp.toPx()
-                    translationY = -tiltY.value * 18.dp.toPx()
-                    alpha = 0.5f + 0.12f * press.value
+                    this.alpha = 0.5f
                 }
                 .blur(48.dp),
         )
@@ -123,42 +178,47 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onClose) { ChevronDownIcon() }
-                Text(
-                    "Сейчас играет",
-                    style = MaterialTheme.typography.labelLarge,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.size(48.dp))
+            // Ручка для свайпа
+            Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.width(40.dp).height(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)))
             }
 
-            // Обложка по макету: квадрат, в углу значок сервиса
+            Spacer(Modifier.height(12.dp))
+
+            // Обложка по макету: квадрат, в углу кружок "J"
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier
                         .aspectRatio(1f)
                         // pointerInput стоит до graphicsLayer, чтобы координаты не искажались поворотом
                         .pointerInput(Unit) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                fun follow(pos: Offset) {
-                                    val nx = (pos.x / size.width * 2f - 1f).coerceIn(-1f, 1f)
-                                    val ny = (pos.y / size.height * 2f - 1f).coerceIn(-1f, 1f)
-                                    scope.launch { tiltX.animateTo(nx, followSpec) }
-                                    scope.launch { tiltY.animateTo(ny, followSpec) }
+                            // Долгое нажатие для активации наклона
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    isTilting = true
+                                    scope.launch { press.animateTo(1f, followSpec) }
+                                },
+                                onDragEnd = {
+                                    isTilting = false
+                                    scope.launch { press.animateTo(0f, releaseSpec) }
+                                    scope.launch { tiltX.animateTo(0f, releaseSpec) }
+                                    scope.launch { tiltY.animateTo(0f, releaseSpec) }
+                                },
+                                onDragCancel = {
+                                    isTilting = false
+                                    scope.launch { press.animateTo(0f, releaseSpec) }
+                                    scope.launch { tiltX.animateTo(0f, releaseSpec) }
+                                    scope.launch { tiltY.animateTo(0f, releaseSpec) }
+                                },
+                                onDrag = { change, _ ->
+                                    if (isTilting) {
+                                        val nx = (change.position.x / size.width * 2f - 1f).coerceIn(-1f, 1f)
+                                        val ny = (change.position.y / size.height * 2f - 1f).coerceIn(-1f, 1f)
+                                        scope.launch { tiltX.animateTo(nx, followSpec) }
+                                        scope.launch { tiltY.animateTo(ny, followSpec) }
+                                    }
                                 }
-                                scope.launch { press.animateTo(1f, followSpec) }
-                                follow(down.position)
-                                do {
-                                    val event = awaitPointerEvent()
-                                    event.changes.firstOrNull()?.let { follow(it.position) }
-                                } while (event.changes.any { it.pressed })
-                                scope.launch { press.animateTo(0f, releaseSpec) }
-                                scope.launch { tiltX.animateTo(0f, releaseSpec) }
-                                scope.launch { tiltY.animateTo(0f, releaseSpec) }
-                            }
+                            )
                         }
                         .graphicsLayer {
                             rotationY = tiltX.value * 10f
@@ -171,33 +231,37 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
                 ) {
                     CoverImage(state.artworkUrl, Modifier.fillMaxSize(), RoundedCornerShape(28.dp))
                     Canvas(Modifier.fillMaxSize().clip(RoundedCornerShape(28.dp))) {
-                        // Блик уходит на сторону, противоположную пальцу, как отражение света
-                        val center = Offset(
-                            size.width * (1f - tiltX.value) / 2f,
-                            size.height * (1f - tiltY.value) / 2f,
-                        )
-                        drawRect(
-                            Brush.radialGradient(
-                                colors = listOf(Color.White.copy(alpha = 0.32f * press.value), Color.Transparent),
-                                center = center,
-                                radius = size.minDimension * 0.75f,
+                        // Блик уходит на сторону, противоположную пальцу
+                        if (press.value > 0f) {
+                            val center = Offset(
+                                size.width * (1f - tiltX.value) / 2f,
+                                size.height * (1f - tiltY.value) / 2f,
                             )
-                        )
-                    }
-                    Surface(
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(36.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                    ) {
-                        // Временный значок: потом заменим логотипом сервиса
-                        Box(contentAlignment = Alignment.Center) {
-                            ServiceLogo(state.provider?.toService(), Modifier.size(20.dp))
+                            drawRect(
+                                Brush.radialGradient(
+                                    colors = listOf(Color.White.copy(alpha = 0.32f * press.value), Color.Transparent),
+                                    center = center,
+                                    radius = size.minDimension * 0.75f,
+                                )
+                            )
                         }
+                    }
+                    // Кружок с буквой "J" (заглушка аккаунта)
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("J", color = Color.White, style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 state.title ?: "",
                 style = MaterialTheme.typography.headlineSmall,
@@ -229,9 +293,6 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
                 Row {
                     IconButton(onClick = { liked = !liked }) {
                         HeartIcon(liked, tint = if (liked) active else inactive)
-                    }
-                    IconButton(onClick = { audio.toggleShuffle() }) {
-                        ShuffleIcon(tint = if (state.shuffle) active else inactive)
                     }
                     IconButton(onClick = { audio.cycleRepeat() }) {
                         RepeatIcon(

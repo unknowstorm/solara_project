@@ -1,7 +1,10 @@
 package com.unknowstorm.musicapp.ui
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,7 +19,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -31,12 +37,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.Track
+import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.DeadTracks
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -45,6 +56,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+
+// --- ВАШИ СУЩЕСТВУЮЩИЕ КЛАССЫ И ФУНКЦИИ (БЕЗ ИЗМЕНЕНИЙ) ---
 
 data class FeedSection(val title: String, val tracks: List<Track>)
 
@@ -136,6 +149,8 @@ private fun buildRows(feeds: List<HomeFeed>, mixed: Boolean): List<FeedRow> {
     return listOf(FeedRow("mix", "Микс из всех источников", Service.ALL, mix)) + rows
 }
 
+// --- ОБНОВЛЕННЫЙ HOME SCREEN ---
+
 @Composable
 fun HomeScreen(
     feeds: List<HomeFeed>,
@@ -149,7 +164,8 @@ fun HomeScreen(
     val rows = buildRows(feeds, mixed)
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        ServiceTray(service, onServiceChange, Modifier.padding(vertical = 8.dp))
+        // Новый верхний бар
+        TopBar(service, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
 
         if (!service.ready) {
             HintCard("${service.title} скоро появится. ${service.note}.")
@@ -157,14 +173,28 @@ fun HomeScreen(
         }
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-            item { SectionTitle("Вы лайкнули") }
+            // Секция "Вы лайкнули" с кнопкой фильтра
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
+                    IconButton(
+                        onClick = { /* TODO: Открыть экран лайков */ },
+                        modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        QueueIcon(Modifier.size(18.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             item { HintCard("Здесь появятся ваши лайки. Они заработают после входа в аккаунт.") }
 
+            // Подборки
             item { SectionTitle("Подборки для вас") }
             if (feeds.any { it.loading }) {
-                item {
-                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-                }
+                item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
             }
             feeds.forEach { feed ->
                 feed.error?.let { message ->
@@ -184,7 +214,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(row.tracks, key = { "${it.provider}:${it.id}" }) { track ->
-                            TrackCard(track, showBadge = mixed) {
+                            HomeTrackCard(track, showBadge = mixed) {
                                 audio.playQueue(row.tracks, row.tracks.indexOf(track))
                             }
                         }
@@ -193,11 +223,110 @@ fun HomeScreen(
                 }
             }
 
+            // Плейлисты
             item { SectionTitle("Ваши плейлисты") }
-            item { HintCard("Плейлисты появятся вместе с аккаунтом. Это следующий этап.") }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(4) { index ->
+                        val colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            MaterialTheme.colorScheme.tertiaryContainer,
+                            MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        PlaylistCard("Плейлист", colors[index % colors.size])
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }
+
+// --- НОВЫЕ КОМПОНЕНТЫ ---
+
+@Composable
+fun TopBar(selected: Service, onSelect: (Service) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = { onSelect(Service.ALL) },
+            modifier = Modifier.clip(CircleShape).background(if (selected == Service.ALL) MaterialTheme.colorScheme.primary else Color.Transparent)
+        ) {
+            GlobeIcon(Modifier.size(22.dp), if (selected == Service.ALL) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        IconButton(
+            onClick = { onSelect(Service.JAMENDO) },
+            modifier = Modifier.clip(CircleShape).background(if (selected == Service.JAMENDO) MaterialTheme.colorScheme.primary else Color.Transparent)
+        ) {
+            ServiceLogo(Service.JAMENDO, Modifier.size(22.dp), if (selected == Service.JAMENDO) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        IconButton(
+            onClick = { onSelect(Service.AUDIUS) },
+            modifier = Modifier.clip(CircleShape).background(if (selected == Service.AUDIUS) MaterialTheme.colorScheme.primary else Color.Transparent)
+        ) {
+            ServiceLogo(Service.AUDIUS, Modifier.size(22.dp), if (selected == Service.AUDIUS) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+
+        IconButton(onClick = { /* TODO: Добавить сервис */ }) {
+            AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun HomeTrackCard(track: Track, showBadge: Boolean, onClick: () -> Unit) {
+    Column(Modifier.width(120.dp).clickable(onClick = onClick)) {
+        Box(Modifier.size(120.dp).clip(RoundedCornerShape(16.dp))) {
+            CoverImage(track.artworkUrl, Modifier.fillMaxSize(), RoundedCornerShape(16.dp))
+            if (showBadge) {
+                ServiceBadge(track.provider.toService(), Modifier.align(Alignment.BottomEnd).padding(6.dp), 20.dp)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(track.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+fun PlaylistCard(title: String, color: Color) {
+    Box(
+        modifier = Modifier
+            .size(90.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(color)
+            .padding(12.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+fun AddIcon(modifier: Modifier = Modifier, tint: Color) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = w * 0.1f
+        drawLine(tint, Offset(w * 0.2f, h * 0.5f), Offset(w * 0.8f, h * 0.5f), stroke, StrokeCap.Round)
+        drawLine(tint, Offset(w * 0.5f, h * 0.2f), Offset(w * 0.5f, h * 0.8f), stroke, StrokeCap.Round)
+    }
+}
+
+// --- ВАШИ СУЩЕСТВУЮЩИЕ КОМПОНЕНТЫ (БЕЗ ИЗМЕНЕНИЙ) ---
 
 @Composable
 private fun RowLabel(row: FeedRow, withService: Boolean) {
@@ -239,27 +368,6 @@ fun ServiceTray(selected: Service, onSelect: (Service) -> Unit, modifier: Modifi
                 modifier = Modifier.semantics { contentDescription = service.title },
             )
         }
-    }
-}
-
-@Composable
-private fun TrackCard(track: Track, showBadge: Boolean, onClick: () -> Unit) {
-    Column(Modifier.width(132.dp).clickable(onClick = onClick)) {
-        TrackCover(track, Modifier.size(132.dp), badge = showBadge, badgeSize = 24.dp)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            track.title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            track.artist,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 

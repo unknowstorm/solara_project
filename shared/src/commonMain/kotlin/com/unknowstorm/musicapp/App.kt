@@ -1,6 +1,7 @@
 package com.unknowstorm.musicapp
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -50,10 +51,17 @@ fun App() {
                 MainScreen(providers, audio, onOpenPlayer = { showPlayer = true })
                 AnimatedVisibility(
                     visible = showPlayer,
+                    // Появление: выезжает снизу вверх
                     enter = slideInVertically { it },
-                    exit = slideOutVertically { it },
+                    // Исчезновение: PlayerScreen сам анимирует свайп вниз и вызывает onClose.
+                    // Здесь мы просто убираем его из композиции без дополнительной анимации,
+                    // чтобы не было "двойного" уезда.
+                    exit = ExitTransition.None,
                 ) {
-                    PlayerScreen(audio, onClose = { showPlayer = false })
+                    PlayerScreen(
+                        audio = audio,
+                        onClose = { showPlayer = false }
+                    )
                 }
                 AnimatedVisibility(visible = showSplash, exit = fadeOut(tween(400))) {
                     SplashScreen()
