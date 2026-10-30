@@ -27,8 +27,8 @@ android {
         applicationId = "com.unknowstorm.musicapp"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "0.5"
+        versionCode = 4
+        versionName = "0.6-home"
     }
     packaging {
         resources {

@@ -32,7 +32,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 @Composable
-fun TrackListScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: () -> Unit) {
+fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
     var query by remember { mutableStateOf("") }
     var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
@@ -106,7 +106,6 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: 
             }
         }
 
-        NowPlayingBar(audio, onOpenPlayer, Modifier.padding(8.dp).navigationBarsPadding())
     }
 }
 
