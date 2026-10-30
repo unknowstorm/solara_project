@@ -42,16 +42,31 @@ import kotlinx.coroutines.launch
 
 data class FeedSection(val title: String, val tracks: List<Track>)
 
-// Пока «подборки для вас» это поиск по жанрам Jamendo
-private val MIXES = listOf(
-    "Для расслабления" to "chillout",
-    "Электроника" to "electronic",
-    "Рок" to "rock",
-    "Поп" to "pop",
-)
+/** Подборки источника: заголовок и поисковый запрос (пустой запрос = популярное). */
+fun defaultMixes(service: Service): List<Pair<String, String>> = when (service) {
+    Service.JAMENDO -> listOf(
+        "Популярное" to "",
+        "Для расслабления" to "chillout",
+        "Электроника" to "electronic",
+        "Рок" to "rock",
+        "Поп" to "pop",
+    )
+    Service.AUDIUS -> listOf(
+        "Популярное" to "",
+        "Электроника" to "electronic",
+        "Рок" to "rock",
+        "Хип-хоп" to "hip hop",
+        "Лоу-фай" to "lofi",
+    )
+    else -> emptyList()
+}
 
-/** Лента главного экрана. Живёт на уровне MainScreen, чтобы не грузиться заново при смене вкладок. */
-class HomeFeed(private val provider: MusicProvider) {
+/** Лента одного источника. Живёт на уровне MainScreen, чтобы не грузиться заново при смене вкладок. */
+class HomeFeed(
+    val service: Service,
+    private val provider: MusicProvider,
+    private val mixes: List<Pair<String, String>>,
+) {
     var sections by mutableStateOf<List<FeedSection>>(emptyList())
         private set
     var loading by mutableStateOf(false)
@@ -67,16 +82,24 @@ class HomeFeed(private val provider: MusicProvider) {
         loading = true
         error = null
         try {
-            sections = coroutineScope {
-                MIXES.map { (title, query) ->
-                    async { FeedSection(title, provider.search(query).take(12)) }
+            var lastError: String? = null
+            val loaded = coroutineScope {
+                mixes.map { (title, query) ->
+                    async {
+                        try {
+                            FeedSection(title, provider.search(query).take(12))
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            println("Solara: feed ${service.title}/$title failed: ${e.stackTraceToString()}")
+                            lastError = e.message
+                            null
+                        }
+                    }
                 }.awaitAll()
-            }.filter { it.tracks.isNotEmpty() }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            println("Solara: feed failed: ${e.stackTraceToString()}")
-            error = "Ошибка загрузки: ${e.message}"
+            }.filterNotNull().filter { it.tracks.isNotEmpty() }
+            sections = loaded
+            if (loaded.isEmpty() && lastError != null) error = "Ошибка загрузки: $lastError"
         } finally {
             loading = false
         }
@@ -85,13 +108,13 @@ class HomeFeed(private val provider: MusicProvider) {
 
 @Composable
 fun HomeScreen(
-    feed: HomeFeed,
+    feeds: List<HomeFeed>,
     service: Service,
     onServiceChange: (Service) -> Unit,
     audio: AudioBackend,
 ) {
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { feed.loadIfNeeded() }
+    LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         ServiceTray(service, onServiceChange, Modifier.padding(vertical = 8.dp))
@@ -106,40 +129,44 @@ fun HomeScreen(
             item { HintCard("Здесь появятся ваши лайки. Они заработают после входа в аккаунт.") }
 
             item { SectionTitle("Подборки для вас") }
-            if (feed.loading) {
+            if (feeds.any { it.loading }) {
                 item {
                     LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                 }
             }
-            feed.error?.let { message ->
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        Text(message, color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { scope.launch { feed.load() } }) { Text("Повторить") }
-                    }
-                }
-            }
-            feed.sections.forEach { section ->
-                item(key = "label:${section.title}") {
-                    Text(
-                        section.title,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
-                    )
-                }
-                item(key = "row:${section.title}") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(section.tracks, key = { "${it.provider}:${it.id}" }) { track ->
-                            TrackCard(track) {
-                                audio.playQueue(section.tracks, section.tracks.indexOf(track))
-                            }
+            feeds.forEach { feed ->
+                feed.error?.let { message ->
+                    item(key = "error:${feed.service.name}") {
+                        Column(Modifier.padding(horizontal = 16.dp)) {
+                            Text("${feed.service.title}: $message", color = MaterialTheme.colorScheme.error)
+                            TextButton(onClick = { scope.launch { feed.load() } }) { Text("Повторить") }
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+                }
+                feed.sections.forEach { section ->
+                    val label = if (feeds.size > 1) "${feed.service.title} · ${section.title}" else section.title
+                    val key = "${feed.service.name}:${section.title}"
+                    item(key = "label:$key") {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
+                        )
+                    }
+                    item(key = "row:$key") {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(section.tracks, key = { "${it.provider}:${it.id}" }) { track ->
+                                TrackCard(track) {
+                                    audio.playQueue(section.tracks, section.tracks.indexOf(track))
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
             }
 

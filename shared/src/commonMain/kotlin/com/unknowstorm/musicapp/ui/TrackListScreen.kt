@@ -32,19 +32,19 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
 @Composable
-fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
+fun TrackListScreen(providers: List<MusicProvider>, sourceName: String, audio: AudioBackend) {
     var query by remember { mutableStateOf("") }
     var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val playback by audio.state.collectAsState()
 
-    LaunchedEffect(query) {
+    LaunchedEffect(query, providers) {
         delay(400)
         loading = true
         error = null
         try {
-            tracks = provider.search(query)
+            tracks = searchAll(providers, query)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -59,7 +59,7 @@ fun TrackListScreen(provider: MusicProvider, audio: AudioBackend) {
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Поиск (Jamendo)") },
+            label = { Text("Поиск ($sourceName)") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         )

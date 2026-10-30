@@ -32,16 +32,32 @@ enum class Tab(val label: String) {
 }
 
 @Composable
-fun MainScreen(provider: MusicProvider, audio: AudioBackend, onOpenPlayer: () -> Unit) {
+fun MainScreen(providers: List<MusicProvider>, audio: AudioBackend, onOpenPlayer: () -> Unit) {
     var tab by remember { mutableStateOf(Tab.HOME) }
     var service by remember { mutableStateOf(Service.ALL) }
-    val feed = remember(provider) { HomeFeed(provider) }
+
+    // Источник сопоставляется с чипом по имени: ProviderId.JAMENDO <-> Service.JAMENDO
+    val feeds = remember(providers) {
+        providers.mapNotNull { provider ->
+            val s = Service.entries.firstOrNull { it.name == provider.id.toString() }
+            s?.let { HomeFeed(it, provider, defaultMixes(it)) }
+        }
+    }
+    val shownFeeds = remember(feeds, service) {
+        if (service == Service.ALL) feeds else feeds.filter { it.service == service }
+    }
+    val searchProviders = remember(providers, service) {
+        providers.filter { service == Service.ALL || it.id.toString() == service.name }
+            .ifEmpty { providers }
+    }
+    val searchLabel = if (searchProviders.size == 1) searchProviders.first().id.toString().lowercase()
+        .replaceFirstChar { it.uppercase() } else "все источники"
 
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
-                Tab.HOME -> HomeScreen(feed, service, { service = it }, audio)
-                Tab.SEARCH -> TrackListScreen(provider, audio)
+                Tab.HOME -> HomeScreen(shownFeeds, service, { service = it }, audio)
+                Tab.SEARCH -> TrackListScreen(searchProviders, searchLabel, audio)
                 Tab.QUEUE -> InfoScreen(
                     "Очередь",
                     "Здесь будет текущая очередь: удаление треков, шафл и повтор списка. Следующий этап.",

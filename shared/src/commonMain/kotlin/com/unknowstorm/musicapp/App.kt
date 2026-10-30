@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import com.unknowstorm.musicapp.player.rememberAudioBackend
+import com.unknowstorm.musicapp.provider.MusicProvider
+import com.unknowstorm.musicapp.provider.audius.AudiusProvider
 import com.unknowstorm.musicapp.provider.jamendo.JamendoProvider
 import com.unknowstorm.musicapp.theme.SolaraTheme
 import com.unknowstorm.musicapp.ui.PlayerScreen
@@ -28,7 +30,12 @@ import kotlinx.coroutines.delay
 fun App() {
     SolaraTheme {
         Surface(Modifier.fillMaxSize()) {
-            val provider = remember { JamendoProvider(Secrets.JAMENDO_CLIENT_ID) }
+            val providers = remember {
+                listOf<MusicProvider>(
+                    JamendoProvider(Secrets.JAMENDO_CLIENT_ID),
+                    AudiusProvider(Secrets.AUDIUS_API_KEY),
+                )
+            }
             val audio = rememberAudioBackend()
             var showSplash by remember { mutableStateOf(true) }
             var showPlayer by remember { mutableStateOf(false) }
@@ -40,7 +47,7 @@ fun App() {
                 showSplash = false
             }
             Box(Modifier.fillMaxSize()) {
-                MainScreen(provider, audio, onOpenPlayer = { showPlayer = true })
+                MainScreen(providers, audio, onOpenPlayer = { showPlayer = true })
                 AnimatedVisibility(
                     visible = showPlayer,
                     enter = slideInVertically { it },
