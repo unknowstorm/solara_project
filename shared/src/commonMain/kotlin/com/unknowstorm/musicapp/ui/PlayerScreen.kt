@@ -79,9 +79,8 @@ fun PlayerScreen(audio: AudioBackend, onClose: () -> Unit) {
             // Не пускаем касания к списку под плеером
             .pointerInput(Unit) { detectTapGestures { } }
     ) {
-        AsyncImage(
-            model = state.artworkUrl,
-            contentDescription = null,
+        RetryAsyncImage(
+            url = state.artworkUrl,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().blur(48.dp).alpha(0.5f),
         )

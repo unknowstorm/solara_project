@@ -26,4 +26,4 @@ fun rememberDelayedFlag(value: Boolean, delayMs: Long = 900, resetKey: Any? = nu
 }
 
 /** Через сколько миллисекунд буферизации показывать спиннер. Меняйте здесь. */
-const val SPINNER_DELAY_MS = 2000L
+const val SPINNER_DELAY_MS = 3000L
