@@ -4,6 +4,7 @@ import com.unknowstorm.musicapp.Secrets
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.storage.Storage
 
 const val AUTH_SCHEME = "solara"
 const val AUTH_HOST = "auth"
@@ -16,5 +17,6 @@ val supabase by lazy {
             host = AUTH_HOST
         }
         install(Postgrest)
+        install(Storage)
     }
 }

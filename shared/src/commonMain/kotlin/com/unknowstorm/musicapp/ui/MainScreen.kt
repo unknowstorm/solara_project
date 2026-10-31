@@ -16,7 +16,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.auth.AuthRepository
+import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -126,6 +129,16 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         Spacer(Modifier.height(16.dp))
 
         AccountBlock(authRepo, onOpenAuth)
+
+        // Кнопка смены пароля: только для вошедшего пользователя
+        val authState by authRepo.state.collectAsState()
+        var showChangePassword by remember { mutableStateOf(false) }
+        if (authState is AuthState.SignedIn) {
+            TextButton(onClick = { showChangePassword = true }) { Text("Сменить пароль") }
+        }
+        if (showChangePassword) {
+            ChangePasswordDialog(repo = authRepo, onDismiss = { showChangePassword = false })
+        }
         Spacer(Modifier.height(24.dp))
 
         Text("Источники музыки", style = MaterialTheme.typography.titleMedium)
