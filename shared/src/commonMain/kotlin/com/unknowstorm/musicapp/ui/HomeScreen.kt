@@ -77,6 +77,13 @@ fun defaultMixes(service: Service): List<Pair<String, String>> = when (service) 
         "Хип-хоп" to "hip hop",
         "Лоу-фай" to "lofi",
     )
+    Service.DEEZER -> listOf(
+        "Чарт" to "",
+        "Электроника" to "electronic",
+        "Рок" to "rock",
+        "Поп" to "pop",
+        "Хип-хоп" to "hip hop",
+    )
     else -> emptyList()
 }
 
@@ -250,6 +257,9 @@ fun HomeScreen(
 
 @Composable
 fun TopBar(selected: Service, onSelect: (Service) -> Unit, modifier: Modifier = Modifier) {
+    val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val active = Service.entries.filter { it.ready }
+    val soon = Service.entries.filter { !it.ready }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -259,29 +269,42 @@ fun TopBar(selected: Service, onSelect: (Service) -> Unit, modifier: Modifier = 
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = { onSelect(Service.ALL) },
-            modifier = Modifier.clip(CircleShape).background(if (selected == Service.ALL) MaterialTheme.colorScheme.primary else Color.Transparent)
-        ) {
-            GlobeIcon(Modifier.size(22.dp), if (selected == Service.ALL) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+        active.forEach { service ->
+            val isSelected = selected == service
+            IconButton(
+                onClick = { onSelect(service) },
+                modifier = Modifier.clip(CircleShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            ) {
+                ServiceLogo(
+                    service,
+                    Modifier.size(22.dp),
+                    if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
-        IconButton(
-            onClick = { onSelect(Service.JAMENDO) },
-            modifier = Modifier.clip(CircleShape).background(if (selected == Service.JAMENDO) MaterialTheme.colorScheme.primary else Color.Transparent)
-        ) {
-            ServiceLogo(Service.JAMENDO, Modifier.size(22.dp), if (selected == Service.JAMENDO) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
-        IconButton(
-            onClick = { onSelect(Service.AUDIUS) },
-            modifier = Modifier.clip(CircleShape).background(if (selected == Service.AUDIUS) MaterialTheme.colorScheme.primary else Color.Transparent)
-        ) {
-            ServiceLogo(Service.AUDIUS, Modifier.size(22.dp), if (selected == Service.AUDIUS) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-
-        IconButton(onClick = { /* TODO: Добавить сервис */ }) {
-            AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        if (soon.isNotEmpty()) {
+            Box {
+                IconButton(onClick = { menuOpen.value = true }) {
+                    AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.DropdownMenu(
+                    expanded = menuOpen.value,
+                    onDismissRequest = { menuOpen.value = false },
+                ) {
+                    soon.forEach { service ->
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(service.title + " · скоро") },
+                            leadingIcon = { ServiceLogo(service, Modifier.size(20.dp)) },
+                            onClick = {
+                                menuOpen.value = false
+                                onSelect(service)
+                            },
+                        )
+                    }
+                }
+            }
         }
     }
 }

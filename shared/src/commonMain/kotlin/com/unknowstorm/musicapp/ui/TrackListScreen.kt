@@ -63,7 +63,12 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
         loading = true
         val fresh = mutableMapOf<ProviderId, SourceResult>()
         try {
-            val sources = sourceId?.let { setOf(it) } ?: emptySet()
+            // «Все» ищет только там, где играют полные треки; превью Deezer живут на своём чипе
+            val sources = sourceId?.let { setOf(it) }
+                ?: providers.filter { p ->
+                    Service.entries.firstOrNull { it.name == p.id.name }?.kind ==
+                        com.unknowstorm.musicapp.model.PlaybackKind.IN_APP
+                }.map { it.id }.toSet()
             hub.search(query, sources).collect { result ->
                 fresh[result.provider] = result
                 results = fresh.toMap() // новые треки появляются, как только ответил любой источник

@@ -42,6 +42,10 @@ class PlaybackService : MediaSessionService() {
                         ?: resolveRedirects(uri)?.also { resolvedUrls[key] = it }
                         ?: uri
                     spec.withUri(target)
+                } else if (uri.host.orEmpty().endsWith("dzcdn.net") &&
+                    uri.fragment.orEmpty().startsWith("deezer=")
+                ) {
+                    spec.withUri(DeezerPreview.fresh(uri) ?: uri)
                 } else {
                     spec
                 }
