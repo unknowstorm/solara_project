@@ -87,6 +87,7 @@ fun OnboardingScreen(
     repo: AuthRepository,
     profile: Profile,
     modifier: Modifier = Modifier,
+    onDone: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     var nick by remember { mutableStateOf(profile.username.orEmpty()) }
@@ -124,8 +125,13 @@ fun OnboardingScreen(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("Почта подтверждена", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text("Расскажи о себе", style = MaterialTheme.typography.headlineLarge)
+                if (onDone != null) {
+                    TextButton(onClick = onDone, enabled = !busy) { Text("← Назад") }
+                    Text("Профиль", style = MaterialTheme.typography.headlineLarge)
+                } else {
+                    Text("Почта подтверждена", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("Расскажи о себе", style = MaterialTheme.typography.headlineLarge)
+                }
 
                 // Аватарка: фото или первая буква ника на цвете палитры
                 Column(
@@ -208,6 +214,7 @@ fun OnboardingScreen(
                             }
                             // При успехе профиль помечается заполненным, и App сам закроет этот экран
                             repo.saveOnboarding(nick.trim(), avatarUpdate, syncPalette, services)
+                                .onSuccess { onDone?.invoke() }
                                 .onFailure { error = it.message }
                             busy = false
                         }
@@ -227,11 +234,13 @@ fun OnboardingScreen(
                     }
                 }
 
-                TextButton(
-                    onClick = { scope.launch { repo.signOut() } },
-                    enabled = !busy,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) { Text("Выйти из аккаунта") }
+                if (onDone == null) {
+                    TextButton(
+                        onClick = { scope.launch { repo.signOut() } },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) { Text("Выйти из аккаунта") }
+                }
             }
         }
     }

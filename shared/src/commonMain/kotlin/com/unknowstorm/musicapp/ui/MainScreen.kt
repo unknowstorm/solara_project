@@ -128,13 +128,24 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         Text("Настройки", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
 
-        AccountBlock(authRepo, onOpenAuth)
+        var editingProfile by remember { mutableStateOf(false) }
+        AccountBlock(authRepo, onOpenAuth, onEditProfile = { editingProfile = true })
 
         // Кнопка смены пароля: только для вошедшего пользователя
         val authState by authRepo.state.collectAsState()
         var showChangePassword by remember { mutableStateOf(false) }
         if (authState is AuthState.SignedIn) {
             TextButton(onClick = { showChangePassword = true }) { Text("Сменить пароль") }
+        }
+        val editProfile = (authState as? AuthState.SignedIn)?.profile
+        if (editingProfile && editProfile != null) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { editingProfile = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                PlatformBackHandler(onBack = { editingProfile = false })
+                OnboardingScreen(repo = authRepo, profile = editProfile, onDone = { editingProfile = false })
+            }
         }
         if (showChangePassword) {
             ChangePasswordDialog(repo = authRepo, onDismiss = { showChangePassword = false })
