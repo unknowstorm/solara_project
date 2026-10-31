@@ -19,7 +19,7 @@ enum class Service(
     AUDIUS("Audius", PlaybackKind.IN_APP, true, "Полные треки внутри приложения"),
     SPOTIFY("Spotify", PlaybackKind.REMOTE, false, "Пульт к приложению Spotify, нужен Premium"),
     YOUTUBE("YouTube", PlaybackKind.EMBEDDED, false, "Режим видео, без фонового воспроизведения"),
-    DEEZER("Deezer", PlaybackKind.PREVIEW, false, "Каталог и 30-секундные превью"),
+    DEEZER("Deezer", PlaybackKind.PREVIEW, true, "Каталог и 30-секундные превью"),
 }
 
 /** Источник трека как значок/чип интерфейса. */

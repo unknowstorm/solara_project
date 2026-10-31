@@ -57,7 +57,7 @@ fun MainScreen(
         }
     }
     val shownFeeds = remember(feeds, service) {
-        if (service == Service.ALL) feeds else feeds.filter { it.service == service }
+        if (service == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == service }
     }
 
     // Делаем фон колонки прозрачным (чтобы не было черных полос)
