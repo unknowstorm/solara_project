@@ -278,10 +278,10 @@ fun ExpandablePlayer(
                 }
                 // цвет: secondaryContainer -> surface (только палитра Material You, без блюра)
                 .drawBehind { drawRect(lerpColor(miniColor, fullColor, progress.floatValue)) }
+                // Вертикальный жест и в свёрнутом, и в развёрнутом виде:
+                // вниз сворачивает, вверх разворачивает вслед за пальцем
                 .then(
-                    if (expanded) {
-                        // Развёрнут: тянем вниз — плеер сворачивается вслед за пальцем
-                        Modifier.draggable(
+                    Modifier.draggable(
                             state = dragState,
                             orientation = Orientation.Vertical,
                             onDragStarted = {
@@ -301,6 +301,10 @@ fun ExpandablePlayer(
                                 onChange(target == 1f)
                             },
                         )
+                )
+                .then(
+                    if (expanded) {
+                        Modifier
                     } else {
                         // Свёрнут: свайп в сторону закрывает, тап разворачивает
                         Modifier
@@ -570,19 +574,15 @@ private fun SharedCover(
                     }
                 }
 
-                // Кружок с буквой "J" (заглушка аккаунта) — виден только в полном плеере
-                Box(
+                // Значок источника текущего трека (Jamendo, Audius, Deezer), виден только в полном плеере
+                ServiceBadge(
+                    playerState.value.provider?.toService(),
                     Modifier
                         .align(Alignment.BottomEnd)
                         .padding(16.dp)
-                        .size(36.dp)
-                        .graphicsLayer { alpha = ((progress() - 0.6f) / 0.4f).coerceIn(0f, 1f) }
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("J", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                }
+                        .graphicsLayer { alpha = ((progress() - 0.6f) / 0.4f).coerceIn(0f, 1f) },
+                    36.dp,
+                )
             }
         }
     }
