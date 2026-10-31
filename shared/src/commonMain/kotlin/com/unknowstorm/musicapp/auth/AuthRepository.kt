@@ -21,7 +21,11 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.random.Random
 
 /**
@@ -125,11 +129,20 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         // Если это тот же пользователь (например, обновился токен), не сбрасываем уже загруженный профиль,
         // иначе экран онбординга мигнёт и потеряет введённое
         val prev = (_state.value as? AuthState.SignedIn)?.takeIf { it.userId == user.id }
-        _state.value = prev ?: AuthState.SignedIn(user.id, user.email, null)
+        // Копия ника лежит в сессии на устройстве, поэтому видна и без сети
+        val cached = user.userMetadata?.get("username")?.jsonPrimitive?.contentOrNull
+        _state.value = prev ?: AuthState.SignedIn(user.id, user.email, cached)
         val profile = runCatching { loadProfile(user.id) }.getOrNull()
         (_state.value as? AuthState.SignedIn)?.takeIf { it.userId == user.id }?.let {
             _state.value = it.copy(username = profile?.username ?: it.username, profile = profile ?: it.profile)
         }
+        val fresh = profile?.username?.takeIf { it.isNotBlank() }
+        if (fresh != null && fresh != cached) cacheUsername(fresh)
+    }
+
+    /** Пишем ник в метаданные сессии (только для показа без сети; источник правды остаётся база). */
+    private suspend fun cacheUsername(name: String) {
+        runCatching { client.auth.updateUser { data = buildJsonObject { put("username", name) } } }
     }
 
     private suspend fun loadProfile(userId: String): Profile {
@@ -243,6 +256,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         (_state.value as? AuthState.SignedIn)?.takeIf { it.userId == user.id }?.let {
             _state.value = it.copy(username = username, profile = profile)
         }
+        cacheUsername(username)
     }
 
     /** Открывает браузер; результат вернётся через диплинк (Android) или локальный сервер (Desktop). */
