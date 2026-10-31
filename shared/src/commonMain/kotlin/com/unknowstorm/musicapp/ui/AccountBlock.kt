@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 fun AccountBlock(
     repo: AuthRepository,
     onOpenAuth: () -> Unit,
+    onEditProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by repo.state.collectAsState()
@@ -42,8 +43,14 @@ fun AccountBlock(
             when (val s = state) {
                 AuthState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
                 is AuthState.SignedIn -> {
+                    UserAvatar(
+                        name = s.username ?: s.email,
+                        size = 72.dp,
+                        image = rememberAvatarImage(repo, s.profile?.avatar),
+                    )
                     Text(s.username ?: "Пользователь", style = MaterialTheme.typography.headlineSmall)
                     s.email?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    Button(onClick = onEditProfile, enabled = s.profile != null) { Text("Изменить профиль") }
                     FilledTonalButton(onClick = { scope.launch { repo.signOut() } }) { Text("Выйти") }
                 }
                 is AuthState.Error -> {
