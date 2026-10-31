@@ -24,10 +24,13 @@ import com.unknowstorm.musicapp.provider.audius.AudiusProvider
 import com.unknowstorm.musicapp.provider.jamendo.JamendoProvider
 import com.unknowstorm.musicapp.theme.SolaraTheme
 import com.unknowstorm.musicapp.ui.AuthScreen
+import com.unknowstorm.musicapp.ui.AwaitEmailScreen
 import com.unknowstorm.musicapp.ui.ExpandablePlayer
 import com.unknowstorm.musicapp.ui.LocalMiniPlayerAnchor
 import com.unknowstorm.musicapp.ui.MainScreen
 import com.unknowstorm.musicapp.ui.MiniPlayerAnchor
+import com.unknowstorm.musicapp.ui.OnboardingScreen
+import com.unknowstorm.musicapp.ui.PendingSignUp
 import com.unknowstorm.musicapp.ui.PlatformBackHandler
 import com.unknowstorm.musicapp.ui.SplashScreen
 import kotlinx.coroutines.delay
@@ -45,6 +48,7 @@ fun App() {
             val audio = rememberAudioBackend()
             val authRepo = remember { AuthRepository() }
             val authState by authRepo.state.collectAsState()
+            val pending by authRepo.pending.collectAsState()
             var showSplash by remember { mutableStateOf(true) }
             var showPlayer by remember { mutableStateOf(false) }
             var showAuth by remember { mutableStateOf(false) }
@@ -79,6 +83,22 @@ fun App() {
                     if (showAuth) {
                         PlatformBackHandler(enabled = true, onBack = { showAuth = false })
                         AuthScreen(repo = authRepo, onClose = { showAuth = false })
+                    }
+                    // После регистрации: «Ожидаем подтверждение письма».
+                    // Закрывается сам, когда письмо подтверждено и пользователь вошёл.
+                    pending?.let { p ->
+                        AwaitEmailScreen(
+                            repo = authRepo,
+                            pending = PendingSignUp(p.email, p.password),
+                            onBack = { authRepo.cancelPending() },
+                        )
+                    }
+                    // Первый вход: ник, аватарка, сервисы, синхронизация палитры.
+                    // Закрывается сам, когда профиль сохранён (onboarded = true).
+                    val signedIn = authState as? AuthState.SignedIn
+                    val profile = signedIn?.profile
+                    if (profile != null && !profile.onboarded) {
+                        OnboardingScreen(repo = authRepo, profile = profile)
                     }
                     AnimatedVisibility(visible = showSplash, exit = fadeOut(tween(400))) {
                         SplashScreen()
