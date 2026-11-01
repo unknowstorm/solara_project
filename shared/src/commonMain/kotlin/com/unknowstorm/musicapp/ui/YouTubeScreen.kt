@@ -33,6 +33,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -118,7 +122,10 @@ private fun YouTubeBrowser(audio: AudioBackend, session: YouTubeSession, onBack:
     DisposableEffect(Unit) { onDispose { session.minimize() } }
 
     val current = session.video
-    val showPlayer = current != null && session.docked
+    // Большой вид держится, пока видео не доехало до мини-окна (иначе содержимое пропало бы рывком)
+    val showPlayer by remember {
+        derivedStateOf { session.video != null && (session.docked || session.progress > 0.01f) }
+    }
     PlatformBackHandler(enabled = showPlayer, onBack = { session.minimize() })
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -205,21 +212,27 @@ private fun YouTubeBrowser(audio: AudioBackend, session: YouTubeSession, onBack:
 
 @Composable
 private fun PlayerPane(video: YouTubeVideo, session: YouTubeSession, openLink: (String) -> Unit) {
-    // Ушли с развёрнутого вида: прежние координаты больше недействительны
-    DisposableEffect(Unit) { onDispose { session.dockBounds = null } }
     Column(
         Modifier
             .fillMaxSize()
+            .graphicsLayer { alpha = ((session.progress - 0.2f) / 0.6f).coerceIn(0f, 1f) }
             // Свайп вниз ниже видео сворачивает его. Плеер перекрывает свою область и жестов не получает.
             .pointerInput(Unit) {
+                val tracker = VelocityTracker()
                 var total = 0f
                 detectVerticalDragGestures(
-                    onDragStart = { total = 0f },
-                    onDragEnd = { if (total > 72.dp.toPx()) session.minimize() },
-                    onDragCancel = { total = 0f },
+                    onDragStart = {
+                        total = 0f
+                        tracker.resetTracking()
+                        session.beginDrag()
+                    },
+                    onDragEnd = { session.endDrag(tracker.calculateVelocity().y) },
+                    onDragCancel = { session.endDrag(0f) },
                     onVerticalDrag = { change, amount ->
                         change.consume()
                         total += amount
+                        tracker.addPosition(change.uptimeMillis, Offset(0f, total))
+                        session.dragBy(amount)
                     },
                 )
             },

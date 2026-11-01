@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,7 +67,8 @@ fun MainScreen(
         if (service == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == service }
     }
 
-    val session = remember { YouTubeSession() }
+    val ytScope = rememberCoroutineScope()
+    val session = remember { YouTubeSession(ytScope) }
     var rootOrigin by remember { mutableStateOf(Offset.Zero) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     val playback by audio.state.collectAsState()
