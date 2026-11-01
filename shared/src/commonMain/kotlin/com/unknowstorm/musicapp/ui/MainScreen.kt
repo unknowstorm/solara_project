@@ -64,7 +64,11 @@ fun MainScreen(
     Column(Modifier.fillMaxSize().background(Color.Transparent)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
-                Tab.HOME -> HomeScreen(shownFeeds, service, { service = it }, audio)
+                Tab.HOME -> if (service == Service.YOUTUBE) {
+                    YouTubeScreen(audio = audio, onBack = { service = Service.ALL })
+                } else {
+                    HomeScreen(shownFeeds, service, { service = it }, audio)
+                }
                 Tab.SEARCH -> TrackListScreen(providers, audio)
                 Tab.QUEUE -> InfoScreen(
                     "Очередь",
@@ -152,6 +156,8 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
+        LegalLinks()
+        Spacer(Modifier.height(24.dp))
         Text("Источники музыки", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Service.entries.filter { it != Service.ALL }.forEach { service ->
