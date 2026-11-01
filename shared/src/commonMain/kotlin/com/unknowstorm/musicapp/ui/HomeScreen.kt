@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,6 +46,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.model.toService
@@ -56,6 +58,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 // --- ВАШИ СУЩЕСТВУЮЩИЕ КЛАССЫ И ФУНКЦИИ (БЕЗ ИЗМЕНЕНИЙ) ---
 
@@ -164,6 +167,11 @@ fun HomeScreen(
     service: Service,
     onServiceChange: (Service) -> Unit,
     audio: AudioBackend,
+    likes: LikesRepository,
+    providers: List<MusicProvider>,
+    likesSelected: Boolean,
+    onOpenLikes: () -> Unit,
+    onOpenAuth: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
@@ -172,7 +180,19 @@ fun HomeScreen(
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Новый верхний бар
-        TopBar(service, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        TopBar(
+            service,
+            onServiceChange,
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            likesSelected = likesSelected,
+            onLikes = onOpenLikes,
+        )
+
+        // Вкладка «Любимые» стоит в панели слева от источников и заменяет ленту
+        if (likesSelected) {
+            LikedContent(likes, providers, audio, onOpenAuth)
+            return@Column
+        }
 
         if (!service.ready) {
             HintCard("${service.title} скоро появится. ${service.note}.")
@@ -189,14 +209,32 @@ fun HomeScreen(
                 ) {
                     Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
                     IconButton(
-                        onClick = { /* TODO: Открыть экран лайков */ },
+                        onClick = onOpenLikes,
                         modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         QueueIcon(Modifier.size(18.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
-            item { HintCard("Здесь появятся ваши лайки. Они заработают после входа в аккаунт.") }
+            item(key = "likes") {
+                val liked by likes.tracks.collectAsState()
+                val signedIn by likes.signedIn.collectAsState()
+                val shown = liked.filterNot { DeadTracks.isDead(it) }
+                when {
+                    !signedIn -> HintCard("Войдите в аккаунт, и треки, которые вы лайкнете (♡ в плеере), будут храниться здесь.")
+                    shown.isEmpty() -> HintCard("Нажмите ♡ в плеере, и трек появится здесь.")
+                    else -> LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(shown, key = { "like:${it.provider}:${it.id}" }) { track ->
+                            HomeTrackCard(track, showBadge = true) {
+                                scope.launch { playLiked(shown, track, providers, audio) }
+                            }
+                        }
+                    }
+                }
+            }
 
             // Подборки
             item { SectionTitle("Подборки для вас") }
@@ -253,10 +291,49 @@ fun HomeScreen(
     }
 }
 
+/**
+ * Лайки хранят только метаданные, поэтому ссылку на звук берём заново у источника:
+ * у Deezer она протухает. Что не удалось получить, пропускаем.
+ */
+internal suspend fun playLiked(
+    tracks: List<Track>,
+    start: Track,
+    providers: List<MusicProvider>,
+    audio: AudioBackend,
+) {
+    // Окно вокруг выбранного трека: так работает и выбор из хвоста длинного списка
+    val from = tracks.indexOfFirst { it.provider == start.provider && it.id == start.id }.coerceAtLeast(0)
+    val window = tracks.drop((from - 5).coerceAtLeast(0)).take(30)
+    val resolved = coroutineScope {
+        window.map { track ->
+            async {
+                val provider = providers.firstOrNull { it.id == track.provider } ?: return@async null
+                val url = try {
+                    withTimeoutOrNull(6_000) { provider.resolveStream(track) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+                url?.takeIf { it.isNotBlank() }?.let { track.copy(streamUrl = it) }
+            }
+        }.awaitAll()
+    }.filterNotNull()
+    val index = resolved.indexOfFirst { it.provider == start.provider && it.id == start.id }
+    if (index >= 0) audio.playQueue(resolved, index)
+}
+
 // --- НОВЫЕ КОМПОНЕНТЫ ---
 
 @Composable
-fun TopBar(selected: Service, onSelect: (Service) -> Unit, modifier: Modifier = Modifier) {
+fun TopBar(
+    selected: Service,
+    onSelect: (Service) -> Unit,
+    modifier: Modifier = Modifier,
+    // Кнопка «Любимые» показывается, только если передан onLikes (на экране YouTube её нет)
+    likesSelected: Boolean = false,
+    onLikes: (() -> Unit)? = null,
+) {
     val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val active = Service.entries.filter { it.ready }
     val soon = Service.entries.filter { !it.ready }
@@ -269,8 +346,23 @@ fun TopBar(selected: Service, onSelect: (Service) -> Unit, modifier: Modifier = 
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // «Любимые»: самая левая кнопка
+        if (onLikes != null) {
+            IconButton(
+                onClick = onLikes,
+                modifier = Modifier.clip(CircleShape)
+                    .background(if (likesSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            ) {
+                HeartIcon(
+                    likesSelected,
+                    Modifier.size(22.dp),
+                    if (likesSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
         active.forEach { service ->
-            val isSelected = selected == service
+            val isSelected = !likesSelected && selected == service
             IconButton(
                 onClick = { onSelect(service) },
                 modifier = Modifier.clip(CircleShape)
