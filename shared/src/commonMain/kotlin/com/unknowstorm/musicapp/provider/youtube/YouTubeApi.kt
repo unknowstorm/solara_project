@@ -35,6 +35,9 @@ class YouTubeApi(
     // Только в памяти и только пока запущено приложение (правила YouTube: данные API нельзя хранить дольше 30 дней)
     private val cache = LinkedHashMap<String, List<YouTubeVideo>>()
 
+    /** Результат поиска из кэша приложения (без запроса и без траты квоты), если он есть. */
+    fun cachedSearch(query: String): List<YouTubeVideo>? = cache["search:${query.trim().lowercase()}"]
+
     /** Поиск музыкальных видео, которые разрешено встраивать. Один поиск стоит 100 единиц квоты. */
     suspend fun search(query: String): List<YouTubeVideo> {
         val q = query.trim()

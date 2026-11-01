@@ -27,6 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.toService
@@ -39,9 +42,10 @@ import com.unknowstorm.musicapp.provider.interleave
 import kotlinx.coroutines.delay
 
 @Composable
-fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
+fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend, session: YouTubeSession? = null) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(Service.ALL) }
+    var ytQuery by remember { mutableStateOf("") }
     var retry by remember { mutableStateOf(0) }
     var results by remember { mutableStateOf<Map<ProviderId, SourceResult>>(emptyMap()) }
     var loading by remember { mutableStateOf(false) }
@@ -88,6 +92,10 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
             onValueChange = { query = it },
             label = { Text("Поиск") },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = { if (selected == Service.YOUTUBE) ytQuery = query.trim() },
+            ),
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         )
 
@@ -97,7 +105,7 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
 
-        if (!canSearch) {
+        if (!canSearch && !(selected == Service.YOUTUBE && session != null)) {
             Text(
                 text = if (selected == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube." else "${selected.title} скоро появится. ${selected.note}.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -134,6 +142,18 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
                 text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
+        }
+
+        if (selected == Service.YOUTUBE && session != null) {
+            // Выдача YouTube отдельная: правила запрещают смешивать её с другими источниками
+            YouTubeSearchPane(
+                submitted = ytQuery,
+                audio = audio,
+                session = session,
+                onLeave = { selected = Service.ALL },
+                modifier = Modifier.weight(1f),
+            )
+            return@Column
         }
 
         LazyColumn(Modifier.weight(1f)) {
