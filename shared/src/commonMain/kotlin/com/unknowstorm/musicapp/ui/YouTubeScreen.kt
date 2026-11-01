@@ -117,36 +117,27 @@ private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceC
     // Ушли с экрана YouTube: играющее видео переезжает в плавающее окно
     DisposableEffect(Unit) { onDispose { session.minimize() } }
 
+    // Большой вид держится, пока видео не доехало до мини-окна (иначе содержимое пропало бы рывком)
     val showPlayer by remember {
         derivedStateOf { session.video != null && (session.docked || session.progress > 0.01f) }
     }
     PlatformBackHandler(enabled = showPlayer, onBack = { session.minimize() })
 
     val current = session.video
-    Box(Modifier.fillMaxSize().statusBarsPadding()) {
-        // Лента всегда под плеером: проявляется, пока плеер гаснет, и наоборот.
-        // Остаётся в композиции, чтобы не терялась позиция прокрутки.
-        Column(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = if (current == null) 1f else (1f - session.progress / 0.5f).coerceIn(0f, 1f)
-                },
-        ) {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        if (showPlayer && current != null) {
+            PlayerPane(current, session, openLink)
+        } else {
             TopBar(Service.YOUTUBE, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
             YouTubeFeed(audio, session, Modifier.weight(1f))
-        }
-
-        if (showPlayer && current != null) {
-            // Сам перехватывает жесты (pointerInput в PlayerPane), поэтому лента под ним не нажимается
-            PlayerPane(current, session, openLink)
         }
     }
 }
 
 @Composable
 private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: Modifier = Modifier) {
-    val api = remember { YouTubeApi.shared }
+    val store = rememberTextStore()
+    val api = remember { YouTubeApi.shared.also { it.attach(store) } }
     val openLink = rememberExternalLinkOpener()
     val scope = rememberCoroutineScope()
 

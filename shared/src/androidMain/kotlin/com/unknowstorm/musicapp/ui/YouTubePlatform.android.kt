@@ -287,3 +287,22 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         AndroidView(factory = { webView }, modifier = modifier)
     }
 }
+
+@androidx.compose.runtime.Composable
+actual fun rememberTextStore(): TextStore {
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    return androidx.compose.runtime.remember {
+        val prefs = context.getSharedPreferences("solara_text_store", android.content.Context.MODE_PRIVATE)
+        object : TextStore {
+            override fun get(key: String): String? = prefs.getString(key, null)
+            override fun set(key: String, value: String) {
+                prefs.edit().putString(key, value).apply()
+            }
+            override fun nowMillis(): Long = System.currentTimeMillis()
+            override fun quotaDay(millis: Long): Long {
+                val tz = java.util.TimeZone.getTimeZone("America/Los_Angeles")
+                return Math.floorDiv(millis + tz.getOffset(millis), 86_400_000L)
+            }
+        }
+    }
+}

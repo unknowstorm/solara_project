@@ -13,11 +13,15 @@ import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import com.unknowstorm.musicapp.ui.TextStore
 
 /**
  * Видео YouTube для раздела YouTube.
  * Намеренно не Track: данные YouTube нельзя класть в лайки, плейлисты, историю и рекомендации.
  */
+@Serializable
 data class YouTubeVideo(
     val id: String,
     val title: String,
@@ -36,14 +40,47 @@ class YouTubeApi(
     private val cache = LinkedHashMap<String, List<YouTubeVideo>>()
 
     /** Результат поиска из кэша приложения (без запроса и без траты квоты), если он есть. */
-    fun cachedSearch(query: String): List<YouTubeVideo>? = cache["search:${query.trim().lowercase()}"]
+    fun cachedSearch(query: String): List<YouTubeVideo>? {
+        val key = "search:${query.trim().lowercase()}"
+        cache[key]?.let { return it }
+        val entry = readDisk()[key] ?: return null
+        cache[key] = entry.videos
+        return entry.videos
+    }
+
+    private var disk: TextStore? = null
+
+    /** Подключает постоянное хранилище: поиски живут в нём до сброса дневной квоты YouTube (полночь по Pacific Time). */
+    fun attach(store: TextStore) {
+        if (disk == null) disk = store
+    }
+
+    private fun readDisk(): Map<String, CacheEntry> {
+        val store = disk ?: return emptyMap()
+        val raw = store.get(DISK_KEY) ?: return emptyMap()
+        val today = store.quotaDay(store.nowMillis())
+        return runCatching { diskJson.decodeFromString<Map<String, CacheEntry>>(raw) }
+            .getOrDefault(emptyMap())
+            .filterValues { store.quotaDay(it.savedAt) == today }
+    }
+
+    private fun saveToDisk(key: String, value: List<YouTubeVideo>) {
+        val store = disk ?: return
+        val all = readDisk().toMutableMap()
+        all[key] = CacheEntry(store.nowMillis(), value)
+        while (all.size > MAX_CACHED) {
+            val oldest = all.minByOrNull { it.value.savedAt }?.key ?: break
+            all.remove(oldest)
+        }
+        runCatching { store.set(DISK_KEY, diskJson.encodeToString(all)) }
+    }
 
     /** Поиск музыкальных видео, которые разрешено встраивать. Один поиск стоит 100 единиц квоты. */
     suspend fun search(query: String): List<YouTubeVideo> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
         val key = "search:${q.lowercase()}"
-        cache[key]?.let { return it }
+        cachedSearch(q)?.let { return it }
         val found: YtSearchResponse = request("search") {
             parameter("part", "id")
             parameter("type", "video")
@@ -99,6 +136,7 @@ class YouTubeApi(
     private fun store(key: String, value: List<YouTubeVideo>): List<YouTubeVideo> {
         cache[key] = value
         while (cache.size > MAX_CACHED) cache.remove(cache.keys.first())
+        if (key.startsWith("search:")) saveToDisk(key, value)
         return value
     }
 
@@ -122,6 +160,8 @@ class YouTubeApi(
     companion object {
         private const val BASE_URL = "https://www.googleapis.com/youtube/v3"
         private const val MAX_CACHED = 30
+        private const val DISK_KEY = "yt_search_cache_v1"
+        private val diskJson = Json { ignoreUnknownKeys = true }
 
         /** Один экземпляр на приложение, чтобы кэш не терялся при смене экранов. */
         val shared: YouTubeApi by lazy { YouTubeApi(Secrets.YOUTUBE_API_KEY) }
@@ -192,3 +232,6 @@ internal data class YtStatus(
     val madeForKids: Boolean? = null,
     val privacyStatus: String? = null,
 )
+
+@Serializable
+internal data class CacheEntry(val savedAt: Long, val videos: List<YouTubeVideo>)

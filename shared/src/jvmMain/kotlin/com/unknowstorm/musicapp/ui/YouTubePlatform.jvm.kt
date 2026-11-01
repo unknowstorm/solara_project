@@ -47,3 +47,20 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         )
     }
 }
+
+@androidx.compose.runtime.Composable
+actual fun rememberTextStore(): TextStore = androidx.compose.runtime.remember {
+    val dir = java.io.File(System.getProperty("user.home"), ".solara").also { it.mkdirs() }
+    object : TextStore {
+        override fun get(key: String): String? =
+            runCatching { java.io.File(dir, "$key.txt").takeIf { it.exists() }?.readText() }.getOrNull()
+        override fun set(key: String, value: String) {
+            runCatching { java.io.File(dir, "$key.txt").writeText(value) }
+        }
+        override fun nowMillis(): Long = System.currentTimeMillis()
+        override fun quotaDay(millis: Long): Long {
+            val tz = java.util.TimeZone.getTimeZone("America/Los_Angeles")
+            return Math.floorDiv(millis + tz.getOffset(millis), 86_400_000L)
+        }
+    }
+}

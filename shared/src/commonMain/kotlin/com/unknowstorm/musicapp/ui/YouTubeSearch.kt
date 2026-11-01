@@ -39,7 +39,8 @@ fun YouTubeSearchPane(
     modifier: Modifier = Modifier,
 ) {
     YouTubeConsentGate(onLeave = onLeave) {
-        val api = remember { YouTubeApi.shared }
+        val store = rememberTextStore()
+        val api = remember { YouTubeApi.shared.also { it.attach(store) } }
         val openLink = rememberExternalLinkOpener()
         var videos by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
         var heading by remember { mutableStateOf("") }
