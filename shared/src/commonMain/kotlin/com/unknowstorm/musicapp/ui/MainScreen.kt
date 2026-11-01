@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +75,13 @@ fun MainScreen(
     val session = remember { YouTubeSession(ytScope) }
     var rootOrigin by remember { mutableStateOf(Offset.Zero) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
+    // Большой плеер YouTube развёрнут полностью: нижняя панель навигации прячется (портрет и альбом).
+    val hideNavBar by remember {
+        derivedStateOf {
+            session.video != null && session.progress >= 0.999f &&
+                tab == Tab.HOME && service == Service.YOUTUBE
+        }
+    }
     val playback by audio.state.collectAsState()
     // Включили нашу музыку: видео YouTube закрывается, два звука одновременно не играют
     LaunchedEffect(playback.mediaId) {
@@ -118,7 +126,7 @@ fun MainScreen(
         )
 
         // ИСПРАВЛЕНИЕ: Убираем тень у NavigationBar и делаем его прозрачным
-        NavigationBar(
+        if (!hideNavBar) NavigationBar(
             containerColor = MaterialTheme.colorScheme.background,
             tonalElevation = 0.dp, // Убирает черную тень!
             modifier = Modifier.background(Color.Transparent)
