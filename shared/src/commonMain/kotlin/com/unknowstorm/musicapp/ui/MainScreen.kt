@@ -88,11 +88,16 @@ fun MainScreen(
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 Tab.HOME -> if (service == Service.YOUTUBE) {
-                    YouTubeScreen(audio = audio, session = session, onBack = { service = Service.ALL })
+                    YouTubeScreen(
+                        audio = audio,
+                        session = session,
+                        onBack = { service = Service.ALL },
+                        onServiceChange = { service = it },
+                    )
                 } else {
                     HomeScreen(shownFeeds, service, { service = it }, audio)
                 }
-                Tab.SEARCH -> TrackListScreen(providers, audio)
+                Tab.SEARCH -> TrackListScreen(providers, audio, session)
                 Tab.QUEUE -> InfoScreen(
                     "Очередь",
                     "Здесь будет текущая очередь: удаление треков, шафл и повтор списка. Следующий этап.",

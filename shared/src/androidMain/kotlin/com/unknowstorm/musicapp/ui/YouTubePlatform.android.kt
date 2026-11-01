@@ -71,12 +71,20 @@ actual fun rememberExternalLinkOpener(): (String) -> Unit {
 }
 
 /** Принимает коды ошибок плеера из JavaScript и передаёт их в основной поток. */
-class YouTubePlayerBridge(private val onError: (Int) -> Unit) {
+class YouTubePlayerBridge(
+    private val onError: (Int) -> Unit,
+    private val onState: (Int) -> Unit = {},
+) {
     private val handler = Handler(Looper.getMainLooper())
 
     @JavascriptInterface
     fun onPlayerError(code: Int) {
         handler.post { onError(code) }
+    }
+
+    @JavascriptInterface
+    fun onPlayerState(state: Int) {
+        handler.post { onState(state) }
     }
 
     @JavascriptInterface
@@ -170,7 +178,7 @@ private fun playerHtml(videoId: String, origin: String): String {
           if (f) { var r = f.getBoundingClientRect(); SolaraBridge.log('iframe ' + r.width + 'x' + r.height + ', window ' + window.innerWidth + 'x' + window.innerHeight); }
           else { SolaraBridge.log('no iframe'); }
         },
-        onStateChange: function (e) { SolaraBridge.log('state ' + e.data); },
+        onStateChange: function (e) { SolaraBridge.log('state ' + e.data); SolaraBridge.onPlayerState(e.data); },
         onError: function (e) { SolaraBridge.log('error ' + e.data); SolaraBridge.onPlayerError(e.data); }
       }
     });
@@ -194,7 +202,7 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         WebView(context).apply {
             setBackgroundColor(android.graphics.Color.BLACK)
             settings.javaScriptEnabled = true
-            WebView.setWebContentsDebuggingEnabled(true)
+            WebView.setWebContentsDebuggingEnabled((context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
             settings.domStorageEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false // автозапуск только после тапа по видео в списке
             webChromeClient = chrome
@@ -229,7 +237,10 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
                     return true
                 }
             }
-            addJavascriptInterface(YouTubePlayerBridge { code -> currentOnError(code) }, "SolaraBridge")
+            addJavascriptInterface(
+                YouTubePlayerBridge({ code -> currentOnError(code) }, { st -> YouTubeControl.onState?.invoke(st) }),
+                "SolaraBridge",
+            )
             loadDataWithBaseURL(origin, playerHtml(videoId, origin), "text/html", "utf-8", null)
         }
     }
@@ -252,7 +263,17 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { webView.onResume() }
 
     DisposableEffect(webView) {
+        YouTubeControl.send = { cmd ->
+            val js = when (cmd) {
+                "play" -> "try { player.playVideo(); } catch (e) {}"
+                "pause" -> "try { player.pauseVideo(); } catch (e) {}"
+                else -> null
+            }
+            if (js != null) webView.evaluateJavascript(js, null)
+        }
         onDispose {
+            YouTubeControl.send = null
+            YouTubeControl.onState?.invoke(-1)
             chrome.exitFullscreen()
             webView.stopLoading()
             webView.loadUrl("about:blank")

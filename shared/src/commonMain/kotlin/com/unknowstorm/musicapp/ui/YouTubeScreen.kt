@@ -4,8 +4,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,42 +19,43 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.youtube.YouTubeApi
 import com.unknowstorm.musicapp.provider.youtube.YouTubeException
@@ -64,159 +67,257 @@ import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
 private const val FLAG_ACCEPTED = "youtube_terms_accepted_v1"
-private const val YOUTUBE_HOME = "https://www.youtube.com"
+internal const val YOUTUBE_HOME = "https://www.youtube.com"
 
-/** Раздел YouTube: сначала согласие с условиями, затем поиск и встроенный плеер. */
+// Подборки по жанрам: это поиск, один запрос стоит 100 единиц квоты, поэтому грузим только по нажатию
+private val GENRES = listOf(
+    "Джаз" to "jazz music",
+    "Поп" to "pop music",
+    "Рок" to "rock music",
+    "Хип-хоп" to "hip hop music",
+    "Электроника" to "electronic music",
+    "Лоу-фай" to "lofi",
+)
+
+/** Показывает содержимое, только если пользователь принял условия YouTube. */
 @Composable
-fun YouTubeScreen(audio: AudioBackend, session: YouTubeSession, onBack: () -> Unit) {
+internal fun YouTubeConsentGate(onLeave: () -> Unit, content: @Composable () -> Unit) {
     val flags = rememberFlagStore()
     var accepted by remember { mutableStateOf(flags.get(FLAG_ACCEPTED)) }
     if (accepted) {
-        YouTubeBrowser(audio, session, onBack)
+        content()
     } else {
         YouTubeConsentScreen(
             onAccept = {
                 flags.set(FLAG_ACCEPTED, true)
                 accepted = true
             },
-            onBack = onBack,
+            onBack = onLeave,
         )
     }
 }
 
+/** Главная, чип YouTube: популярное и подборки; при открытом видео большой плеер. */
 @Composable
-private fun YouTubeBrowser(audio: AudioBackend, session: YouTubeSession, onBack: () -> Unit) {
-    val api = remember { YouTubeApi.shared }
-    val openLink = rememberExternalLinkOpener()
-    val focusManager = LocalFocusManager.current
-    val scope = rememberCoroutineScope()
-
-    var query by remember { mutableStateOf("") }
-    var heading by remember { mutableStateOf("") }
-    var videos by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    fun load(label: String, quiet: Boolean = false, request: suspend () -> List<YouTubeVideo>) {
-        scope.launch {
-            loading = true
-            error = null
-            try {
-                videos = request()
-                heading = label
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: YouTubeException) {
-                if (!quiet) error = e.message
-            } catch (e: Exception) {
-                if (!quiet) error = "Не удалось загрузить: ${e.message}"
-            } finally {
-                loading = false
-            }
-        }
+fun YouTubeScreen(
+    audio: AudioBackend,
+    session: YouTubeSession,
+    onBack: () -> Unit,
+    onServiceChange: (Service) -> Unit,
+) {
+    YouTubeConsentGate(onLeave = onBack) {
+        YouTubeHome(audio, session, onServiceChange)
     }
+}
 
-    LaunchedEffect(Unit) { load("Популярная музыка", quiet = true) { api.popularMusic() } }
+@Composable
+private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceChange: (Service) -> Unit) {
+    val openLink = rememberExternalLinkOpener()
 
     // Ушли с экрана YouTube: играющее видео переезжает в плавающее окно
     DisposableEffect(Unit) { onDispose { session.minimize() } }
 
-    val current = session.video
     // Большой вид держится, пока видео не доехало до мини-окна (иначе содержимое пропало бы рывком)
     val showPlayer by remember {
         derivedStateOf { session.video != null && (session.docked || session.progress > 0.01f) }
     }
     PlatformBackHandler(enabled = showPlayer, onBack = { session.minimize() })
 
+    val current = session.video
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = { if (showPlayer) session.minimize() else onBack() }) {
-                Text(if (showPlayer) "Свернуть" else "← Назад")
-            }
-            Spacer(Modifier.weight(1f))
-            // Логотип ведёт на YouTube: на видео, если оно открыто, иначе на главную
-            YouTubeLogo(
-                onClick = {
-                    openLink(if (showPlayer && current != null) "$YOUTUBE_HOME/watch?v=${current.id}" else YOUTUBE_HOME)
-                },
-            )
+        if (showPlayer && current != null) {
+            PlayerPane(current, session, openLink)
+        } else {
+            TopBar(Service.YOUTUBE, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+            YouTubeFeed(audio, session, Modifier.weight(1f))
         }
-
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (!showPlayer || current == null) {
-                Column(Modifier.fillMaxSize()) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        label = { Text("Поиск на YouTube") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(
-                            onSearch = {
-                                val q = query.trim()
-                                if (q.isNotEmpty() && !loading) {
-                                    focusManager.clearFocus()
-                                    load("Результаты: $q") { api.search(q) }
-                                }
-                            },
-                        ),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    )
-                    Text(
-                        "Поиск запускается по нажатию Enter: у YouTube дневной лимит запросов на всё приложение.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                    if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    error?.let {
-                        Text(
-                            it,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-                    if (heading.isNotEmpty()) {
-                        Text(
-                            heading,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    } else if (!loading && error == null) {
-                        Text(
-                            "Введите запрос и нажмите Enter.",
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-                    LazyColumn(Modifier.weight(1f)) {
-                        items(videos, key = { it.id }) { video ->
-                            VideoRow(video) {
-                                // Звук нашего плеера и YouTube не должны играть одновременно
-                                audio.stop()
-                                session.open(video, videos)
-                            }
-                        }
-                    }
-                }
-            } else {
-                PlayerPane(current, session, openLink)
-            }
-        }
-
-        LegalFooter()
     }
 }
 
 @Composable
+private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: Modifier = Modifier) {
+    val api = remember { YouTubeApi.shared }
+    val openLink = rememberExternalLinkOpener()
+    val scope = rememberCoroutineScope()
+
+    var popular by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
+    var popularLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    // Уже загруженные раньше подборки берём из кэша приложения: это не тратит квоту
+    val genres = remember {
+        mutableStateMapOf<String, List<YouTubeVideo>>().also { map ->
+            GENRES.forEach { (title, query) -> api.cachedSearch(query)?.let { map[title] = it } }
+        }
+    }
+    var loadingGenre by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        popularLoading = true
+        try {
+            popular = api.popularMusic()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: YouTubeException) {
+            error = e.message
+        } catch (e: Exception) {
+            error = "Не удалось загрузить популярное: ${e.message}"
+        } finally {
+            popularLoading = false
+        }
+    }
+
+    fun play(video: YouTubeVideo, list: List<YouTubeVideo>) {
+        // Звук нашего плеера и YouTube не должны играть одновременно
+        audio.stop()
+        session.open(video, list)
+    }
+
+    fun loadGenre(title: String, query: String) {
+        if (loadingGenre != null) return
+        scope.launch {
+            loadingGenre = title
+            error = null
+            try {
+                genres[title] = api.search(query)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: YouTubeException) {
+                error = e.message
+            } catch (e: Exception) {
+                error = "Не удалось загрузить: ${e.message}"
+            } finally {
+                loadingGenre = null
+            }
+        }
+    }
+
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        item(key = "head") {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Поиск по YouTube: вкладка «Поиск», чип YouTube.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        if (popularLoading) {
+            item(key = "progress") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
+        }
+        error?.let {
+            item(key = "error") {
+                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+        }
+        if (popular.isNotEmpty()) {
+            item(key = "popular-label") { FeedTitle("Популярная музыка") }
+            item(key = "popular-strip") { VideoStrip(popular) { play(it, popular) } }
+        }
+        item(key = "genres-label") { FeedTitle("Подборки по жанрам") }
+        item(key = "genres-hint") {
+            Text(
+                "Подборка загружается по нажатию: у YouTube дневной лимит запросов на всё приложение.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        GENRES.forEach { (title, query) ->
+            val loaded = genres[title]
+            if (loaded != null) {
+                item(key = "label:$title") {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                    )
+                }
+                item(key = "strip:$title") { VideoStrip(loaded) { play(it, loaded) } }
+            } else {
+                item(key = "label:$title") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = { loadGenre(title, query) },
+                            enabled = loadingGenre == null,
+                        ) { Text(if (loadingGenre == title) "Загрузка…" else "Показать") }
+                    }
+                }
+            }
+        }
+        item(key = "legal") { LegalFooter() }
+    }
+}
+
+@Composable
+private fun FeedTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun VideoStrip(videos: List<YouTubeVideo>, onClick: (YouTubeVideo) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(videos) { video -> VideoCard(video) { onClick(video) } }
+    }
+}
+
+@Composable
+private fun VideoCard(video: YouTubeVideo, onClick: () -> Unit) {
+    Column(Modifier.width(220.dp).clickable(onClick = onClick)) {
+        // Миниатюра без обрезки, скруглений и значков поверх: по правилам её нельзя менять
+        AsyncImage(
+            model = video.thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(video.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(
+            video.channel,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (video.durationMs > 0) {
+            Text(
+                formatYtDuration(video.durationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Большой экран видео в раскладке основного плеера. Само видео рисует общий слой YouTubeOverlay. */
+@Composable
 private fun PlayerPane(video: YouTubeVideo, session: YouTubeSession, openLink: (String) -> Unit) {
+    var showMenu by remember { mutableStateOf(false) }
+    val playing = session.playerState == 1 || session.playerState == 3
+
     Column(
         Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = ((session.progress - 0.2f) / 0.6f).coerceIn(0f, 1f) }
-            // Свайп вниз ниже видео сворачивает его. Плеер перекрывает свою область и жестов не получает.
+            // Свайп вниз сворачивает видео за пальцем. Плеер перекрывает свою область и жестов не получает.
             .pointerInput(Unit) {
                 val tracker = VelocityTracker()
                 var total = 0f
@@ -235,83 +336,119 @@ private fun PlayerPane(video: YouTubeVideo, session: YouTubeSession, openLink: (
                         session.dragBy(amount)
                     },
                 )
-            },
+            }
+            .padding(horizontal = 24.dp),
     ) {
-        // Здесь стоит плеер: он рисуется поверх этого места общим слоем (YouTubeOverlay).
-        // Вокруг плеера нет наложений: наши элементы стоят только под ним.
+        // Ручка: показывает, что экран сворачивается, и сворачивает по тапу
         Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .background(Color.Black)
-                .onGloballyPositioned { session.dockBounds = it.boundsInWindow() },
+            Modifier.fillMaxWidth().height(28.dp).clickable { session.minimize() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
+            )
+        }
+
+        // Место под видео (как у обложки в основном плеере). Плеер рисуется поверх этого места.
+        // Вокруг плеера нет наложений: наши элементы стоят только ниже него.
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .background(Color.Black)
+                    .onGloballyPositioned { session.dockBounds = it.boundsInWindow() },
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text(
+            video.title,
+            style = MaterialTheme.typography.headlineSmall,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
         )
-        // Кнопки стоят сразу под видео, поэтому не смещаются при длинном названии
+        Text(
+            video.channel,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        session.errorCode?.let {
+            Text(playerErrorText(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(
-                onClick = { session.previous() },
-                enabled = session.hasPrev,
-                modifier = Modifier.weight(1f),
-            ) {
-                YtSkipGlyph(false, Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Предыдущее")
+            IconButton(onClick = { showMenu = true }) { MoreIcon() }
+            // Логотип YouTube ведёт на это видео в YouTube
+            YouTubeLogo(onClick = { openLink("$YOUTUBE_HOME/watch?v=${video.id}") })
+        }
+
+        // На месте таймлайна основного плеера: у YouTube прогресс и перемотка внутри его плеера
+        Spacer(Modifier.height(56.dp))
+
+        Row(
+            Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { session.previous() }, enabled = session.hasPrev, modifier = Modifier.size(60.dp)) {
+                SkipIcon(next = false, modifier = Modifier.size(36.dp))
             }
-            Spacer(Modifier.width(8.dp))
-            OutlinedButton(
-                onClick = { session.next() },
-                enabled = session.hasNext,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text("Следующее")
-                Spacer(Modifier.width(8.dp))
-                YtSkipGlyph(true, Modifier.size(16.dp))
+            FilledIconButton(
+                onClick = { YouTubeControl.send?.invoke(if (playing) "pause" else "play") },
+                modifier = Modifier.size(86.dp),
+            ) { PlayPauseIcon(playing, Modifier.size(48.dp)) }
+            IconButton(onClick = { session.next() }, enabled = session.hasNext, modifier = Modifier.size(60.dp)) {
+                SkipIcon(next = true, modifier = Modifier.size(36.dp))
             }
         }
-        Column(Modifier.padding(16.dp)) {
-            Text(video.title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                video.channel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            session.errorCode?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(playerErrorText(it), color = MaterialTheme.colorScheme.error)
-            }
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { openLink("https://music.youtube.com/watch?v=${video.id}") },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Открыть в YouTube Music") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { openLink("$YOUTUBE_HOME/watch?v=${video.id}") },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Открыть в YouTube") }
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { session.close() },
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Закрыть видео") }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "Видео играет, пока оно видно на экране: в полном виде или в плавающем окне, которое можно " +
-                    "перетаскивать за верхнюю полосу (быстрый свайп вверх по ней разворачивает окно). Свайп вниз под видео сворачивает его в окно. Если свернуть приложение или выключить экран, видео " +
-                    "встаёт на паузу (правила YouTube). Фоновое воспроизведение работает в официальных " +
-                    "приложениях YouTube и YouTube Music.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    }
+
+    if (showMenu) {
+        AlertDialog(
+            onDismissRequest = { showMenu = false },
+            confirmButton = { TextButton(onClick = { showMenu = false }) { Text("Готово") } },
+            title = { Text(video.title, maxLines = 3, overflow = TextOverflow.Ellipsis) },
+            text = {
+                Column {
+                    Text("Канал: ${video.channel}", style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onClick = { openLink("https://music.youtube.com/watch?v=${video.id}") }) {
+                        Text("Открыть в YouTube Music")
+                    }
+                    TextButton(onClick = { openLink("$YOUTUBE_HOME/watch?v=${video.id}") }) {
+                        Text("Открыть в YouTube")
+                    }
+                    TextButton(onClick = {
+                        showMenu = false
+                        session.close()
+                    }) { Text("Закрыть видео") }
+                    Text(
+                        "Видео играет, пока оно видно на экране: в полном виде или в плавающем окне. " +
+                            "Если свернуть приложение или выключить экран, видео встаёт на паузу (правила YouTube). " +
+                            "Фоновое воспроизведение работает в официальных приложениях YouTube и YouTube Music.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+        )
     }
 }
 
 @Composable
-private fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
+internal fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Top,
@@ -325,12 +462,7 @@ private fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                video.title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Text(video.title, style = MaterialTheme.typography.titleSmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Text(
                 video.channel,
                 style = MaterialTheme.typography.bodySmall,
@@ -374,7 +506,7 @@ private fun playerErrorText(code: Int): String = when (code) {
     else -> "Видео не удалось воспроизвести (код $code)."
 }
 
-private fun formatYtDuration(ms: Long): String {
+internal fun formatYtDuration(ms: Long): String {
     val total = ms / 1000
     val h = total / 3600
     val m = (total % 3600) / 60

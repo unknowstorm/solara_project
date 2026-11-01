@@ -25,6 +25,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -86,6 +87,8 @@ class YouTubeSession(private val scope: CoroutineScope) {
     /** Последнее известное место большого плеера в координатах окна (его сообщает экран YouTube). */
     var dockBounds by mutableStateOf<Rect?>(null)
     var errorCode by mutableStateOf<Int?>(null)
+    /** Состояние плеера по IFrame API: 1 играет, 2 пауза, 3 буферизация, 0 конец, -1 нет данных. */
+    var playerState by mutableStateOf(-1)
 
     var progress by mutableFloatStateOf(0f)
         private set
@@ -213,6 +216,10 @@ fun YouTubeOverlay(
     val openLink = rememberExternalLinkOpener()
 
     LaunchedEffect(session.docked) { session.syncTo(session.docked) }
+    DisposableEffect(session) {
+        YouTubeControl.onState = { session.playerState = it }
+        onDispose { YouTubeControl.onState = null }
+    }
 
     val miniPx = with(density) { MINI_SIZE.toPx() }
     val stripPx = with(density) { STRIP_HEIGHT.toPx() }
