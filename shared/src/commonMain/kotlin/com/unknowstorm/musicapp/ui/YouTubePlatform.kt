@@ -23,3 +23,17 @@ expect fun rememberExternalLinkOpener(): (String) -> Unit
  */
 @Composable
 expect fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int) -> Unit)
+
+/**
+ * Постоянное хранилище строк (переживает перезапуск, обновление и пересборку).
+ * quotaDay: номер календарного дня в Pacific Time, когда у YouTube сбрасывается квота.
+ */
+interface TextStore {
+    fun get(key: String): String?
+    fun set(key: String, value: String)
+    fun nowMillis(): Long
+    fun quotaDay(millis: Long): Long
+}
+
+@Composable
+expect fun rememberTextStore(): TextStore

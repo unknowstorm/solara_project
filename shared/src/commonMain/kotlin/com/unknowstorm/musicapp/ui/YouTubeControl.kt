@@ -8,4 +8,6 @@ package com.unknowstorm.musicapp.ui
 object YouTubeControl {
     var send: ((String) -> Unit)? = null
     var onState: ((Int) -> Unit)? = null
+    /** Позиция и длительность в секундах: плеер сообщает их несколько раз в секунду. */
+    var onTime: ((Double, Double) -> Unit)? = null
 }

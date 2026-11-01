@@ -74,6 +74,7 @@ actual fun rememberExternalLinkOpener(): (String) -> Unit {
 class YouTubePlayerBridge(
     private val onError: (Int) -> Unit,
     private val onState: (Int) -> Unit = {},
+    private val onTime: (Double, Double) -> Unit = { _, _ -> },
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
@@ -85,6 +86,11 @@ class YouTubePlayerBridge(
     @JavascriptInterface
     fun onPlayerState(state: Int) {
         handler.post { onState(state) }
+    }
+
+    @JavascriptInterface
+    fun onPlayerTime(position: Double, duration: Double) {
+        handler.post { onTime(position, duration) }
     }
 
     @JavascriptInterface
@@ -169,7 +175,7 @@ private fun playerHtml(videoId: String, origin: String): String {
       width: window.innerWidth,
       height: window.innerHeight,
       videoId: '$safeId',
-      playerVars: { playsinline: 1, autoplay: 1, origin: '$origin' },
+      playerVars: { controls: 0, playsinline: 1, autoplay: 1, origin: '$origin' },
       events: {
         onReady: function () {
           SolaraBridge.log('player ready');
@@ -178,7 +184,7 @@ private fun playerHtml(videoId: String, origin: String): String {
           if (f) { var r = f.getBoundingClientRect(); SolaraBridge.log('iframe ' + r.width + 'x' + r.height + ', window ' + window.innerWidth + 'x' + window.innerHeight); }
           else { SolaraBridge.log('no iframe'); }
         },
-        onStateChange: function (e) { SolaraBridge.log('state ' + e.data); SolaraBridge.onPlayerState(e.data); },
+        onStateChange: function (e) { SolaraBridge.log('state ' + e.data); SolaraBridge.onPlayerState(e.data); if (!window.solaraTimer) { window.solaraTimer = setInterval(function () { try { SolaraBridge.onPlayerTime(player.getCurrentTime(), player.getDuration()); } catch (err) {} }, 250); } },
         onError: function (e) { SolaraBridge.log('error ' + e.data); SolaraBridge.onPlayerError(e.data); }
       }
     });
@@ -238,7 +244,7 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
                 }
             }
             addJavascriptInterface(
-                YouTubePlayerBridge({ code -> currentOnError(code) }, { st -> YouTubeControl.onState?.invoke(st) }),
+                YouTubePlayerBridge({ code -> currentOnError(code) }, { st -> YouTubeControl.onState?.invoke(st) }, { pos, dur -> YouTubeControl.onTime?.invoke(pos, dur) }),
                 "SolaraBridge",
             )
             loadDataWithBaseURL(origin, playerHtml(videoId, origin), "text/html", "utf-8", null)
@@ -267,7 +273,9 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
             val js = when (cmd) {
                 "play" -> "try { player.playVideo(); } catch (e) {}"
                 "pause" -> "try { player.pauseVideo(); } catch (e) {}"
-                else -> null
+                else -> cmd.removePrefix("seek:").toDoubleOrNull()
+                    ?.takeIf { cmd.startsWith("seek:") }
+                    ?.let { "try { player.seekTo($it, true); } catch (e) {}" }
             }
             if (js != null) webView.evaluateJavascript(js, null)
         }
@@ -285,5 +293,24 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
     // factory вызывается один раз за жизнь AndroidView, поэтому при смене WebView его нужно пересоздать
     key(webView) {
         AndroidView(factory = { webView }, modifier = modifier)
+    }
+}
+
+@androidx.compose.runtime.Composable
+actual fun rememberTextStore(): TextStore {
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    return androidx.compose.runtime.remember {
+        val prefs = context.getSharedPreferences("solara_text_store", android.content.Context.MODE_PRIVATE)
+        object : TextStore {
+            override fun get(key: String): String? = prefs.getString(key, null)
+            override fun set(key: String, value: String) {
+                prefs.edit().putString(key, value).apply()
+            }
+            override fun nowMillis(): Long = System.currentTimeMillis()
+            override fun quotaDay(millis: Long): Long {
+                val tz = java.util.TimeZone.getTimeZone("America/Los_Angeles")
+                return Math.floorDiv(millis + tz.getOffset(millis), 86_400_000L)
+            }
+        }
     }
 }

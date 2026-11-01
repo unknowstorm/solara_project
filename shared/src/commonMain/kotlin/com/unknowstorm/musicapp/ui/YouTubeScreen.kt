@@ -112,31 +112,31 @@ fun YouTubeScreen(
 
 @Composable
 private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceChange: (Service) -> Unit) {
-    val openLink = rememberExternalLinkOpener()
-
     // Ушли с экрана YouTube: играющее видео переезжает в плавающее окно
     DisposableEffect(Unit) { onDispose { session.minimize() } }
 
-    // Большой вид держится, пока видео не доехало до мини-окна (иначе содержимое пропало бы рывком)
     val showPlayer by remember {
         derivedStateOf { session.video != null && (session.docked || session.progress > 0.01f) }
     }
     PlatformBackHandler(enabled = showPlayer, onBack = { session.minimize() })
 
-    val current = session.video
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        if (showPlayer && current != null) {
-            PlayerPane(current, session, openLink)
-        } else {
-            TopBar(Service.YOUTUBE, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
-            YouTubeFeed(audio, session, Modifier.weight(1f))
-        }
+    // Лента всегда на месте. Большой плеер рисует YouTubeOverlay: контейнер растёт поверх ленты
+    // до границ этого экрана, как у основного плеера.
+    Column(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { session.screenBounds = it.boundsInWindow() }
+            .statusBarsPadding(),
+    ) {
+        TopBar(Service.YOUTUBE, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        YouTubeFeed(audio, session, Modifier.weight(1f))
     }
 }
 
 @Composable
 private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: Modifier = Modifier) {
-    val api = remember { YouTubeApi.shared }
+    val store = rememberTextStore()
+    val api = remember { YouTubeApi.shared.also { it.attach(store) } }
     val openLink = rememberExternalLinkOpener()
     val scope = rememberCoroutineScope()
 
@@ -307,146 +307,6 @@ private fun VideoCard(video: YouTubeVideo, onClick: () -> Unit) {
     }
 }
 
-/** Большой экран видео в раскладке основного плеера. Само видео рисует общий слой YouTubeOverlay. */
-@Composable
-private fun PlayerPane(video: YouTubeVideo, session: YouTubeSession, openLink: (String) -> Unit) {
-    var showMenu by remember { mutableStateOf(false) }
-    val playing = session.playerState == 1 || session.playerState == 3
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .graphicsLayer { alpha = ((session.progress - 0.2f) / 0.6f).coerceIn(0f, 1f) }
-            // Свайп вниз сворачивает видео за пальцем. Плеер перекрывает свою область и жестов не получает.
-            .pointerInput(Unit) {
-                val tracker = VelocityTracker()
-                var total = 0f
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        total = 0f
-                        tracker.resetTracking()
-                        session.beginDrag()
-                    },
-                    onDragEnd = { session.endDrag(tracker.calculateVelocity().y) },
-                    onDragCancel = { session.endDrag(0f) },
-                    onVerticalDrag = { change, amount ->
-                        change.consume()
-                        total += amount
-                        tracker.addPosition(change.uptimeMillis, Offset(0f, total))
-                        session.dragBy(amount)
-                    },
-                )
-            }
-            .padding(horizontal = 24.dp),
-    ) {
-        // Ручка: показывает, что экран сворачивается, и сворачивает по тапу
-        Box(
-            Modifier.fillMaxWidth().height(28.dp).clickable { session.minimize() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(
-                Modifier
-                    .width(40.dp)
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
-            )
-        }
-
-        // Место под видео (как у обложки в основном плеере). Плеер рисуется поверх этого места.
-        // Вокруг плеера нет наложений: наши элементы стоят только ниже него.
-        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .background(Color.Black)
-                    .onGloballyPositioned { session.dockBounds = it.boundsInWindow() },
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-        Text(
-            video.title,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            video.channel,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        session.errorCode?.let {
-            Text(playerErrorText(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        }
-
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { showMenu = true }) { MoreIcon() }
-            // Логотип YouTube ведёт на это видео в YouTube
-            YouTubeLogo(onClick = { openLink("$YOUTUBE_HOME/watch?v=${video.id}") })
-        }
-
-        // На месте таймлайна основного плеера: у YouTube прогресс и перемотка внутри его плеера
-        Spacer(Modifier.height(56.dp))
-
-        Row(
-            Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { session.previous() }, enabled = session.hasPrev, modifier = Modifier.size(60.dp)) {
-                SkipIcon(next = false, modifier = Modifier.size(36.dp))
-            }
-            FilledIconButton(
-                onClick = { YouTubeControl.send?.invoke(if (playing) "pause" else "play") },
-                modifier = Modifier.size(86.dp),
-            ) { PlayPauseIcon(playing, Modifier.size(48.dp)) }
-            IconButton(onClick = { session.next() }, enabled = session.hasNext, modifier = Modifier.size(60.dp)) {
-                SkipIcon(next = true, modifier = Modifier.size(36.dp))
-            }
-        }
-    }
-
-    if (showMenu) {
-        AlertDialog(
-            onDismissRequest = { showMenu = false },
-            confirmButton = { TextButton(onClick = { showMenu = false }) { Text("Готово") } },
-            title = { Text(video.title, maxLines = 3, overflow = TextOverflow.Ellipsis) },
-            text = {
-                Column {
-                    Text("Канал: ${video.channel}", style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = { openLink("https://music.youtube.com/watch?v=${video.id}") }) {
-                        Text("Открыть в YouTube Music")
-                    }
-                    TextButton(onClick = { openLink("$YOUTUBE_HOME/watch?v=${video.id}") }) {
-                        Text("Открыть в YouTube")
-                    }
-                    TextButton(onClick = {
-                        showMenu = false
-                        session.close()
-                    }) { Text("Закрыть видео") }
-                    Text(
-                        "Видео играет, пока оно видно на экране: в полном виде или в плавающем окне. " +
-                            "Если свернуть приложение или выключить экран, видео встаёт на паузу (правила YouTube). " +
-                            "Фоновое воспроизведение работает в официальных приложениях YouTube и YouTube Music.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-        )
-    }
-}
-
 @Composable
 internal fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
     Row(
@@ -498,7 +358,7 @@ fun YouTubeLogo(modifier: Modifier = Modifier, onClick: () -> Unit) {
     }
 }
 
-private fun playerErrorText(code: Int): String = when (code) {
+internal fun playerErrorText(code: Int): String = when (code) {
     101, 150 -> "Автор запретил встраивание этого видео. Откройте его в YouTube."
     100 -> "Видео недоступно: удалено, закрыто или недоступно в вашем регионе."
     153 -> "YouTube не смог проверить приложение. Откройте видео в YouTube."
