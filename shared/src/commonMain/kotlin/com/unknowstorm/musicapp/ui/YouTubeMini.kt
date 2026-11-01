@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -262,7 +263,8 @@ fun YouTubeOverlay(
         .graphicsLayer {
             val p = session.progress
             shadowElevation = lerp(shadowPx, 0f, p)
-            shape = RoundedCornerShape(lerp(cornerPx, 0f, p))
+            val r = lerp(cornerPx, 0f, p)
+            shape = RoundedCornerShape(topStart = r, topEnd = r, bottomEnd = 0f, bottomStart = 0f)
             clip = true
         }
 
@@ -325,10 +327,35 @@ fun YouTubeOverlay(
                     )
                 }
             }
-            Box(Modifier.fillMaxWidth().weight(1f)) {
+            Box(Modifier.fillMaxWidth().weight(1f).clipToBounds().background(Color.Black)) {
+                // Пока окно в движении, плеер держит большой размер и только масштабируется:
+                // перестраивать страницу плеера на каждом кадре дорого (отсюда была шероховатость)
                 YouTubePlayerView(
                     videoId = video.id,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .layout { measurable, constraints ->
+                            val moving = session.progress in 0.002f..0.998f
+                            val placeable = if (moving) {
+                                measurable.measure(
+                                    Constraints.fixed(
+                                        dockRect.width.roundToInt().coerceAtLeast(1),
+                                        dockRect.height.roundToInt().coerceAtLeast(1),
+                                    )
+                                )
+                            } else {
+                                measurable.measure(Constraints.fixed(constraints.maxWidth, constraints.maxHeight))
+                            }
+                            layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                        }
+                        .graphicsLayer {
+                            if (session.progress in 0.002f..0.998f && dockRect.width > 0f) {
+                                val k = size.width / dockRect.width
+                                scaleX = k
+                                scaleY = k
+                                transformOrigin = TransformOrigin(0f, 0f)
+                                translationY = (size.height - dockRect.height * k) / 2f
+                            }
+                        },
                     onError = { session.errorCode = it },
                 )
             }
@@ -337,11 +364,12 @@ fun YouTubeOverlay(
 }
 
 /**
- * Жест на нашей плашке (на плеер жесты не вешаем: правило Mouseovers). Направление выбирается
- * по первому заметному движению: вверх = «раскрыть» (mode 2), иначе двигаем окно (mode 1).
+ * Жест на нашей плашке (на плеер жесты не вешаем: правило Mouseovers).
+ * fixedMode: 1 = окно едет за пальцем в любую сторону, 2 = палец вверх тянет окно к большому видео.
  */
 @Composable
 private fun Modifier.dragHandle(
+    fixedMode: Int,
     onBegin: (expand: Boolean) -> Unit,
     onMove: (delta: Offset, expand: Boolean) -> Unit,
     onEnd: (velocityY: Float, expand: Boolean) -> Unit,
@@ -349,36 +377,22 @@ private fun Modifier.dragHandle(
     val begin by rememberUpdatedState(onBegin)
     val move by rememberUpdatedState(onMove)
     val end by rememberUpdatedState(onEnd)
-    return pointerInput(Unit) {
+    return pointerInput(fixedMode) {
         val tracker = VelocityTracker()
         var total = Offset.Zero
-        var mode = 0 // 0 = ещё не ясно, 1 = двигаем окно, 2 = раскрываем
         detectDragGestures(
             onDragStart = {
                 tracker.resetTracking()
                 total = Offset.Zero
-                mode = 0
+                begin(fixedMode == 2)
             },
-            onDragEnd = {
-                if (mode != 0) end(tracker.calculateVelocity().y, mode == 2)
-                mode = 0
-            },
-            onDragCancel = {
-                if (mode != 0) end(0f, mode == 2)
-                mode = 0
-            },
+            onDragEnd = { end(tracker.calculateVelocity().y, fixedMode == 2) },
+            onDragCancel = { end(0f, fixedMode == 2) },
             onDrag = { change, amount ->
                 change.consume()
                 total += amount
                 tracker.addPosition(change.uptimeMillis, total)
-                if (mode == 0) {
-                    if (total.getDistance() < 12f) return@detectDragGestures
-                    mode = if (abs(total.y) > abs(total.x) && total.y < 0f) 2 else 1
-                    begin(mode == 2)
-                    move(total, mode == 2)
-                } else {
-                    move(amount, mode == 2)
-                }
+                move(amount, fixedMode == 2)
             },
         )
     }
@@ -386,7 +400,7 @@ private fun Modifier.dragHandle(
 
 /**
  * Полоса над видео: логотип YouTube (обязателен по правилам бренда), развернуть, закрыть.
- * Тап по полосе разворачивает окно, свайп вверх тянет его к большому видео.
+ * Окно двигают за логотип; тап или свайп вверх по остальной плашке разворачивает его.
  */
 @Composable
 private fun MiniStrip(
@@ -403,11 +417,11 @@ private fun MiniStrip(
             .height(STRIP_HEIGHT)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onExpand)
-            .dragHandle(onBegin, onMove, onEnd)
+            .dragHandle(2, onBegin, onMove, onEnd)
             .padding(start = 4.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        YouTubeLogo(onClick = onLogo)
+        YouTubeLogo(modifier = Modifier.dragHandle(1, onBegin, onMove, onEnd), onClick = onLogo)
         Spacer(Modifier.weight(1f))
         Box(Modifier.size(32.dp).clickable(onClick = onExpand), contentAlignment = Alignment.Center) {
             ChevronDownIcon(Modifier.size(20.dp).rotate(180f))
