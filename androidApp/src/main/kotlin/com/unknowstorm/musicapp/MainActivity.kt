@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Приложение могли открыть по ссылке solara://auth (подтверждение почты, Google)
-        handleAuthDeepLink(intent)
+        if (intent?.data != null) handleAuthDeepLink(intent)
 
         setContent {
             App()
@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleAuthDeepLink(intent)
+        if (intent.data != null) handleAuthDeepLink(intent)
     }
 }
 
