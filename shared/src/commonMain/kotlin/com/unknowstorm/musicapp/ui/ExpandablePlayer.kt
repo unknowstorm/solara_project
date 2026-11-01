@@ -84,6 +84,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.unknowstorm.musicapp.model.toService
+import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.likes.asTrack
+import com.unknowstorm.musicapp.likes.containsTrack
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.RepeatMode
 import kotlinx.coroutines.Job
@@ -130,8 +133,10 @@ val LocalMiniPlayerAnchor = staticCompositionLocalOf { MiniPlayerAnchor() }
 @Composable
 fun ExpandablePlayer(
     audio: AudioBackend,
+    likes: LikesRepository,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
+    onNeedAuth: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val onChange by rememberUpdatedState(onExpandedChange)
@@ -336,6 +341,8 @@ fun ExpandablePlayer(
             if (fullVisible) {
                 FullContent(
                     audio = audio,
+                    likes = likes,
+                    onNeedAuth = onNeedAuth,
                     expandProgress = { progress.floatValue },
                     width = fullWidthDp,
                     height = fullHeightDp,
@@ -595,6 +602,8 @@ private fun SharedCover(
 @Composable
 private fun FullContent(
     audio: AudioBackend,
+    likes: LikesRepository,
+    onNeedAuth: () -> Unit,
     expandProgress: () -> Float,
     width: Dp,
     height: Dp,
@@ -604,7 +613,11 @@ private fun FullContent(
 ) {
     val state by audio.state.collectAsState()
     var dragValue by remember { mutableStateOf<Float?>(null) }
-    var liked by remember(state.mediaId) { mutableStateOf(false) } // пока только визуально
+    val likedTracks by likes.tracks.collectAsState()
+    val signedIn by likes.signedIn.collectAsState()
+    val likeError by likes.error.collectAsState()
+    val currentTrack = state.asTrack()
+    val liked = likedTracks.containsTrack(currentTrack)
     var showDetails by remember { mutableStateOf(false) }
 
     val trackProgress = if (state.durationMs > 0) {
@@ -662,7 +675,7 @@ private fun FullContent(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                state.error?.let {
+                (state.error ?: likeError)?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 
@@ -675,7 +688,13 @@ private fun FullContent(
                         MoreIcon()
                     }
                     Row {
-                        IconButton(onClick = { liked = !liked }) {
+                        IconButton(onClick = {
+                            when {
+                                currentTrack == null -> Unit
+                                !signedIn -> onNeedAuth()
+                                else -> likes.toggle(currentTrack)
+                            }
+                        }) {
                             HeartIcon(liked, tint = if (liked) active else inactive)
                         }
                         IconButton(onClick = { audio.cycleRepeat() }) {

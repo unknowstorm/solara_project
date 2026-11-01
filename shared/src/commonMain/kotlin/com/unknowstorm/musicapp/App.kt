@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
+import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.player.rememberAudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.provider.audius.AudiusProvider
@@ -49,6 +50,7 @@ fun App() {
             }
             val audio = rememberAudioBackend()
             val authRepo = remember { AuthRepository() }
+            val likes = remember { LikesRepository(authRepo) }
             val authState by authRepo.state.collectAsState()
             val pending by authRepo.pending.collectAsState()
             var showSplash by remember { mutableStateOf(true) }
@@ -72,14 +74,21 @@ fun App() {
                         providers = providers,
                         audio = audio,
                         authRepo = authRepo,
+                        likes = likes,
                         onOpenPlayer = { showPlayer = true },
                         onOpenAuth = { showAuth = true },
                     )
                     // Мини-плеер и полный плеер — один компонент: плавно перетекает из одного в другой
                     ExpandablePlayer(
                         audio = audio,
+                        likes = likes,
                         expanded = showPlayer,
                         onExpandedChange = { showPlayer = it },
+                        // Гость нажал ♡: сворачиваем плеер и открываем вход
+                        onNeedAuth = {
+                            showPlayer = false
+                            showAuth = true
+                        },
                     )
                     // Экран входа и регистрации поверх всего
                     if (showAuth) {

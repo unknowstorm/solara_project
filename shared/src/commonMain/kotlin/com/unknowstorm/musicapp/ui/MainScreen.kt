@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
+import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -51,11 +52,13 @@ fun MainScreen(
     providers: List<MusicProvider>,
     audio: AudioBackend,
     authRepo: AuthRepository,
+    likes: LikesRepository,
     onOpenPlayer: () -> Unit,
     onOpenAuth: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.HOME) }
     var service by remember { mutableStateOf(Service.ALL) }
+    var showLikes by remember { mutableStateOf(false) }
 
     val feeds = remember(providers) {
         providers.mapNotNull { provider ->
@@ -95,7 +98,7 @@ fun MainScreen(
                         onServiceChange = { service = it },
                     )
                 } else {
-                    HomeScreen(shownFeeds, service, { service = it }, audio)
+                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth)
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session)
                 Tab.QUEUE -> InfoScreen(
