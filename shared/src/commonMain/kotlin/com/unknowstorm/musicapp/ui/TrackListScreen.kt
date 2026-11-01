@@ -99,7 +99,7 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend) {
 
         if (!canSearch) {
             Text(
-                text = "${selected.title} скоро появится. ${selected.note}.",
+                text = if (selected == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube." else "${selected.title} скоро появится. ${selected.note}.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp)
             )
