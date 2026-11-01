@@ -34,6 +34,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -71,6 +75,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -79,6 +84,7 @@ import androidx.compose.ui.util.lerp
 import com.unknowstorm.musicapp.provider.youtube.YouTubeVideo
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -90,7 +96,7 @@ private val STRIP_HEIGHT = 36.dp
 private val EDGE = 8.dp
 private val MINI_CORNER = 12.dp // подберите под скругление мини-плеера аудио
 private val HEADER_ESTIMATE = 56.dp // высота шапки экрана YouTube, пока реальное место плеера неизвестно
-private val FLICK_VELOCITY = 1200.dp // скорость рывка в dp/с
+private val FLICK_VELOCITY = 400.dp // скорость рывка в dp/с (раньше 1200: приходилось дёргать слишком резко)
 private val FULL_SIDE_MARGIN = 24.dp // поля большого экрана
 private val FULL_VIDEO_TOP = 72.dp // отступ видео от верха (под статус-баром)
 private val MINI_BOTTOM_RESERVE = 80.dp // отступ мини-окна от низа: над нижней панелью навигации
@@ -100,6 +106,8 @@ private val FULL_LINKS_HEIGHT = 56.dp // ряд ссылок под информ
 private val FULL_TIMELINE_HEIGHT = 64.dp // таймлайн + время
 private val FULL_CONTROLS_HEIGHT = 126.dp // 16 сверху + кнопка 86 + 24 снизу
 private val FULL_BLOCK_GAP = 20.dp
+private val YT_TRAVEL_CAP = 200.dp // путь пальца, за который окно полностью разворачивается (было почти пол-экрана)
+private val RAIL_SIZE = 112.dp // боковая (или нижняя) панель кнопок в полноэкранном режиме
 
 /**
  * Текущее видео YouTube на уровне всего приложения.
@@ -119,6 +127,8 @@ class YouTubeSession(private val scope: CoroutineScope) {
     /** Область экрана YouTube в координатах окна: до неё растёт контейнер. Её сообщает YouTubeHome. */
     var screenBounds by mutableStateOf<Rect?>(null)
     var errorCode by mutableStateOf<Int?>(null)
+    /** Полноэкранный режим: видео на всё окно, кнопки рядом с ним (не поверх). */
+    var fullscreen by mutableStateOf(false)
     /** Состояние плеера по IFrame API: 1 играет, 2 пауза, 3 буферизация, 0 конец, -1 нет данных. */
     var playerState by mutableStateOf(-1)
     /** Позиция и длительность текущего видео в секундах (0 у прямых трансляций). */
@@ -168,6 +178,7 @@ class YouTubeSession(private val scope: CoroutineScope) {
     }
 
     fun minimize() {
+        fullscreen = false
         if (video != null) docked = false
     }
 
@@ -178,6 +189,7 @@ class YouTubeSession(private val scope: CoroutineScope) {
         video = null
         queue = emptyList()
         docked = false
+        fullscreen = false
         progress = 0f
         errorCode = null
     }
@@ -224,7 +236,7 @@ class YouTubeSession(private val scope: CoroutineScope) {
         val expand = when {
             velocityY < -flickPx -> true
             velocityY > flickPx -> false
-            else -> progress > 0.5f
+            else -> progress > 0.35f
         }
         docked = expand
         settle(if (expand) 1f else 0f, -velocityY / travelPx)
@@ -254,6 +266,9 @@ fun YouTubeOverlay(
     val openLink = rememberExternalLinkOpener()
 
     LaunchedEffect(session.docked) { session.syncTo(session.docked) }
+    // Полный экран: прячем системные панели и (на Android) поворачиваем в альбом. «Назад» сначала выходит из него.
+    FullscreenWindowEffect(session.fullscreen)
+    PlatformBackHandler(enabled = session.fullscreen, onBack = { session.fullscreen = false })
     DisposableEffect(session) {
         YouTubeControl.onState = {
             session.playerState = it
@@ -287,21 +302,70 @@ fun YouTubeOverlay(
     val timelinePx = with(density) { FULL_TIMELINE_HEIGHT.toPx() }
     val controlsPx = with(density) { FULL_CONTROLS_HEIGHT.toPx() }
     val topInset = WindowInsets.statusBars.getTop(density).toFloat()
+    val layoutDirection = LocalLayoutDirection.current
+    val sideInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+    val leftInsetPx = sideInsets.getLeft(density, layoutDirection).toFloat()
+    val rightInsetPx = sideInsets.getRight(density, layoutDirection).toFloat()
+    val bottomInsetPx = sideInsets.getBottom(density).toFloat()
+    val fullscreen = session.fullscreen
+    val railPx = with(density) { RAIL_SIZE.toPx() }
+    val roomPx = with(density) { 8.dp.toPx() }
+    val travelCapPx = with(density) { YT_TRAVEL_CAP.toPx() }
 
-    // Куда растёт контейнер: область экрана YouTube (её сообщает YouTubeHome), а пока её не знаем, весь контейнер
-    val full: Rect = session.screenBounds?.translate(-containerOrigin)
-        ?: Rect(0f, 0f, containerSize.width.toFloat(), containerSize.height.toFloat())
+    // Куда растёт контейнер: область экрана YouTube (её сообщает YouTubeHome), а пока её не знаем, весь контейнер.
+    // В полноэкранном режиме контейнер занимает всё окно, в том числе поверх нижней панели.
+    val rootRect = Rect(0f, 0f, containerSize.width.toFloat(), containerSize.height.toFloat())
+    // Нижняя панель при большом плеере прячется: контейнер растёт до низа окна.
+    val full: Rect = if (fullscreen) rootRect else (
+        session.screenBounds?.translate(-containerOrigin)
+            ?.let { Rect(it.left, it.top, it.right, rootRect.bottom) } ?: rootRect
+        )
     val topPadPx = (topInset - full.top).coerceAtLeast(0f)
+    val landscape = full.width >= full.height
 
-    // Место видео внутри большого контейнера (в его координатах). Блок «видео + информация + ссылки»
-    // стоит по центру свободной области между ручкой и таймлайном.
-    val dockW = (full.width - sidePx * 2f).coerceAtLeast(1f)
-    val dockH = dockW * 9f / 16f
-    val areaTop = topPadPx + handlePx
-    val groupH = dockH + gapPx + infoPx + linksPx
-    val freeH = full.height - areaTop - timelinePx - controlsPx - groupH
-    val dockLeft = sidePx
-    val dockTop = areaTop + (freeH / 2f).coerceAtLeast(0f)
+    // Место видео внутри большого контейнера (в его координатах)
+    val lay: YtLayout = when {
+        // Полный экран в альбоме: видео по центру, справа панель кнопок
+        fullscreen && landscape -> {
+            val availW = (full.width - leftInsetPx - rightInsetPx - railPx).coerceAtLeast(1f)
+            val availH = full.height
+            val w = min(availW, availH * 16f / 9f)
+            YtLayout(leftInsetPx + (availW - w) / 2f, (availH - w * 9f / 16f) / 2f, w, w * 9f / 16f)
+        }
+        // Полный экран в портрете (например, окно на ПК): видео сверху, панель кнопок снизу
+        fullscreen -> {
+            val availH = (full.height - railPx - topPadPx - bottomInsetPx).coerceAtLeast(1f)
+            val w = min(full.width, availH * 16f / 9f)
+            YtLayout((full.width - w) / 2f, topPadPx + (availH - w * 9f / 16f) / 2f, w, w * 9f / 16f)
+        }
+        // Альбом: видео слева, название, таймлайн и кнопки справа
+        landscape -> {
+            val areaTop = topPadPx + roomPx
+            val areaH = (full.height - areaTop - roomPx * 2f - bottomInsetPx).coerceAtLeast(1f)
+            val maxW = (full.width - leftInsetPx - rightInsetPx - sidePx * 3f) * 0.55f
+            val h = min(areaH, maxW * 9f / 16f).coerceAtLeast(1f)
+            val w = h * 16f / 9f
+            val left = leftInsetPx + sidePx
+            YtLayout(
+                left, areaTop + (areaH - h) / 2f, w, h,
+                panelLeft = left + w + sidePx,
+                panelRight = full.width - rightInsetPx - sidePx,
+            )
+        }
+        // Портрет: блок «видео + информация + ссылки» по центру свободной области между ручкой и таймлайном
+        else -> {
+            val w = (full.width - sidePx * 2f).coerceAtLeast(1f)
+            val h = w * 9f / 16f
+            val areaTop = topPadPx + handlePx
+            val groupH = h + gapPx + infoPx + linksPx
+            val freeH = full.height - areaTop - timelinePx - controlsPx - groupH - bottomInsetPx
+            YtLayout(sidePx, areaTop + (freeH / 2f).coerceAtLeast(0f), w, h)
+        }
+    }
+    val dockW = lay.w
+    val dockH = lay.h
+    val dockLeft = lay.left
+    val dockTop = lay.top
 
     val minX = edgePx
     val minY = topInset + edgePx
@@ -314,7 +378,8 @@ fun YouTubeOverlay(
     val pos = clamp(floatPos ?: Offset(maxX, maxY - reservePx))
 
     SideEffect {
-        session.travelPx = max(abs(full.top - pos.y), full.height * 0.4f)
+        // Короткий путь пальца: окно разворачивается, как основной плеер, а не только у самого верха экрана
+        session.travelPx = min(abs(full.top - pos.y), travelCapPx).coerceAtLeast(1f)
         session.flickPx = with(density) { FLICK_VELOCITY.toPx() }
     }
 
@@ -395,6 +460,12 @@ fun YouTubeOverlay(
                 height = with(density) { full.height.toDp() },
                 topPad = with(density) { topPadPx.toDp() },
                 belowVideoStart = with(density) { (dockTop + dockH + gapPx).toDp() },
+                landscape = landscape,
+                fullscreen = fullscreen,
+                panelLeft = with(density) { lay.panelLeft.toDp() },
+                panelRight = with(density) { (full.width - lay.panelRight).coerceAtLeast(0f).toDp() },
+                rightInset = with(density) { rightInsetPx.toDp() },
+                bottomInset = with(density) { bottomInsetPx.toDp() },
             )
         }
 
@@ -478,12 +549,24 @@ fun YouTubeOverlay(
     }
 }
 
+/** Положение видео (и, в альбоме, правой панели) внутри большого контейнера, в пикселях. */
+private class YtLayout(
+    val left: Float,
+    val top: Float,
+    val w: Float,
+    val h: Float,
+    val panelLeft: Float = 0f,
+    val panelRight: Float = 0f,
+)
+
 /**
- * Содержимое большого экрана (FULL-CONTENT-V2), как FullContent у основного плеера.
+ * Содержимое большого экрана (FULL-CONTENT-V3). Три раскладки:
+ *  - портрет: видео сверху, под ним название, ссылки, пояснение, таймлайн и кнопки;
+ *  - альбом: видео слева, справа название, ссылки, таймлайн и кнопки;
+ *  - полный экран: видео по центру, кнопки в боковой (или нижней) панели рядом с ним, не поверх.
  * Рисуется внутри растущего контейнера в полный размер и обрезается им; видео сюда не входит.
  * Плеер без родной панели (controls=0): таймлайн и play/pause у нас, команды идут через IFrame API.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun YouTubeFullContent(
     session: YouTubeSession,
@@ -493,15 +576,15 @@ private fun YouTubeFullContent(
     height: Dp,
     topPad: Dp,
     belowVideoStart: Dp,
+    landscape: Boolean,
+    fullscreen: Boolean,
+    panelLeft: Dp,
+    panelRight: Dp,
+    rightInset: Dp,
+    bottomInset: Dp,
 ) {
     val playing = session.playerState == 1 || session.playerState == 3
     val blocker = remember { MutableInteractionSource() }
-    var dragValue by remember { mutableStateOf<Float?>(null) }
-
-    val durationSec = session.durationSec
-    val trackProgress = if (durationSec > 0.0) (session.positionSec / durationSec).toFloat().coerceIn(0f, 1f) else 0f
-    val shownProgress = dragValue ?: trackProgress
-    val shownSec = dragValue?.let { it * durationSec } ?: session.positionSec
 
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
         Box(
@@ -512,149 +595,309 @@ private fun YouTubeFullContent(
                 .graphicsLayer { alpha = ((session.progress - 0.3f) / 0.5f).coerceIn(0f, 1f) }
                 // не пускаем нажатия сквозь контейнер в ленту под ним
                 .clickable(interactionSource = blocker, indication = null) {}
-                // Свайп вниз сворачивает видео за пальцем. Плеер лежит выше и жестов не получает.
-                .pointerInput(Unit) {
-                    val tracker = VelocityTracker()
-                    var total = 0f
-                    detectVerticalDragGestures(
-                        onDragStart = {
-                            total = 0f
-                            tracker.resetTracking()
-                            session.beginDrag()
-                        },
-                        onDragEnd = { session.endDrag(tracker.calculateVelocity().y) },
-                        onDragCancel = { session.endDrag(0f) },
-                        onVerticalDrag = { change, amount ->
-                            change.consume()
-                            total += amount
-                            tracker.addPosition(change.uptimeMillis, Offset(0f, total))
-                            session.dragBy(amount)
-                        },
-                    )
-                },
+                // Свайп вниз сворачивает видео за пальцем (в полном экране выходим кнопкой). Плеер лежит выше и жестов не получает.
+                .then(
+                    if (fullscreen) {
+                        Modifier
+                    } else {
+                        Modifier.pointerInput(Unit) {
+                            val tracker = VelocityTracker()
+                            var total = 0f
+                            detectVerticalDragGestures(
+                                onDragStart = {
+                                    total = 0f
+                                    tracker.resetTracking()
+                                    session.beginDrag()
+                                },
+                                onDragEnd = { session.endDrag(tracker.calculateVelocity().y) },
+                                onDragCancel = { session.endDrag(0f) },
+                                onVerticalDrag = { change, amount ->
+                                    change.consume()
+                                    total += amount
+                                    tracker.addPosition(change.uptimeMillis, Offset(0f, total))
+                                    session.dragBy(amount)
+                                },
+                            )
+                        }
+                    }
+                ),
         ) {
-            // Ручка: показывает, что экран сворачивается, и сворачивает по тапу
-            Box(
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = topPad)
-                    .fillMaxWidth()
-                    .height(FULL_HANDLE_AREA)
-                    .clickable { session.minimize() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    Modifier
-                        .width(40.dp)
-                        .height(4.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
-                )
-            }
-
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = FULL_SIDE_MARGIN)
-                    .padding(bottom = 24.dp),
-            ) {
-                // Здесь сверху лежит видео (его рисует сам оверлей)
-                Spacer(Modifier.height(belowVideoStart))
-
-                Column(Modifier.fillMaxWidth().height(FULL_INFO_HEIGHT)) {
-                    Text(
-                        video.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        video.channel,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    session.errorCode?.let {
-                        Text(playerErrorText(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-
-                // Ссылки: официальные логотипы ведут на это видео. Справа закрыть видео.
-                Row(
-                    Modifier.fillMaxWidth().height(FULL_LINKS_HEIGHT),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    YouTubeLogo(onClick = { openLink("https://www.youtube.com/watch?v=${video.id}") })
-                    Spacer(Modifier.width(12.dp))
-                    YouTubeMusicLink(onClick = { openLink("https://music.youtube.com/watch?v=${video.id}") })
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { session.close() }) {
-                        CloseIcon(Modifier.size(22.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                // Свободное место: пояснение. Если места мало, оно просто обрезается и ничего не сдвигает.
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    Text(
-                        "Видео играет, пока оно видно на экране. Если свернуть приложение или выключить экран, " +
-                            "оно встаёт на паузу (правила YouTube). Фоновое воспроизведение работает в " +
-                            "официальных приложениях YouTube и YouTube Music.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-
-                // Таймлайн: волна и невидимый Slider для перемотки, как у основного плеера
-                Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
-                    LinearWavyProgressIndicator(
-                        progress = { shownProgress },
-                        amplitude = { if (playing) 1f else 0f },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                    )
-                    Slider(
-                        value = shownProgress,
-                        onValueChange = { dragValue = it },
-                        onValueChangeFinished = {
-                            dragValue?.let {
-                                val sec = it * durationSec
-                                YouTubeControl.send?.invoke("seek:$sec")
-                                session.positionSec = sec
-                            }
-                            dragValue = null
+            when {
+                fullscreen -> {
+                    YtRail(
+                        session = session,
+                        video = video,
+                        playing = playing,
+                        vertical = landscape,
+                        openLink = openLink,
+                        modifier = if (landscape) {
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = rightInset)
+                                .width(RAIL_SIZE)
+                                .fillMaxHeight()
+                                .padding(vertical = 16.dp)
+                        } else {
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = bottomInset)
+                                .height(RAIL_SIZE)
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
                         },
-                        enabled = durationSec > 0.0,
-                        modifier = Modifier.fillMaxWidth().alpha(0f),
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatYtDuration((shownSec * 1000).toLong()), style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        if (durationSec > 0.0) formatYtDuration((durationSec * 1000).toLong()) else "",
-                        style = MaterialTheme.typography.labelMedium,
                     )
                 }
 
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = { session.previous() }, enabled = session.hasPrev, modifier = Modifier.size(60.dp)) {
-                        SkipIcon(next = false, modifier = Modifier.size(36.dp))
+                landscape -> {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(start = panelLeft, end = panelRight, top = topPad + 8.dp, bottom = 8.dp + bottomInset),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        YtTitleBlock(video, session, compact = true)
+                        Spacer(Modifier.height(4.dp))
+                        YtLinksRow(session, video, openLink, rowHeight = 48.dp, showMinimize = true)
+                        YtTimeline(session, playing)
+                        YtControls(session, playing, compact = true, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
                     }
-                    FilledIconButton(
-                        onClick = { YouTubeControl.send?.invoke(if (playing) "pause" else "play") },
-                        modifier = Modifier.size(86.dp),
-                    ) { PlayPauseIcon(playing, Modifier.size(48.dp)) }
-                    IconButton(onClick = { session.next() }, enabled = session.hasNext, modifier = Modifier.size(60.dp)) {
-                        SkipIcon(next = true, modifier = Modifier.size(36.dp))
+                }
+
+                else -> {
+                    // Ручка: показывает, что экран сворачивается, и сворачивает по тапу
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = topPad)
+                            .fillMaxWidth()
+                            .height(FULL_HANDLE_AREA)
+                            .clickable { session.minimize() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            Modifier
+                                .width(40.dp)
+                                .height(4.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)),
+                        )
+                    }
+
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = FULL_SIDE_MARGIN)
+                            .padding(bottom = 24.dp + bottomInset),
+                    ) {
+                        // Здесь сверху лежит видео (его рисует сам оверлей)
+                        Spacer(Modifier.height(belowVideoStart))
+
+                        Column(Modifier.fillMaxWidth().height(FULL_INFO_HEIGHT)) {
+                            YtTitleBlock(video, session, compact = false)
+                        }
+
+                        YtLinksRow(session, video, openLink, rowHeight = FULL_LINKS_HEIGHT, showMinimize = false)
+
+                        // Свободное место: пояснение. Если места мало, оно просто обрезается и ничего не сдвигает.
+                        Box(Modifier.weight(1f).fillMaxWidth()) {
+                            Text(
+                                "Видео играет, пока оно видно на экране. Если свернуть приложение или выключить экран, " +
+                                    "оно встаёт на паузу (правила YouTube). Фоновое воспроизведение работает в " +
+                                    "официальных приложениях YouTube и YouTube Music.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        }
+
+                        YtTimeline(session, playing)
+                        YtControls(session, playing, compact = false, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
                     }
                 }
             }
+        }
+    }
+}
+
+/** Название видео, канал и ошибка плеера (если есть). */
+@Composable
+private fun YtTitleBlock(video: YouTubeVideo, session: YouTubeSession, compact: Boolean) {
+    Text(
+        video.title,
+        style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+        maxLines = if (compact) 1 else 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+        video.channel,
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    session.errorCode?.let {
+        Text(playerErrorText(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/**
+ * Ссылки: официальные логотипы ведут на это видео. Справа: полный экран, (в альбоме) свернуть, закрыть.
+ */
+@Composable
+private fun YtLinksRow(
+    session: YouTubeSession,
+    video: YouTubeVideo,
+    openLink: (String) -> Unit,
+    rowHeight: Dp,
+    showMinimize: Boolean,
+) {
+    Row(
+        Modifier.fillMaxWidth().height(rowHeight),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        YouTubeLogo(onClick = { openLink("https://www.youtube.com/watch?v=${video.id}") })
+        Spacer(Modifier.width(12.dp))
+        YouTubeMusicLink(onClick = { openLink("https://music.youtube.com/watch?v=${video.id}") })
+        Spacer(Modifier.weight(1f))
+        IconButton(onClick = { session.fullscreen = true }) {
+            FullscreenGlyph(exit = false, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (showMinimize) {
+            IconButton(onClick = { session.minimize() }) {
+                ChevronDownIcon(Modifier.size(22.dp))
+            }
+        }
+    }
+}
+
+/** Таймлайн: волна и невидимый Slider для перемотки, как у основного плеера. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun YtTimeline(session: YouTubeSession, playing: Boolean) {
+    var dragValue by remember { mutableStateOf<Float?>(null) }
+    val durationSec = session.durationSec
+    val trackProgress = if (durationSec > 0.0) (session.positionSec / durationSec).toFloat().coerceIn(0f, 1f) else 0f
+    val shownProgress = dragValue ?: trackProgress
+    val shownSec = dragValue?.let { it * durationSec } ?: session.positionSec
+
+    Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
+        LinearWavyProgressIndicator(
+            progress = { shownProgress },
+            amplitude = { if (playing) 1f else 0f },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        )
+        Slider(
+            value = shownProgress,
+            onValueChange = { dragValue = it },
+            onValueChangeFinished = {
+                dragValue?.let {
+                    val sec = it * durationSec
+                    YouTubeControl.send?.invoke("seek:$sec")
+                    session.positionSec = sec
+                }
+                dragValue = null
+            },
+            enabled = durationSec > 0.0,
+            modifier = Modifier.fillMaxWidth().alpha(0f),
+        )
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(formatYtDuration((shownSec * 1000).toLong()), style = MaterialTheme.typography.labelMedium)
+        Text(
+            if (durationSec > 0.0) formatYtDuration((durationSec * 1000).toLong()) else "",
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+/** Предыдущее, play/pause, следующее. compact: меньшие кнопки для альбома. */
+@Composable
+private fun YtControls(session: YouTubeSession, playing: Boolean, compact: Boolean, modifier: Modifier = Modifier) {
+    val side = if (compact) 52.dp else 60.dp
+    val sideIcon = if (compact) 30.dp else 36.dp
+    val mid = if (compact) 64.dp else 86.dp
+    val midIcon = if (compact) 36.dp else 48.dp
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = { session.previous() }, enabled = session.hasPrev, modifier = Modifier.size(side)) {
+            SkipIcon(next = false, modifier = Modifier.size(sideIcon))
+        }
+        FilledIconButton(
+            onClick = { YouTubeControl.send?.invoke(if (playing) "pause" else "play") },
+            modifier = Modifier.size(mid),
+        ) { PlayPauseIcon(playing, Modifier.size(midIcon)) }
+        IconButton(onClick = { session.next() }, enabled = session.hasNext, modifier = Modifier.size(side)) {
+            SkipIcon(next = true, modifier = Modifier.size(sideIcon))
+        }
+    }
+}
+
+/**
+ * Панель кнопок полноэкранного режима. Стоит рядом с видео, а не на нём (правила YouTube запрещают
+ * что-либо поверх плеера). Логотип YouTube остаётся и ведёт на это видео.
+ */
+@Composable
+private fun YtRail(
+    session: YouTubeSession,
+    video: YouTubeVideo,
+    playing: Boolean,
+    vertical: Boolean,
+    openLink: (String) -> Unit,
+    modifier: Modifier,
+) {
+    val items: @Composable () -> Unit = {
+        YouTubeLogo(onClick = { openLink("https://www.youtube.com/watch?v=${video.id}") })
+        IconButton(onClick = { session.previous() }, enabled = session.hasPrev, modifier = Modifier.size(48.dp)) {
+            SkipIcon(next = false, modifier = Modifier.size(28.dp))
+        }
+        FilledIconButton(
+            onClick = { YouTubeControl.send?.invoke(if (playing) "pause" else "play") },
+            modifier = Modifier.size(60.dp),
+        ) { PlayPauseIcon(playing, Modifier.size(34.dp)) }
+        IconButton(onClick = { session.next() }, enabled = session.hasNext, modifier = Modifier.size(48.dp)) {
+            SkipIcon(next = true, modifier = Modifier.size(28.dp))
+        }
+        IconButton(onClick = { session.fullscreen = false }, modifier = Modifier.size(48.dp)) {
+            FullscreenGlyph(exit = true, modifier = Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+    if (vertical) {
+        Column(modifier, verticalArrangement = Arrangement.SpaceEvenly, horizontalAlignment = Alignment.CenterHorizontally) { items() }
+    } else {
+        Row(modifier, horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) { items() }
+    }
+}
+
+/** Значок «во весь экран» (четыре уголка наружу) и «выйти» (уголки внутрь). */
+@Composable
+private fun FullscreenGlyph(exit: Boolean, modifier: Modifier = Modifier, tint: Color = LocalContentColor.current) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = w * 0.11f
+        fun corner(x: Float, y: Float, dx: Float, dy: Float, arm: Float) {
+            drawLine(tint, Offset(x, y), Offset(x + dx * arm, y), strokeWidth = stroke)
+            drawLine(tint, Offset(x, y), Offset(x, y + dy * arm), strokeWidth = stroke)
+        }
+        if (!exit) {
+            val p = w * 0.1f
+            val arm = w * 0.3f
+            corner(p, p, 1f, 1f, arm)
+            corner(w - p, p, -1f, 1f, arm)
+            corner(p, h - p, 1f, -1f, arm)
+            corner(w - p, h - p, -1f, -1f, arm)
+        } else {
+            val a = w * 0.36f
+            val arm = w * 0.26f
+            corner(a, a, -1f, -1f, arm)
+            corner(w - a, a, 1f, -1f, arm)
+            corner(a, h - a, -1f, 1f, arm)
+            corner(w - a, h - a, 1f, 1f, arm)
         }
     }
 }

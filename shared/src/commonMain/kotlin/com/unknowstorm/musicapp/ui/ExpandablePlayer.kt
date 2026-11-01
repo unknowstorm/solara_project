@@ -21,6 +21,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -77,6 +80,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -230,12 +234,30 @@ fun ExpandablePlayer(
         val miniWidthDp = with(density) { miniNow.width.toDp() }
 
         // --- Геометрия полного экрана (в dp) ---
-        val coverTop = topInset + 32.dp + CoverDownShift
-        val coverSize = maxOf(160.dp, minOf(maxWidth - ScreenSideMargin * 2f, maxHeight - coverTop - bottomInset - BelowCoverBlock))
+        val layoutDirection = LocalLayoutDirection.current
+        val sideInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+        val leftInset = with(density) { sideInsets.getLeft(density, layoutDirection).toDp() }
+        val rightInset = with(density) { sideInsets.getRight(density, layoutDirection).toDp() }
+        val landscape = fullW > fullH
+
+        val coverTop: Dp
+        val coverSize: Dp
+        val coverLeft: Dp
+        if (landscape) {
+            // Альбомная ориентация: обложка слева по центру, справа название и кнопки управления
+            val availH = maxHeight - topInset - bottomInset
+            coverSize = maxOf(120.dp, minOf(availH - 24.dp, maxWidth * 0.42f))
+            coverTop = topInset + (availH - coverSize) / 2f
+            coverLeft = leftInset + 32.dp
+        } else {
+            coverTop = topInset + 32.dp + CoverDownShift
+            coverSize = maxOf(160.dp, minOf(maxWidth - ScreenSideMargin * 2f, maxHeight - coverTop - bottomInset - BelowCoverBlock))
+            coverLeft = (maxWidth - coverSize) / 2f
+        }
         val coverTopPx = with(density) { coverTop.toPx() }
-        val coverSizePx = with(density) { coverSize.toPx() }
-        val bigX = (fullW - coverSizePx) / 2f
+        val bigX = with(density) { coverLeft.toPx() }
         val belowCoverStart = coverTop + coverSize + 20.dp
+        val panelStart = coverLeft + coverSize + 32.dp
 
         val miniCornerPx = with(density) { MiniCorner.toPx() }
         val shadowPx = with(density) { 3.dp.toPx() }
@@ -342,6 +364,9 @@ fun ExpandablePlayer(
                     topInset = topInset,
                     bottomInset = bottomInset,
                     belowCoverStart = belowCoverStart,
+                    landscape = landscape,
+                    panelStart = panelStart,
+                    rightInset = rightInset,
                 )
             }
             // Обложка — общий элемент: одна и та же картинка в мини и в полном плеере
@@ -601,6 +626,9 @@ private fun FullContent(
     topInset: Dp,
     bottomInset: Dp,
     belowCoverStart: Dp,
+    landscape: Boolean,
+    panelStart: Dp,
+    rightInset: Dp,
 ) {
     val state by audio.state.collectAsState()
     var dragValue by remember { mutableStateOf<Float?>(null) }
@@ -638,18 +666,31 @@ private fun FullContent(
             )
 
             Column(
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = ScreenSideMargin)
-                    .padding(bottom = bottomInset),
+                modifier = if (landscape) {
+                    // Альбом: обложка слева, всё остальное в правой колонке по центру высоты
+                    Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = panelStart,
+                            end = rightInset + 32.dp,
+                            top = topInset + 16.dp,
+                            bottom = bottomInset + 8.dp,
+                        )
+                } else {
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = ScreenSideMargin)
+                        .padding(bottom = bottomInset)
+                },
+                verticalArrangement = if (landscape) Arrangement.Center else Arrangement.Top,
             ) {
                 // Здесь сверху лежит общая обложка (её рисует SharedCover)
-                Spacer(Modifier.height(belowCoverStart))
+                if (!landscape) Spacer(Modifier.height(belowCoverStart))
 
                 Text(
                     state.title ?: "",
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 2,
+                    style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                    maxLines = if (landscape) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -710,10 +751,14 @@ private fun FullContent(
                     Text(formatTime(state.durationMs), style = MaterialTheme.typography.labelMedium)
                 }
 
-                Spacer(Modifier.weight(1f))
+                if (landscape) Spacer(Modifier.height(8.dp)) else Spacer(Modifier.weight(1f))
 
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 80.dp),
+                    if (landscape) {
+                        Modifier.fillMaxWidth().padding(top = 8.dp)
+                    } else {
+                        Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 80.dp)
+                    },
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
