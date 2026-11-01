@@ -26,6 +26,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.model.Service
@@ -60,12 +66,27 @@ fun MainScreen(
         if (service == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == service }
     }
 
+    val session = remember { YouTubeSession() }
+    var rootOrigin by remember { mutableStateOf(Offset.Zero) }
+    var rootSize by remember { mutableStateOf(IntSize.Zero) }
+    val playback by audio.state.collectAsState()
+    // Включили нашу музыку: видео YouTube закрывается, два звука одновременно не играют
+    LaunchedEffect(playback.mediaId) {
+        if (playback.mediaId != null && session.video != null) session.close()
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { rootOrigin = it.positionInWindow() }
+            .onSizeChanged { rootSize = it }
+    ) {
     // Делаем фон колонки прозрачным (чтобы не было черных полос)
     Column(Modifier.fillMaxSize().background(Color.Transparent)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 Tab.HOME -> if (service == Service.YOUTUBE) {
-                    YouTubeScreen(audio = audio, onBack = { service = Service.ALL })
+                    YouTubeScreen(audio = audio, session = session, onBack = { service = Service.ALL })
                 } else {
                     HomeScreen(shownFeeds, service, { service = it }, audio)
                 }
@@ -108,6 +129,19 @@ fun MainScreen(
                 )
             }
         }
+    }
+
+        // Единственный плеер YouTube: на экране YouTube большой, в остальных местах плавающее окно
+        YouTubeOverlay(
+            session = session,
+            containerOrigin = rootOrigin,
+            containerSize = rootSize,
+            onExpand = {
+                tab = Tab.HOME
+                service = Service.YOUTUBE
+                session.docked = true
+            },
+        )
     }
 }
 

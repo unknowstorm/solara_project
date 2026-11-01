@@ -20,7 +20,9 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -146,7 +148,8 @@ private fun playerHtml(videoId: String, origin: String): String {
 <body>
 <div id="wrap"><div id="player"></div></div>
 <script>
-  var player;
+  var player; var pendingId = null;
+  function solaraLoad(id) { if (player && player.loadVideoById) { player.loadVideoById(id); } else { pendingId = id; } }
   window.onerror = function (m, s, l) { SolaraBridge.log('js error: ' + m + ' @' + l); };
   SolaraBridge.log('page start');
   var tag = document.createElement('script');
@@ -162,6 +165,7 @@ private fun playerHtml(videoId: String, origin: String): String {
       events: {
         onReady: function () {
           SolaraBridge.log('player ready');
+          if (pendingId) { player.loadVideoById(pendingId); pendingId = null; }
           var f = document.getElementsByTagName('iframe')[0];
           if (f) { var r = f.getBoundingClientRect(); SolaraBridge.log('iframe ' + r.width + 'x' + r.height + ', window ' + window.innerWidth + 'x' + window.innerHeight); }
           else { SolaraBridge.log('no iframe'); }
@@ -184,7 +188,7 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
     val currentOnError by rememberUpdatedState(onError)
     val chrome = remember(context) { FullscreenChrome(context.findActivity()) }
 
-    val webView = remember(videoId) {
+    val webView = remember {
         // Referer = идентификатор приложения в виде https://com.example.app (требование YouTube)
         val origin = "https://" + context.packageName.lowercase()
         WebView(context).apply {
@@ -230,6 +234,16 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         }
     }
 
+    // Другое видео: тот же плеер, новый ролик (старое остаётся на экране, пока новое не загрузится)
+    val loadedId = remember { arrayOf(videoId) }
+    LaunchedEffect(videoId) {
+        if (videoId != loadedId[0]) {
+            loadedId[0] = videoId
+            val safe = videoId.filter { it.isLetterOrDigit() || it == '-' || it == '_' }
+            webView.evaluateJavascript("solaraLoad('$safe')", null)
+        }
+    }
+
     // Фоновое воспроизведение YouTube запрещено: при уходе из приложения ставим на паузу
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
         webView.evaluateJavascript("try { player.pauseVideo(); } catch (e) {}", null)
@@ -247,5 +261,8 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         }
     }
 
-    AndroidView(factory = { webView }, modifier = modifier)
+    // factory вызывается один раз за жизнь AndroidView, поэтому при смене WebView его нужно пересоздать
+    key(webView) {
+        AndroidView(factory = { webView }, modifier = modifier)
+    }
 }
