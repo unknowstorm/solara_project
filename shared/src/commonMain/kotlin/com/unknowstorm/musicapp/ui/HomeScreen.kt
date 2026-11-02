@@ -335,7 +335,7 @@ fun TopBar(
     onLikes: (() -> Unit)? = null,
 ) {
     val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val active = Service.entries.filter { it.ready }
+    val active = Service.entries.filter { it.ready && it != Service.SPOTIFY }
     val soon = Service.entries.filter { !it.ready }
     Row(
         modifier = modifier
@@ -376,7 +376,7 @@ fun TopBar(
             }
         }
 
-        if (soon.isNotEmpty()) {
+        if (soon.isNotEmpty() || Service.SPOTIFY.ready) {
             Box {
                 IconButton(onClick = { menuOpen.value = true }) {
                     AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
@@ -385,6 +385,12 @@ fun TopBar(
                     expanded = menuOpen.value,
                     onDismissRequest = { menuOpen.value = false },
                 ) {
+                    if (Service.SPOTIFY.ready) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Spotify") },
+                            onClick = { menuOpen.value = false; onSelect(Service.SPOTIFY) },
+                        )
+                    }
                     soon.forEach { service ->
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(service.title + " · скоро") },

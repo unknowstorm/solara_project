@@ -40,6 +40,7 @@ import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
+import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
 
 enum class Tab(val label: String) {
     HOME("Главная"),
@@ -83,6 +84,10 @@ fun MainScreen(
         }
     }
     val playback by audio.state.collectAsState()
+    val spotify = LocalSpotifyRemote.current
+    // Наша музыка или YouTube заиграли: Spotify на паузу
+    LaunchedEffect(playback.isPlaying) { if (playback.isPlaying) spotify?.pause() }
+    LaunchedEffect(session.video) { if (session.video != null) spotify?.pause() }
     // Включили нашу музыку: видео YouTube закрывается, два звука одновременно не играют
     LaunchedEffect(playback.mediaId) {
         if (playback.mediaId != null && session.video != null) session.close()
@@ -98,7 +103,13 @@ fun MainScreen(
     Column(Modifier.fillMaxSize().background(Color.Transparent)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
-                Tab.HOME -> if (service == Service.YOUTUBE) {
+                Tab.HOME -> if (service == Service.SPOTIFY) {
+                    SpotifyScreen(
+                        remote = spotify,
+                        onBack = { service = Service.ALL },
+                        onBeforePlay = { audio.stop(); session.close() },
+                    )
+                } else if (service == Service.YOUTUBE) {
                     YouTubeScreen(
                         audio = audio,
                         session = session,
