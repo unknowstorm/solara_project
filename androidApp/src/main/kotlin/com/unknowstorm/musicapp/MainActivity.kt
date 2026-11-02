@@ -7,9 +7,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.CompositionLocalProvider
 import com.unknowstorm.musicapp.auth.handleAuthDeepLink
+import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
+import com.unknowstorm.musicapp.spotify.SpotifyRemoteImpl
 
 class MainActivity : ComponentActivity() {
+    private lateinit var spotify: SpotifyRemoteImpl
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -17,9 +22,21 @@ class MainActivity : ComponentActivity() {
         // Приложение могли открыть по ссылке solara://auth (подтверждение почты, Google)
         if (intent?.data != null) handleAuthDeepLink(intent)
 
+        spotify = SpotifyRemoteImpl(this)
         setContent {
-            App()
+            CompositionLocalProvider(LocalSpotifyRemote provides spotify) { App() }
         }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        spotify.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun onDestroy() {
+        spotify.release()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

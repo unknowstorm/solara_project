@@ -17,7 +17,7 @@ enum class Service(
     ALL("Все", null, true, "Все доступные источники"),
     JAMENDO("Jamendo", PlaybackKind.IN_APP, true, "Полные треки внутри приложения"),
     AUDIUS("Audius", PlaybackKind.IN_APP, true, "Полные треки внутри приложения"),
-    SPOTIFY("Spotify", PlaybackKind.REMOTE, false, "Пульт к приложению Spotify, нужен Premium"),
+    SPOTIFY("Spotify", PlaybackKind.REMOTE, true, "Пульт к приложению Spotify, нужен Premium"),
     YOUTUBE("YouTube", PlaybackKind.EMBEDDED, true, "Видео во встроенном плеере: Главная → YouTube. Без фонового воспроизведения"),
     DEEZER("Deezer", PlaybackKind.PREVIEW, true, "Каталог и 30-секундные превью"),
 }

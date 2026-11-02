@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Иконка системной заставки Android 12+: тот же логотип, что и в Compose-заставке.
+     Рамка в процентах подогнана так, чтобы логотип выглядел как 160dp. Не совпадает размер при переходе:
+     увеличьте процент (логотип меньше) или уменьшите (больше). -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_logo_fg"
+    android:inset="4.5%" />
