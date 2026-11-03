@@ -270,6 +270,8 @@ fun ExpandablePlayer(
         val miniColor = MaterialTheme.colorScheme.secondaryContainer
         val fullColor = MaterialTheme.colorScheme.surface
 
+        // Запоминаем в момент расстановки, стоит ли плеер на измеренном месте: до этого он невидим
+        val placedOnAnchor = remember { mutableStateOf(false) }
         val miniVisible by remember { derivedStateOf { progress.floatValue < 0.999f } }
         val fullVisible by remember { derivedStateOf { progress.floatValue > 0.001f } }
 
@@ -288,6 +290,7 @@ fun ExpandablePlayer(
                 }
                 // размер: из мини-плеера на весь экран
                 .layout { measurable, _ ->
+                    placedOnAnchor.value = anchor.bounds != null
                     val m = miniRect()
                     val p = progress.floatValue
                     val w = lerp(m.width, fullW, p).roundToInt().coerceAtLeast(0)
@@ -299,6 +302,8 @@ fun ExpandablePlayer(
                 .graphicsLayer {
                     val p = progress.floatValue
                     translationX = miniOffsetX
+                    // Пока место под мини-плеер не измерено, не рисуем его: иначе он мелькает поверх нижней панели
+                    alpha = if (!placedOnAnchor.value && p < 0.01f) 0f else 1f
                     shape = RoundedCornerShape(CornerSize(lerp(miniCornerPx, 0f, p)))
                     clip = true
                     shadowElevation = lerp(shadowPx, 0f, p)

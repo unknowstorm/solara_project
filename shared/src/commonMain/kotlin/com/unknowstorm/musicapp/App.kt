@@ -25,7 +25,11 @@ import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.provider.audius.AudiusProvider
 import com.unknowstorm.musicapp.provider.deezer.DeezerProvider
 import com.unknowstorm.musicapp.provider.jamendo.JamendoProvider
+import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
 import com.unknowstorm.musicapp.theme.SolaraTheme
+import com.unknowstorm.musicapp.ui.LocalSpotifyMini
+import com.unknowstorm.musicapp.ui.SpotifyExpandablePlayer
+import com.unknowstorm.musicapp.ui.SpotifyMiniState
 import com.unknowstorm.musicapp.ui.AuthScreen
 import com.unknowstorm.musicapp.ui.AwaitEmailScreen
 import com.unknowstorm.musicapp.ui.ExpandablePlayer
@@ -127,6 +131,8 @@ private fun AppContent(boot: AppBoot) {
     var showPlayer by remember { mutableStateOf(false) }
     var showAuth by remember { mutableStateOf(false) }
     val miniAnchor = remember { MiniPlayerAnchor() }
+    val spotify = LocalSpotifyRemote.current
+    val spotifyMini = remember { SpotifyMiniState() }
     val focusManager = LocalFocusManager.current
     // Снимаем фокус с поля поиска, иначе его «капля» остаётся поверх плеера
     LaunchedEffect(showPlayer) { if (showPlayer) focusManager.clearFocus() }
@@ -134,7 +140,10 @@ private fun AppContent(boot: AppBoot) {
     LaunchedEffect(authState) {
         if (authState is AuthState.SignedIn) showAuth = false
     }
-    CompositionLocalProvider(LocalMiniPlayerAnchor provides miniAnchor) {
+    CompositionLocalProvider(
+        LocalMiniPlayerAnchor provides miniAnchor,
+        LocalSpotifyMini provides spotifyMini,
+    ) {
         Box(Modifier.fillMaxSize()) {
             MainScreen(
                 providers = providers,
@@ -156,6 +165,10 @@ private fun AppContent(boot: AppBoot) {
                     showAuth = true
                 },
             )
+            // Мини-плеер Spotify: отдельный компонент, не связан с нашим AudioBackend-плеером
+            if (spotify != null) {
+                SpotifyExpandablePlayer(remote = spotify, audio = audio)
+            }
             // Экран входа и регистрации поверх всего
             if (showAuth) {
                 PlatformBackHandler(enabled = true, onBack = { showAuth = false })

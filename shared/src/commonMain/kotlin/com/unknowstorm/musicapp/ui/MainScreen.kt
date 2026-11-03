@@ -106,6 +106,8 @@ fun MainScreen(
                 Tab.HOME -> if (service == Service.SPOTIFY) {
                     SpotifyScreen(
                         remote = spotify,
+                        onServiceChange = { service = it; showLikes = false },
+                        onOpenLikes = { service = Service.ALL; showLikes = true },
                         onBack = { service = Service.ALL },
                         onBeforePlay = { audio.stop(); session.close() },
                     )
@@ -119,7 +121,7 @@ fun MainScreen(
                 } else {
                     HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth)
                 }
-                Tab.SEARCH -> TrackListScreen(providers, audio, session)
+                Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY })
                 Tab.QUEUE -> InfoScreen(
                     "Очередь",
                     "Здесь будет текущая очередь: удаление треков, шафл и повтор списка. Следующий этап.",
@@ -127,6 +129,9 @@ fun MainScreen(
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
             }
         }
+
+        // Место под мини-плеер Spotify (рисует его SpotifyExpandablePlayer)
+        SpotifyMiniSlot(hidden = playback.title != null)
 
         // Мини-плеер лежит над нижней панелью
         NowPlayingBar(

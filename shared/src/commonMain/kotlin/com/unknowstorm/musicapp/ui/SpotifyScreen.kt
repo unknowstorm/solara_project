@@ -1,138 +1,237 @@
 package com.unknowstorm.musicapp.ui
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.unknowstorm.musicapp.resources.Res
-import com.unknowstorm.musicapp.resources.spotify_logo
+import com.unknowstorm.musicapp.model.Service
+import com.unknowstorm.musicapp.spotify.SpotifyItem
 import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.SpotifyState
-import com.unknowstorm.musicapp.spotify.parseSpotifyLink
-import org.jetbrains.compose.resources.painterResource
 
-/** Изолированный раздел Spotify: ни в «Все», ни в поиск, ни в очередь, ни в лайки не попадает. */
+/**
+ * Страница Spotify на главной, в том же стиле, что и остальные сервисы: общая панель сверху и ряды подборок.
+ * Ряды Spotify занимают строку целиком, с другими источниками не смешиваются. Запуск по ссылке живёт на вкладке «Поиск».
+ */
 @Composable
-fun SpotifyScreen(remote: SpotifyRemote?, onBack: () -> Unit, onBeforePlay: () -> Unit) {
-    PlatformBackHandler(onBack = onBack)
-    Column(
-        Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("← Назад") }
-        }
-        // Полный логотип на чёрном фоне, без изменений
-        Surface(color = Color.Black, shape = RoundedCornerShape(8.dp)) {
-            Image(
-                painterResource(Res.drawable.spotify_logo),
-                contentDescription = "Spotify",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp).height(32.dp),
-            )
-        }
-        if (remote == null) {
-            Text("Раздел Spotify доступен только в Android-версии.")
+fun SpotifyScreen(
+    remote: SpotifyRemote?,
+    onServiceChange: (Service) -> Unit,
+    onOpenLikes: () -> Unit,
+    onBack: () -> Unit,
+    onBeforePlay: () -> Unit,
+) {
+    val ui = LocalSpotifyMini.current
+    val s = remote?.state?.collectAsState()?.value
+    PlatformBackHandler(
+        enabled = !ui.expanded,
+        onBack = { if (s?.browse != null) remote?.closeBrowse() else onBack() },
+    )
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        TopBar(
+            Service.SPOTIFY,
+            onServiceChange,
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            likesSelected = false,
+            onLikes = onOpenLikes,
+        )
+        if (remote == null || s == null) {
+            StatusColumn {
+                SpotifyHeader()
+                Text("Раздел Spotify доступен только в Android-версии.", Modifier.padding(horizontal = 16.dp))
+            }
             return@Column
         }
-        val s by remote.state.collectAsState()
         when {
-            !s.appInstalled -> {
-                Text("Для этого раздела нужно приложение Spotify: оно играет музыку само, Solara только управляет им.")
-                Button(onClick = remote::getSpotifyApp) { Text("GET SPOTIFY FREE") }
+            !s.appInstalled -> StatusColumn {
+                SpotifyHeader()
+                Text(
+                    "Для этого раздела нужно приложение Spotify: оно играет музыку само, Solara только управляет им.",
+                    Modifier.padding(horizontal = 16.dp),
+                )
+                Button(onClick = remote::getSpotifyApp, modifier = Modifier.padding(horizontal = 16.dp)) { Text("GET SPOTIFY FREE") }
             }
-            !s.connected -> {
+            !s.connected -> StatusColumn {
+                SpotifyHeader()
                 Text(
                     "Музыку играет приложение Spotify, Solara управляет им как пульт. Нужен Spotify Premium. " +
-                        "Solara ничего из Spotify не сохраняет.",
+                        "Solara ничего из Spotify не сохраняет. После первого подключения оно происходит автоматически.",
+                    Modifier.padding(horizontal = 16.dp),
                 )
-                s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Button(onClick = remote::connect, enabled = !s.connecting) {
-                    Text(if (s.connecting) "Подключение…" else "Подключить Spotify")
+                s.error?.let { Text(it, Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
+                Button(
+                    onClick = remote::connect,
+                    enabled = !s.connecting,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) { Text(if (s.connecting) "Подключение…" else "Подключить Spotify") }
+            }
+            s.premium == false -> StatusColumn {
+                SpotifyHeader()
+                Text("Управление воспроизведением доступно только с подпиской Spotify Premium.", Modifier.padding(horizontal = 16.dp))
+                Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
+                    TextButton(onClick = remote::disconnect) { Text("Отключить Spotify") }
                 }
             }
-            s.premium == false -> {
-                Text("Управление воспроизведением доступно только с подпиской Spotify Premium.")
-                OutlinedButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
-                TextButton(onClick = remote::disconnect) { Text("Отключить Spotify") }
-            }
-            else -> SpotifyConnected(remote, s, onBeforePlay)
+            else -> SpotifyHome(remote, s, onBeforePlay)
         }
     }
 }
 
 @Composable
-private fun SpotifyConnected(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: () -> Unit) {
-    var link by remember { mutableStateOf("") }
-    var linkError by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = link,
-        onValueChange = { link = it; linkError = false },
-        label = { Text("Ссылка Spotify на трек, альбом или плейлист") },
-        isError = linkError,
-        supportingText = { if (linkError) Text("Не похоже на ссылку Spotify") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+private fun ColumnScope.StatusColumn(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
     )
-    Button(onClick = {
-        val uri = parseSpotifyLink(link)
-        if (uri == null) linkError = true else { onBeforePlay(); remote.playUri(uri) }
-    }) { Text("Играть по ссылке") }
-    s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+}
 
-    if (s.title != null) {
-        // Обложка без обрезки, блюра и надписей; углы 4 dp
-        Box(
-            Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            s.cover?.let {
-                Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-            }
-        }
-        Text(s.title, style = MaterialTheme.typography.headlineSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(s.artist ?: "", color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-
-        var drag by remember { mutableStateOf<Float?>(null) }
-        val frac = if (s.durationMs > 0) (s.positionMs.toFloat() / s.durationMs).coerceIn(0f, 1f) else 0f
-        Slider(
-            value = drag ?: frac,
-            onValueChange = { drag = it },
-            onValueChangeFinished = {
-                drag?.let { remote.seekTo((it * s.durationMs).toLong()) }
-                drag = null
-            },
-            enabled = s.durationMs > 0,
-        )
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = remote::toggleSaved) {
-                if (s.saved) Text("✓", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
-                else AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurface)
-            }
-            IconButton(onClick = remote::previous, modifier = Modifier.size(56.dp)) { SkipIcon(next = false, modifier = Modifier.size(32.dp)) }
-            FilledIconButton(
-                onClick = { if (s.isPaused) remote.resume() else remote.pause() },
-                modifier = Modifier.size(72.dp),
-            ) { PlayPauseIcon(!s.isPaused, Modifier.size(40.dp)) }
-            IconButton(onClick = remote::next, modifier = Modifier.size(56.dp)) { SkipIcon(next = true, modifier = Modifier.size(32.dp)) }
+/** Полный логотип Spotify (атрибуция контента) и необязательная подсказка. */
+@Composable
+private fun SpotifyHeader(hint: String? = null) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        SpotifyLogoBar()
+        if (hint != null) {
+            Text(
+                hint,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        OutlinedButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
-        TextButton(onClick = remote::disconnect) { Text("Отключить Spotify") }
+}
+
+@Composable
+private fun SpotifySectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun SpotifyRowLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 8.dp),
+    )
+}
+
+@Composable
+private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: () -> Unit) {
+    val ui = LocalSpotifyMini.current
+    LaunchedEffect(Unit) { if (s.shelves == null) remote.loadRecommended() }
+
+    val play: (SpotifyItem) -> Unit = { item ->
+        onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
+    }
+    val tap: (SpotifyItem) -> Unit = { item ->
+        if (item.playable) play(item) else remote.openItem(item)
+    }
+    val pad = PaddingValues(horizontal = 16.dp)
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        item(key = "header") {
+            SpotifyHeader("Музыку по ссылке можно запустить во вкладке «Поиск»: чип «+», затем Spotify.")
+        }
+
+        s.error?.let { message ->
+            item(key = "error") {
+                Text(message, Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.error)
+            }
+        }
+
+        val browse = s.browse
+        if (browse != null) {
+            // Открыта внутренняя подборка: показываем её вместо рядов
+            item(key = "browse-head") {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(s.browseTitle ?: "Подборка", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = remote::closeBrowse) { Text("← К подборкам") }
+                }
+            }
+            item(key = "browse-row") {
+                SpotifyTileRow(browse, s.covers, contentPadding = pad, onOpenSpotify = remote::openSpotifyApp, onClick = tap)
+            }
+        } else {
+            val recent = s.history
+            if (recent.isNotEmpty()) {
+                item(key = "recent") {
+                    Column {
+                        SpotifySectionTitle("Недавно играло")
+                        SpotifyTileRow(recent, s.covers, contentPadding = pad, onOpenSpotify = remote::openSpotifyApp, onClick = play)
+                    }
+                }
+            }
+
+            item(key = "shelves-title") { SpotifySectionTitle("Подборки для вас") }
+            val shelves = s.shelves
+            when {
+                shelves == null -> item(key = "loading") {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                }
+                shelves.isEmpty() -> item(key = "empty") {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Text("Spotify не вернул подборки. Откройте приложение Spotify, включите что-нибудь и повторите.")
+                        TextButton(onClick = remote::loadRecommended) { Text("Повторить") }
+                    }
+                }
+                else -> shelves.forEachIndexed { i, shelf ->
+                    item(key = "shelf:$i") {
+                        Column {
+                            SpotifyRowLabel(shelf.title)
+                            SpotifyTileRow(shelf.items, s.covers, contentPadding = pad, onOpenSpotify = remote::openSpotifyApp, onClick = tap)
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        item(key = "footer") {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
+                TextButton(onClick = remote::disconnect) { Text("Отключить Spotify") }
+            }
+        }
     }
 }

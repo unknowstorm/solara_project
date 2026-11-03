@@ -42,7 +42,12 @@ import com.unknowstorm.musicapp.provider.interleave
 import kotlinx.coroutines.delay
 
 @Composable
-fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend, session: YouTubeSession? = null) {
+fun TrackListScreen(
+    providers: List<MusicProvider>,
+    audio: AudioBackend,
+    session: YouTubeSession? = null,
+    onOpenSpotify: () -> Unit = {},
+) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(Service.ALL) }
     var ytQuery by remember { mutableStateOf("") }
@@ -87,7 +92,7 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend, session
     val failed = providers.mapNotNull { p -> results[p.id]?.takeIf { it.error != null } }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        OutlinedTextField(
+        if (selected != Service.SPOTIFY) OutlinedTextField(
             value = query,
             onValueChange = { query = it },
             label = { Text("Поиск") },
@@ -105,7 +110,7 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend, session
             LinearProgressIndicator(Modifier.fillMaxWidth())
         }
 
-        if (!canSearch && !(selected == Service.YOUTUBE && session != null)) {
+        if (!canSearch && selected != Service.SPOTIFY && !(selected == Service.YOUTUBE && session != null)) {
             Text(
                 text = if (selected == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube." else "${selected.title} скоро появится. ${selected.note}.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -142,6 +147,17 @@ fun TrackListScreen(providers: List<MusicProvider>, audio: AudioBackend, session
                 text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
+        }
+
+        if (selected == Service.SPOTIFY) {
+            // Выдача Spotify отдельная: с другими источниками не смешивается
+            SpotifySearchPane(
+                remote = com.unknowstorm.musicapp.spotify.LocalSpotifyRemote.current,
+                onBeforePlay = { audio.stop(); session?.close() },
+                onOpenSection = onOpenSpotify,
+                modifier = Modifier.weight(1f),
+            )
+            return@Column
         }
 
         if (selected == Service.YOUTUBE && session != null) {

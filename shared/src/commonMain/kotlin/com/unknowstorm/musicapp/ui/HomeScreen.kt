@@ -57,12 +57,29 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 // --- ВАШИ СУЩЕСТВУЮЩИЕ КЛАССЫ И ФУНКЦИИ (БЕЗ ИЗМЕНЕНИЙ) ---
 
 data class FeedSection(val title: String, val tracks: List<Track>)
+
+/** Запрос подборки с повторами: на холодном старте сеть часто ещё не готова (DNS, таймаут). */
+private suspend fun searchWithRetry(provider: MusicProvider, query: String): List<Track> {
+    var last: Exception? = null
+    repeat(3) { attempt ->
+        try {
+            return provider.search(query)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            last = e
+            delay(800L * (attempt + 1))
+        }
+    }
+    throw last ?: IllegalStateException("search failed")
+}
 
 /** Подборки источника: заголовок и поисковый запрос (пустой запрос = популярное). */
 fun defaultMixes(service: Service): List<Pair<String, String>> = when (service) {
@@ -104,7 +121,16 @@ class HomeFeed(
         private set
 
     suspend fun loadIfNeeded() {
-        if (sections.isEmpty() && !loading) load()
+        if (sections.isEmpty() && !loading) {
+            load()
+            // Если сеть так и не ответила, пробуем ещё пару раз сами, без нажатия «Повторить»
+            var tries = 0
+            while (sections.isEmpty() && error != null && tries < 2) {
+                tries++
+                delay(4000)
+                load()
+            }
+        }
     }
 
     suspend fun load() {
@@ -116,7 +142,7 @@ class HomeFeed(
                 mixes.map { (title, query) ->
                     async {
                         try {
-                            FeedSection(title, provider.search(query).take(12))
+                            FeedSection(title, searchWithRetry(provider, query).take(12))
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
@@ -378,8 +404,16 @@ fun TopBar(
 
         if (soon.isNotEmpty() || Service.SPOTIFY.ready) {
             Box {
-                IconButton(onClick = { menuOpen.value = true }) {
-                    AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                val spotifyOn = !likesSelected && selected == Service.SPOTIFY
+                IconButton(
+                    onClick = { menuOpen.value = true },
+                    modifier = Modifier.clip(CircleShape)
+                        .background(if (spotifyOn) MaterialTheme.colorScheme.primary else Color.Transparent),
+                ) {
+                    AddIcon(
+                        Modifier.size(24.dp),
+                        if (spotifyOn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 androidx.compose.material3.DropdownMenu(
                     expanded = menuOpen.value,
@@ -475,7 +509,7 @@ fun ServiceTray(selected: Service, onSelect: (Service) -> Unit, modifier: Modifi
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(Service.entries.toList(), key = { it.name }) { service ->
+        items(Service.entries.filter { it != Service.SPOTIFY }, key = { it.name }) { service ->
             FilterChip(
                 selected = service == selected,
                 onClick = { onSelect(service) },
@@ -488,6 +522,23 @@ fun ServiceTray(selected: Service, onSelect: (Service) -> Unit, modifier: Modifi
                 },
                 modifier = Modifier.semantics { contentDescription = service.title },
             )
+        }
+        // Spotify вне ряда логотипов: вход через «+», только текстом
+        item(key = "more") {
+            val open = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            Box {
+                FilterChip(
+                    selected = selected == Service.SPOTIFY,
+                    onClick = { open.value = true },
+                    label = { Text(if (selected == Service.SPOTIFY) "+ Spotify" else "+") },
+                )
+                androidx.compose.material3.DropdownMenu(expanded = open.value, onDismissRequest = { open.value = false }) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Spotify") },
+                        onClick = { open.value = false; onSelect(Service.SPOTIFY) },
+                    )
+                }
+            }
         }
     }
 }
