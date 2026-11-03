@@ -34,6 +34,11 @@ class MainActivity : ComponentActivity() {
         spotify.onActivityResult(requestCode, resultCode, data)
     }
 
+    override fun onStart() {
+        super.onStart()
+        spotify.autoConnect()
+    }
+
     override fun onDestroy() {
         spotify.release()
         super.onDestroy()

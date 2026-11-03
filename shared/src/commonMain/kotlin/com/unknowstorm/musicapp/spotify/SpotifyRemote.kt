@@ -4,6 +4,18 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.flow.StateFlow
 
+data class SpotifyItem(
+    val uri: String,
+    val title: String,
+    val subtitle: String? = null,
+    val playable: Boolean = true,
+    val hasChildren: Boolean = false,
+    val imageKey: String? = null,
+)
+
+/** Ряд (полка) рекомендаций Spotify: заголовок и элементы. */
+data class SpotifyShelf(val title: String, val items: List<SpotifyItem>)
+
 /** Состояние Spotify живёт только в памяти. Ничего из него не сохраняется. */
 data class SpotifyState(
     val appInstalled: Boolean = true,
@@ -19,6 +31,11 @@ data class SpotifyState(
     val durationMs: Long = 0L,
     val saved: Boolean = false,
     val error: String? = null,
+    val history: List<SpotifyItem> = emptyList(),
+    val browse: List<SpotifyItem>? = null,
+    val browseTitle: String? = null,
+    val covers: Map<String, ImageBitmap> = emptyMap(),
+    val shelves: List<SpotifyShelf>? = null,
 )
 
 interface SpotifyRemote {
@@ -34,6 +51,9 @@ interface SpotifyRemote {
     fun toggleSaved()
     fun openSpotifyApp()
     fun getSpotifyApp()
+    fun loadRecommended()
+    fun openItem(item: SpotifyItem)
+    fun closeBrowse()
 }
 
 val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }
