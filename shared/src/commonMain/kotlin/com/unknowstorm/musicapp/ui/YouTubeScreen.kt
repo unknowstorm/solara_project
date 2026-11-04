@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -69,7 +71,8 @@ import org.jetbrains.compose.resources.painterResource
 private const val FLAG_ACCEPTED = "youtube_terms_accepted_v1"
 internal const val YOUTUBE_HOME = "https://www.youtube.com"
 
-// Подборки по жанрам: это поиск, один запрос стоит 100 единиц квоты, поэтому грузим только по нажатию
+// Подборки по жанрам: это поиск, один запрос стоит 100 единиц квоты. Обычно берём готовые с сервера,
+// а свои запросы делаем только по свайпу вниз, если на сервере чего-то не хватает
 private val GENRES = listOf(
     "Джаз" to "jazz music",
     "Поп" to "pop music",
@@ -133,6 +136,7 @@ private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceC
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: Modifier = Modifier) {
     val store = rememberTextStore()
@@ -141,7 +145,10 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
     val scope = rememberCoroutineScope()
 
     var popular by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
-    var popularLoading by remember { mutableStateOf(false) }
+    // Первая загрузка при открытии экрана: пока она идёт, подборки и кнопки не рисуем, чтобы ничего не мигало
+    var loading by remember { mutableStateOf(true) }
+    // Обновление свайпом вниз или кнопкой
+    var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     // Уже загруженные раньше подборки берём из кэша приложения: это не тратит квоту
     val genres = remember {
@@ -149,20 +156,48 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
             GENRES.forEach { (title, query) -> api.cachedSearch(query)?.let { map[title] = it } }
         }
     }
-    var loadingGenre by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        popularLoading = true
+    // fillMissing = false: только общий кэш сервера (при открытии). true: ещё и свои запросы за недостающим (свайп)
+    suspend fun load(fillMissing: Boolean) {
+        error = null
         try {
+            api.syncShared()
+            GENRES.forEach { (title, query) ->
+                if (!genres.containsKey(title)) api.cachedSearch(query)?.let { genres[title] = it }
+            }
             popular = api.popularMusic()
+            if (fillMissing) {
+                GENRES.forEach { (title, query) ->
+                    if (!genres.containsKey(title)) genres[title] = api.search(query)
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: YouTubeException) {
             error = e.message
         } catch (e: Exception) {
-            error = "Не удалось загрузить популярное: ${e.message}"
+            error = "Не удалось загрузить: ${e.message}"
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        loading = true
+        try {
+            load(fillMissing = false)
         } finally {
-            popularLoading = false
+            loading = false
+        }
+    }
+
+    fun refresh() {
+        if (loading || refreshing) return
+        scope.launch {
+            refreshing = true
+            try {
+                load(fillMissing = true)
+            } finally {
+                refreshing = false
+            }
         }
     }
 
@@ -172,90 +207,68 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
         session.open(video, list)
     }
 
-    fun loadGenre(title: String, query: String) {
-        if (loadingGenre != null) return
-        scope.launch {
-            loadingGenre = title
-            error = null
-            try {
-                genres[title] = api.search(query)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: YouTubeException) {
-                error = e.message
-            } catch (e: Exception) {
-                error = "Не удалось загрузить: ${e.message}"
-            } finally {
-                loadingGenre = null
-            }
-        }
-    }
+    val missing = GENRES.any { !genres.containsKey(it.first) }
 
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-        item(key = "head") {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "Поиск по YouTube: вкладка «Поиск», чип YouTube.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        if (popularLoading) {
-            item(key = "progress") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
-        }
-        error?.let {
-            item(key = "error") {
-                Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            }
-        }
-        if (popular.isNotEmpty()) {
-            item(key = "popular-label") { FeedTitle("Популярная музыка") }
-            item(key = "popular-strip") { VideoStrip(popular) { play(it, popular) } }
-        }
-        item(key = "genres-label") { FeedTitle("Подборки по жанрам") }
-        item(key = "genres-hint") {
-            Text(
-                "Подборка загружается по нажатию: у YouTube дневной лимит запросов на всё приложение.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-        GENRES.forEach { (title, query) ->
-            val loaded = genres[title]
-            if (loaded != null) {
-                item(key = "label:$title") {
+    PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refresh() }, modifier = modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            item(key = "head") {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
+                    Spacer(Modifier.width(12.dp))
                     Text(
-                        title,
-                        style = MaterialTheme.typography.labelLarge,
+                        "Поиск по YouTube: вкладка «Поиск», чип YouTube.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                        modifier = Modifier.weight(1f),
                     )
                 }
-                item(key = "strip:$title") { VideoStrip(loaded) { play(it, loaded) } }
-            } else {
-                item(key = "label:$title") {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        TextButton(
-                            onClick = { loadGenre(title, query) },
-                            enabled = loadingGenre == null,
-                        ) { Text(if (loadingGenre == title) "Загрузка…" else "Показать") }
+            }
+            if (loading) {
+                item(key = "progress") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
+            }
+            error?.let {
+                item(key = "error") {
+                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                }
+            }
+            if (popular.isNotEmpty()) {
+                item(key = "popular-label") { FeedTitle("Популярная музыка") }
+                item(key = "popular-strip") { VideoStrip(popular) { play(it, popular) } }
+            }
+            if (genres.isNotEmpty()) {
+                item(key = "genres-label") { FeedTitle("Подборки по жанрам") }
+                GENRES.forEach { (title, _) ->
+                    val loaded = genres[title] ?: return@forEach
+                    item(key = "label:$title") {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                        )
+                    }
+                    item(key = "strip:$title") { VideoStrip(loaded) { play(it, loaded) } }
+                }
+            }
+            if (!loading && missing) {
+                item(key = "missing") {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
+                        Text(
+                            "Не все подборки загрузились. Потяните экран вниз, чтобы обновить.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = { refresh() }, enabled = !refreshing) {
+                            Text(if (refreshing) "Загрузка…" else "Обновить")
+                        }
                     }
                 }
             }
+            item(key = "legal") { LegalFooter() }
         }
-        item(key = "legal") { LegalFooter() }
     }
 }
 

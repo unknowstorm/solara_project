@@ -99,8 +99,10 @@ fun YouTubeConsentScreen(onAccept: () -> Unit, onBack: () -> Unit) {
     var showPrivacy by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp)
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         TextButton(onClick = onBack) { Text("← Назад") }
         Text("YouTube в Solara", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
@@ -118,7 +120,9 @@ fun YouTubeConsentScreen(onAccept: () -> Unit, onBack: () -> Unit) {
             Checkbox(checked = agreed, onCheckedChange = { agreed = it })
             Text(LegalTexts.CONSENT_LINE, modifier = Modifier.weight(1f))
         }
+    }
         Spacer(Modifier.height(12.dp))
+        // Кнопка закреплена внизу экрана и не уезжает при прокрутке текста
         Button(onClick = onAccept, enabled = agreed, modifier = Modifier.fillMaxWidth()) { Text("Продолжить") }
     }
 
