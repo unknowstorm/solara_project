@@ -6,11 +6,14 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import kotlinx.coroutines.CancellationException
 import io.ktor.client.request.parameter
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.decodeFromString
@@ -40,12 +43,52 @@ class YouTubeApi(
     private val cache = LinkedHashMap<String, List<YouTubeVideo>>()
 
     /** Результат поиска из кэша приложения (без запроса и без траты квоты), если он есть. */
-    fun cachedSearch(query: String): List<YouTubeVideo>? {
-        val key = "search:${query.trim().lowercase()}"
+    fun cachedSearch(query: String): List<YouTubeVideo>? = cachedByKey("search:${query.trim().lowercase()}")
+
+    private var cacheDay = Long.MIN_VALUE
+
+    /** Память и диск с проверкой квотного дня: после сброса квоты (полночь Pacific Time, 10:00 по Киеву) старое не используется. */
+    private fun cachedByKey(key: String): List<YouTubeVideo>? {
+        rollover()
         cache[key]?.let { return it }
         val entry = readDisk()[key] ?: return null
         cache[key] = entry.videos
         return entry.videos
+    }
+
+    private fun rollover() {
+        val store = disk ?: return
+        val today = store.quotaDay(store.nowMillis())
+        if (cacheDay != today) { cache.clear(); cacheDay = today }
+    }
+
+    /**
+     * Общий суточный кэш подборок на сервере (Supabase, обновляется раз в сутки после сброса квоты YouTube).
+     * Читаем одним запросом: квоту YouTube это не тратит. Если сервер недоступен или пуст, ничего не меняется.
+     */
+    suspend fun syncShared(): Boolean {
+        val store = disk ?: return false
+        rollover()
+        val today = store.quotaDay(store.nowMillis())
+        return try {
+            val rows: List<SharedRow> = client.get("$SHARED_URL/rest/v1/yt_cache") {
+                parameter("select", "key,videos,quota_day")
+                header("apikey", SHARED_KEY)
+            }.body()
+            var any = false
+            for (r in rows) {
+                // Вчерашние данные тоже принимаем: между сбросом квоты и обновлением на сервере проходят минуты
+                if (r.quotaDay < today - 1 || r.videos.isEmpty()) continue
+                cache[r.key] = r.videos
+                if (r.key.startsWith("search:") || r.key.startsWith("popular:")) saveToDisk(r.key, r.videos)
+                any = true
+            }
+            any
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private var disk: TextStore? = null
@@ -97,7 +140,7 @@ class YouTubeApi(
     /** «Популярная музыка» через videos.list: стоит 1 единицу квоты. Может быть недоступна для региона. */
     suspend fun popularMusic(region: String = "UA"): List<YouTubeVideo> {
         val key = "popular:$region"
-        cache[key]?.let { return it }
+        cachedByKey(key)?.let { return it }
         val response: YtVideosResponse = request("videos") {
             parameter("part", "snippet,contentDetails,status")
             parameter("chart", "mostPopular")
@@ -136,7 +179,7 @@ class YouTubeApi(
     private fun store(key: String, value: List<YouTubeVideo>): List<YouTubeVideo> {
         cache[key] = value
         while (cache.size > MAX_CACHED) cache.remove(cache.keys.first())
-        if (key.startsWith("search:")) saveToDisk(key, value)
+        if (key.startsWith("search:") || key.startsWith("popular:")) saveToDisk(key, value)
         return value
     }
 
@@ -161,6 +204,9 @@ class YouTubeApi(
         private const val BASE_URL = "https://www.googleapis.com/youtube/v3"
         private const val MAX_CACHED = 30
         private const val DISK_KEY = "yt_search_cache_v1"
+        // Публичный (publishable) ключ Supabase: он создан для встраивания в приложение, секретов в нём нет
+        private const val SHARED_URL = "https://llyjvonszkahqmyxcqbi.supabase.co"
+        private const val SHARED_KEY = "sb_publishable_kPXbz4ayg5E2GszNuzdy5g_SmcAhuqn"
         private val diskJson = Json { ignoreUnknownKeys = true }
 
         /** Один экземпляр на приложение, чтобы кэш не терялся при смене экранов. */
@@ -235,3 +281,10 @@ internal data class YtStatus(
 
 @Serializable
 internal data class CacheEntry(val savedAt: Long, val videos: List<YouTubeVideo>)
+
+@Serializable
+internal data class SharedRow(
+    val key: String,
+    val videos: List<YouTubeVideo> = emptyList(),
+    @SerialName("quota_day") val quotaDay: Long = 0,
+)
