@@ -579,10 +579,8 @@ private fun SpFullContent(
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             )
             // Логотип Spotify на экране с его контентом
-            // В альбомном режиме по центру стоит обложка: логотип уходит в правую панель
-            if (landscape) {
-                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopStart).padding(start = panelStart, top = topInset + 28.dp))
-            } else {
+            // В портрете он стоит над обложкой; в альбоме он первой строкой колонки (см. ниже), чтобы не налезать на текст
+            if (!landscape) {
                 SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopCenter).padding(top = topInset + 28.dp))
             }
 
@@ -597,6 +595,11 @@ private fun SpFullContent(
                 verticalArrangement = if (landscape) Arrangement.Center else Arrangement.Top,
             ) {
                 if (!landscape) Spacer(Modifier.height(belowCoverStart))
+                // Логотип первой строкой колонки: двигается вместе с текстом и не может на него наложиться
+                if (landscape) {
+                    SpotifyLogoChip(24.dp)
+                    Spacer(Modifier.height(8.dp))
+                }
 
                 Text(
                     s.title ?: "",
