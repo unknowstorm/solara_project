@@ -220,6 +220,10 @@ fun HomeScreen(
             return@Column
         }
 
+        if (service == Service.DEEZER) {
+            HintCard("Deezer: только 30-секундные превью. Они живут на своём чипе и не попадают в общий поиск и очередь.")
+        }
+
         if (!service.ready) {
             HintCard("${service.title} скоро появится. ${service.note}.")
             return@Column
@@ -234,12 +238,6 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
-                    IconButton(
-                        onClick = onOpenLikes,
-                        modifier = Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        QueueIcon(Modifier.size(18.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
                 }
             }
             item(key = "likes") {

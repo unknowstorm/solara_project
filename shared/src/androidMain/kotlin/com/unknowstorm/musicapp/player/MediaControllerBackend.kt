@@ -27,6 +27,8 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     private val appContext = context.applicationContext
     private val _state = MutableStateFlow(PlaybackState())
     override val state: StateFlow<PlaybackState> = _state.asStateFlow()
+    private val _queue = MutableStateFlow<List<QueueItem>>(emptyList())
+    override val queue: StateFlow<List<QueueItem>> = _queue.asStateFlow()
 
     private val handler = Handler(Looper.getMainLooper())
     private var controller: MediaController? = null
@@ -42,6 +44,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
+            if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) updateQueue()
             publish()
         }
 
@@ -113,6 +116,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             }
             controller = connected
             connected.addListener(listener)
+            updateQueue()
             pendingQueue?.let { (items, index) -> start(connected, items, index) }
             pendingQueue = null
             publish()
@@ -195,6 +199,36 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         controller?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
     }
 
+    private fun updateQueue() {
+        val c = controller ?: return
+        _queue.value = (0 until c.mediaItemCount).map { i ->
+            val m = c.getMediaItemAt(i)
+            QueueItem(
+                mediaId = m.mediaId,
+                title = m.mediaMetadata.title?.toString().orEmpty(),
+                artist = m.mediaMetadata.artist?.toString().orEmpty(),
+                artworkUrl = m.mediaMetadata.artworkUri?.toString(),
+                provider = m.mediaMetadata.extras?.getString("provider")
+                    ?.let { n -> ProviderId.entries.firstOrNull { it.name == n } },
+            )
+        }
+    }
+
+    override fun playAt(index: Int) {
+        lastError = null
+        controller?.let {
+            if (index in 0 until it.mediaItemCount) {
+                it.seekTo(index, 0L)
+                it.prepare()
+                it.play()
+            }
+        }
+    }
+
+    override fun removeAt(index: Int) {
+        controller?.let { if (index in 0 until it.mediaItemCount) it.removeMediaItem(index) }
+    }
+
     private fun showError(text: String) {
         lastError = text
         handler.removeCallbacks(clearError)
@@ -240,6 +274,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 else -> RepeatMode.OFF
             },
             shuffle = c.shuffleModeEnabled,
+            currentIndex = c.currentMediaItemIndex,
             provider = item?.mediaMetadata?.extras?.getString("provider")
                 ?.let { name -> ProviderId.entries.firstOrNull { it.name == name } },
         )

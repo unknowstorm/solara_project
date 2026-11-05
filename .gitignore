@@ -19,3 +19,6 @@ captures
 node_modules/
 shared/src/commonMain/kotlin/com/unknowstorm/musicapp/Secrets.kt
 shared/src/commonMain/kotlin/Secrets.kt
+
+context*.txt
+context.txt~
