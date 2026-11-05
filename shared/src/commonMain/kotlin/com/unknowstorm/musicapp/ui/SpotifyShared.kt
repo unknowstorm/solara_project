@@ -40,6 +40,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.resources.Res
+import com.unknowstorm.musicapp.resources.spotify_icon
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.painter.Painter
+import com.unknowstorm.musicapp.resources.spotify_icon_black
+import com.unknowstorm.musicapp.resources.spotify_icon_white
+import com.unknowstorm.musicapp.resources.spotify_logo_black
+import com.unknowstorm.musicapp.resources.spotify_logo_white
 import com.unknowstorm.musicapp.resources.spotify_logo
 import com.unknowstorm.musicapp.spotify.SpotifyItem
 import com.unknowstorm.musicapp.spotify.SpotifyRemote
@@ -49,11 +56,8 @@ import org.jetbrains.compose.resources.painterResource
 /** Полный логотип Spotify на чёрном фоне, без изменений. */
 @Composable
 internal fun SpotifyLogoBar(modifier: Modifier = Modifier) {
-    Row(
-        modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Image(painterResource(Res.drawable.spotify_logo), contentDescription = "Spotify", modifier = Modifier.height(24.dp))
+    Row(modifier.padding(vertical = 6.dp)) {
+        Image(spotifyMonoLogo(MaterialTheme.colorScheme.background), contentDescription = "Spotify", modifier = Modifier.height(24.dp))
     }
 }
 
@@ -114,19 +118,22 @@ internal fun SpotifyTileRow(
         items(shown.size, key = { shown[it].uri }) { i -> SpotifyTile(shown[i], covers) { onClick(shown[i]) } }
         if (onOpenSpotify != null) {
             item {
-                Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-                    OutlinedButton(
-                        onClick = onOpenSpotify,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
-                    ) {
-                        Text(
-                            "OPEN SPOTIFY",
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 2,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        )
-                    }
+                // Последняя плитка ряда: тот же размер, что у обложек, углы 4 dp
+                Column(
+                    Modifier.size(120.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable(onClick = onOpenSpotify).padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Image(spotifyMonoIcon(MaterialTheme.colorScheme.surfaceVariant), contentDescription = "Spotify", modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "OPEN SPOTIFY",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    )
                 }
             }
         }
@@ -200,3 +207,24 @@ fun SpotifySearchPane(
         TextButton(onClick = onOpenSection) { Text("Открыть раздел Spotify") }
     }
 }
+
+
+/** Монохромная иконка Spotify: белая на тёмном фоне, чёрная на светлом. Зелёную можно только на чёрном или белом. */
+@Composable
+internal fun spotifyMonoIcon(background: Color): Painter =
+    painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_icon_white else Res.drawable.spotify_icon_black)
+
+/** Кнопка «OPEN SPOTIFY» с иконкой, как в примерах гайдлайнов. */
+@Composable
+internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(onClick = onClick, modifier = modifier) {
+        Image(spotifyMonoIcon(MaterialTheme.colorScheme.background), contentDescription = null, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("OPEN SPOTIFY")
+    }
+}
+
+/** Монохромный полный логотип Spotify: белый на тёмном фоне, чёрный на светлом. */
+@Composable
+internal fun spotifyMonoLogo(background: Color): Painter =
+    painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_logo_white else Res.drawable.spotify_logo_black)

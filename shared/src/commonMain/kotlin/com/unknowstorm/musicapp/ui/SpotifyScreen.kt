@@ -92,7 +92,7 @@ fun SpotifyScreen(
                 SpotifyHeader()
                 Text("Управление воспроизведением доступно только с подпиской Spotify Premium.", Modifier.padding(horizontal = 16.dp))
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
+                    SpotifyOpenButton(remote::openSpotifyApp)
                     TextButton(onClick = remote::disconnect) { Text("Отключить Spotify") }
                 }
             }
@@ -164,7 +164,7 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         item(key = "header") {
-            SpotifyHeader("Музыку по ссылке можно запустить во вкладке «Поиск»: чип «+», затем Spotify.")
+            SpotifyHeader("Музыку по ссылке можно запустить во вкладке «Поиск»: кнопка «+», затем Spotify.")
         }
 
         s.error?.let { message ->
@@ -229,7 +229,7 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
+                SpotifyOpenButton(remote::openSpotifyApp)
                 TextButton(onClick = remote::disconnect) { Text("Отключить Spotify") }
             }
         }
