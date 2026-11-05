@@ -104,7 +104,7 @@ fun TrackListScreen(
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         )
 
-        ServiceTray(selected, { selected = it }, Modifier.padding(bottom = 8.dp))
+        TopBar(selected, { selected = it }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())

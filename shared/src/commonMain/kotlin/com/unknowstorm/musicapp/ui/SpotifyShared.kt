@@ -83,14 +83,14 @@ internal fun SpotifyTile(item: SpotifyItem, covers: Map<String, ImageBitmap>, on
         SpotifyCover(covers[item.imageKey], 120.dp)
         Spacer(Modifier.height(6.dp))
         Text(
-            spotifyLimit(item.title, if (item.uri.startsWith("spotify:track:")) 23 else 25),
+            item.title,
             style = MaterialTheme.typography.titleSmall,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         item.subtitle?.takeIf { it.isNotBlank() }?.let {
             Text(
-                spotifyLimit(it, 18),
+                it,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
