@@ -68,6 +68,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -87,6 +88,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.resources.Res
+import com.unknowstorm.musicapp.resources.spotify_icon
+import com.unknowstorm.musicapp.resources.spotify_like
+import com.unknowstorm.musicapp.resources.spotify_liked
 import com.unknowstorm.musicapp.resources.spotify_logo
 import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.SpotifyState
@@ -424,18 +428,21 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
 /** Полный логотип Spotify на чёрной плашке, без изменений. */
 @Composable
 private fun SpotifyLogoChip(logoHeight: Dp, modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(Color.Black)
-            .padding(horizontal = 6.dp, vertical = 3.dp)
-    ) {
-        Image(
-            painterResource(Res.drawable.spotify_logo),
-            contentDescription = "Spotify",
-            modifier = Modifier.height(logoHeight),
-        )
-    }
+    Image(
+        spotifyMonoLogo(MaterialTheme.colorScheme.surface),
+        contentDescription = "Spotify",
+        modifier = modifier.height(logoHeight),
+    )
+}
+
+/** Иконка Spotify без надписи на чёрной плашке: в мини-плеере не хватает места под полный логотип. */
+@Composable
+private fun SpotifyIconChip(iconSize: Dp, modifier: Modifier = Modifier) {
+    Image(
+        spotifyMonoIcon(MaterialTheme.colorScheme.secondaryContainer),
+        contentDescription = "Spotify",
+        modifier = modifier.size(iconSize),
+    )
 }
 
 @Composable
@@ -467,7 +474,7 @@ private fun SpMiniContent(
                 }
             }
             Spacer(Modifier.width(6.dp))
-            SpotifyLogoChip(14.dp)
+            SpotifyIconChip(24.dp)
             Spacer(Modifier.width(8.dp))
             IconButton(
                 onClick = { if (s.isPaused) remote.resume() else remote.pause() },
@@ -547,6 +554,9 @@ private fun SpFullContent(
     val s by stateHolder
     var dragValue by remember { mutableStateOf<Float?>(null) }
     var showDetails by remember { mutableStateOf(false) }
+    // Сообщение при лайке по правилам Spotify; пропадает само
+    var likeNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(likeNote) { if (likeNote != null) { delay(2000); likeNote = null } }
 
     val trackProgress = if (s.durationMs > 0) (s.positionMs.toFloat() / s.durationMs).coerceIn(0f, 1f) else 0f
     val shownProgress = dragValue ?: trackProgress
@@ -610,14 +620,29 @@ private fun SpFullContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { showDetails = true }) { MoreIcon() }
-                    TextButton(onClick = remote::openSpotifyApp) { Text("OPEN SPOTIFY") }
+                    SpotifyOpenButton(remote::openSpotifyApp)
                     // «+» кладёт трек в Liked Songs самого Spotify, у нас ничего не хранится
-                    IconButton(onClick = remote::toggleSaved) {
-                        if (s.saved) Text("✓", color = active, style = MaterialTheme.typography.titleLarge)
-                        else AddIcon(Modifier.size(24.dp), inactive)
+                    IconButton(onClick = {
+                        likeNote = if (!s.saved) "Added to Liked Songs" else "Removed from Liked Songs"
+                        remote.toggleSaved()
+                    }) {
+                        Image(
+                            painterResource(if (s.saved) Res.drawable.spotify_liked else Res.drawable.spotify_like),
+                            contentDescription = if (s.saved) "Liked" else "Like",
+                            modifier = Modifier.size(32.dp).clip(CircleShape).background(if (!s.saved && MaterialTheme.colorScheme.surface.luminance() >= 0.179f) Color.Black else Color.Transparent),
+                        )
                     }
                 }
 
+                likeNote?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = active,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
                     LinearWavyProgressIndicator(
                         progress = { shownProgress },
