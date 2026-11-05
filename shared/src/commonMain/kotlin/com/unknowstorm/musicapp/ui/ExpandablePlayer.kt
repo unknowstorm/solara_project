@@ -734,14 +734,17 @@ private fun FullContent(
                         MoreIcon()
                     }
                     Row {
-                        IconButton(onClick = {
+                        IconButton(enabled = currentTrack?.provider != com.unknowstorm.musicapp.model.ProviderId.DEEZER, onClick = {
                             when {
                                 currentTrack == null -> Unit
                                 !signedIn -> onNeedAuth()
                                 else -> likes.toggle(currentTrack)
                             }
                         }) {
-                            HeartIcon(liked, tint = if (liked) active else inactive)
+                            HeartIcon(
+                                liked,
+                                tint = if (currentTrack?.provider == com.unknowstorm.musicapp.model.ProviderId.DEEZER) inactive.copy(alpha = 0.3f) else if (liked) active else inactive,
+                            )
                         }
                         IconButton(onClick = { audio.cycleRepeat() }) {
                             RepeatIcon(

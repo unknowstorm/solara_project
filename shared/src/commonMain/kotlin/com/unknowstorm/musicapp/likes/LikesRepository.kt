@@ -107,7 +107,7 @@ class LikesRepository(
                     .select { order("liked_at", Order.DESCENDING); limit(200) }
                     .decodeList<LikeRow>()
                 // Пока шёл запрос, мог войти другой пользователь: тогда ответ выбрасываем
-                if (userId == owner) _tracks.value = rows.mapNotNull { it.toTrack() }
+                if (userId == owner) _tracks.value = rows.mapNotNull { it.toTrack() }.filter { it.provider != ProviderId.DEEZER }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -119,6 +119,8 @@ class LikesRepository(
     /** Ставит или снимает лайк. Интерфейс обновляется сразу, при ошибке сети откатывается. */
     fun toggle(track: Track) {
         if (!_signedIn.value) return
+        // Deezer: только 30-секундные превью, в общие лайки не входит
+        if (track.provider == ProviderId.DEEZER) return
         val wasLiked = _tracks.value.containsTrack(track)
         _tracks.update { list ->
             if (wasLiked) list.filterNot { it.provider == track.provider && it.id == track.id }
