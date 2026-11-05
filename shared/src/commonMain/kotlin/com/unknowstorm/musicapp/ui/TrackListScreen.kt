@@ -92,6 +92,8 @@ fun TrackListScreen(
     val failed = providers.mapNotNull { p -> results[p.id]?.takeIf { it.error != null } }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        TopBar(selected, { selected = it }, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+
         if (selected != Service.SPOTIFY) OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -101,10 +103,8 @@ fun TrackListScreen(
             keyboardActions = KeyboardActions(
                 onSearch = { if (selected == Service.YOUTUBE) ytQuery = query.trim() },
             ),
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
         )
-
-        TopBar(selected, { selected = it }, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth())
