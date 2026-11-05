@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,7 +21,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
@@ -28,10 +32,19 @@ import com.unknowstorm.musicapp.resources.Res
 import com.unknowstorm.musicapp.resources.logo
 import org.jetbrains.compose.resources.painterResource
 
-/** Фон заставки. Тот же цвет, что у окна при запуске (res/values/splash_colors.xml): вспышки между ними нет. */
-val SplashBackground = Color(0xFF1A1111)
-
 private val LogoSize = 160.dp
+// Инверсия для светлой темы: светлое становится чёрным (диск), тёмное или бледное усиливается до белого (буква S).
+// Прозрачность не трогаем. 6375 = 25 * 255.
+private val InvertedLogo = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            -25f, 0f, 0f, 0f, 6375f,
+            0f, -25f, 0f, 0f, 6375f,
+            0f, 0f, -25f, 0f, 6375f,
+            0f, 0f, 0f, 1f, 0f,
+        )
+    )
+)
 private const val ENTER_MS = 380 // логотип «въезжает»: проявляется, растёт и доворачивается до остановки
 private const val EXIT_MS = 280 // заставка растворяется, логотип чуть увеличивается
 private const val SPIN_UP_SEC = 0.45f // разгон пластинки от покоя до рабочей скорости
@@ -90,13 +103,14 @@ fun SplashScreen(
         Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = 1f - exit.value }
-            .background(SplashBackground)
+            .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {},
         contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(Res.drawable.logo),
             contentDescription = null,
+            colorFilter = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) InvertedLogo else null,
             modifier = Modifier
                 .size(LogoSize)
                 .graphicsLayer {

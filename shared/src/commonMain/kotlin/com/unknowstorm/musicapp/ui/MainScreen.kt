@@ -121,11 +121,8 @@ fun MainScreen(
                 } else {
                     HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth)
                 }
-                Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY })
-                Tab.QUEUE -> InfoScreen(
-                    "Очередь",
-                    "Здесь будет текущая очередь: удаление треков, шафл и повтор списка. Следующий этап.",
-                )
+                Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
+                Tab.QUEUE -> QueueScreen(audio)
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
             }
         }

@@ -581,9 +581,9 @@ private fun SpFullContent(
             // Логотип Spotify на экране с его контентом
             // В альбомном режиме по центру стоит обложка: логотип уходит в правую панель
             if (landscape) {
-                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopStart).padding(start = panelStart, top = topInset + 12.dp))
+                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopStart).padding(start = panelStart, top = topInset + 28.dp))
             } else {
-                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopCenter).padding(top = topInset + 20.dp))
+                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopCenter).padding(top = topInset + 28.dp))
             }
 
             Column(

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.toService
@@ -47,9 +48,11 @@ fun TrackListScreen(
     audio: AudioBackend,
     session: YouTubeSession? = null,
     onOpenSpotify: () -> Unit = {},
+    likes: LikesRepository? = null,
 ) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(Service.ALL) }
+    var likesSelected by remember { mutableStateOf(false) }
     var ytQuery by remember { mutableStateOf("") }
     var retry by remember { mutableStateOf(0) }
     var results by remember { mutableStateOf<Map<ProviderId, SourceResult>>(emptyMap()) }
@@ -62,8 +65,8 @@ fun TrackListScreen(
     val canSearch = selected == Service.ALL ||
         (selected.ready && providers.any { it.id == sourceId })
 
-    LaunchedEffect(query, selected, retry, hub) {
-        if (!canSearch) {
+    LaunchedEffect(query, selected, retry, hub, likesSelected) {
+        if (!canSearch || likesSelected) {
             results = emptyMap()
             loading = false
             return@LaunchedEffect
@@ -92,7 +95,13 @@ fun TrackListScreen(
     val failed = providers.mapNotNull { p -> results[p.id]?.takeIf { it.error != null } }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        TopBar(selected, { selected = it }, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        TopBar(
+            selected,
+            { selected = it; likesSelected = false },
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            likesSelected = likesSelected,
+            onLikes = if (likes != null) ({ likesSelected = true; selected = Service.ALL }) else null,
+        )
 
         if (selected != Service.SPOTIFY) OutlinedTextField(
             value = query,
@@ -147,6 +156,11 @@ fun TrackListScreen(
                 text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
+        }
+
+        if (likesSelected && likes != null) {
+            LikesSearchPane(likes, providers, audio, query, Modifier.weight(1f))
+            return@Column
         }
 
         if (selected == Service.SPOTIFY) {
