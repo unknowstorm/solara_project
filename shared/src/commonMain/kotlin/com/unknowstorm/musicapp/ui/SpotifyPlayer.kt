@@ -88,10 +88,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.resources.Res
-import com.unknowstorm.musicapp.resources.spotify_icon
 import com.unknowstorm.musicapp.resources.spotify_like
 import com.unknowstorm.musicapp.resources.spotify_liked
-import com.unknowstorm.musicapp.resources.spotify_logo
 import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.SpotifyState
 import kotlinx.coroutines.Job
@@ -473,9 +471,9 @@ private fun SpMiniContent(
                     Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(10.dp))
             SpotifyIconChip(24.dp)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(20.dp))
             IconButton(
                 onClick = { if (s.isPaused) remote.resume() else remote.pause() },
                 modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
@@ -581,7 +579,12 @@ private fun SpFullContent(
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             )
             // Логотип Spotify на экране с его контентом
-            SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopCenter).padding(top = topInset + 20.dp))
+            // В альбомном режиме по центру стоит обложка: логотип уходит в правую панель
+            if (landscape) {
+                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopStart).padding(start = panelStart, top = topInset + 12.dp))
+            } else {
+                SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopCenter).padding(top = topInset + 20.dp))
+            }
 
             Column(
                 modifier = if (landscape) {
@@ -634,14 +637,11 @@ private fun SpFullContent(
                     }
                 }
 
-                likeNote?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = active,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                // Место под подпись зарезервировано всегда: полоса воспроизведения не прыгает
+                Box(Modifier.fillMaxWidth().height(20.dp), contentAlignment = Alignment.CenterEnd) {
+                    likeNote?.let {
+                        Text(it, style = MaterialTheme.typography.labelMedium, color = active)
+                    }
                 }
                 Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
                     LinearWavyProgressIndicator(

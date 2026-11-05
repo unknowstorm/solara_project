@@ -40,14 +40,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.resources.Res
-import com.unknowstorm.musicapp.resources.spotify_icon
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
 import com.unknowstorm.musicapp.resources.spotify_icon_black
 import com.unknowstorm.musicapp.resources.spotify_icon_white
 import com.unknowstorm.musicapp.resources.spotify_logo_black
 import com.unknowstorm.musicapp.resources.spotify_logo_white
-import com.unknowstorm.musicapp.resources.spotify_logo
 import com.unknowstorm.musicapp.spotify.SpotifyItem
 import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.parseSpotifyLink
