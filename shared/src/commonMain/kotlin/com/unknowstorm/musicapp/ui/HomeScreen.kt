@@ -212,6 +212,20 @@ fun HomeScreen(
     val rows = buildRows(feeds, mixed)
     val signedInForRecs by likes.signedIn.collectAsState()
     LaunchedEffect(recs, signedInForRecs) { recs?.ensureLoaded(signedInForRecs) }
+    // На чипе источника рекомендации только его, на «Все» смешанные
+    // Deezer: только превью, общие лайки и рекомендации на его чипе не показываем
+    val isDeezer = service == Service.DEEZER
+    val recProvider = when (service) {
+        Service.JAMENDO -> com.unknowstorm.musicapp.model.ProviderId.JAMENDO
+        Service.AUDIUS -> com.unknowstorm.musicapp.model.ProviderId.AUDIUS
+        else -> null
+    }
+    val shownRecs = recs?.tracks.orEmpty().let { list ->
+        if (recProvider == null) list else list.filter { it.provider == recProvider }
+    }
+    val recArtists = recs?.artists.orEmpty()
+        .filter { a -> shownRecs.any { it.artist.contains(a.removePrefix("@"), ignoreCase = true) } }
+        .ifEmpty { recs?.artists.orEmpty() }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Новый верхний бар
@@ -240,7 +254,7 @@ fun HomeScreen(
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             // Секция "Вы лайкнули" с кнопкой фильтра
-            item {
+            if (!isDeezer) item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -249,19 +263,24 @@ fun HomeScreen(
                     Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
                 }
             }
-            item(key = "likes") {
+            if (!isDeezer) item(key = "likes") {
                 val liked by likes.tracks.collectAsState()
                 val signedIn by likes.signedIn.collectAsState()
-                val shown = liked.filterNot { DeadTracks.isDead(it) }
+                val shown = liked
+                    .filterNot { DeadTracks.isDead(it) }
+                    .filter { recProvider == null || it.provider == recProvider }
                 when {
                     !signedIn -> HintCard("Войдите в аккаунт, и треки, которые вы лайкнете (♡ в плеере), будут храниться здесь.")
-                    shown.isEmpty() -> HintCard("Нажмите ♡ в плеере, и трек появится здесь.")
+                    shown.isEmpty() -> HintCard(
+                        if (recProvider != null && liked.isNotEmpty()) "На этом сервисе лайков пока нет."
+                        else "Нажмите ♡ в плеере, и трек появится здесь."
+                    )
                     else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(shown, key = { "like:${it.provider}:${it.id}" }) { track ->
-                            HomeTrackCard(track, showBadge = true) {
+                            HomeTrackCard(track, showBadge = recProvider == null) {
                                 scope.launch { playLiked(shown, track, providers, audio) }
                             }
                         }
@@ -271,10 +290,10 @@ fun HomeScreen(
 
             // Подборки
             item { SectionTitle("Подборки для вас") }
-            if (recs != null && recs.tracks.isNotEmpty()) {
+            if (!isDeezer && shownRecs.isNotEmpty()) {
                 item(key = "recs-label") {
                     Text(
-                        "Ещё от тех, кого вы слушаете: " + recs.artists.joinToString(", "),
+                        "Ещё от тех, кого вы слушаете: " + recArtists.joinToString(", "),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -287,9 +306,9 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(recs.tracks, key = { "rec:${it.provider}:${it.id}" }) { track ->
+                        items(shownRecs, key = { "rec:${it.provider}:${it.id}" }) { track ->
                             HomeTrackCard(track, showBadge = true) {
-                                audio.playQueue(recs.tracks, recs.tracks.indexOf(track))
+                                audio.playQueue(shownRecs, shownRecs.indexOf(track))
                             }
                         }
                     }

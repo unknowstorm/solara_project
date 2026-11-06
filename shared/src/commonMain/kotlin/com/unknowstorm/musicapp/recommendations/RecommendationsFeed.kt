@@ -16,8 +16,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val TOP_ARTISTS = 3
-private const val PER_ARTIST = 6
-private const val TOTAL = 20
+private const val PER_ARTIST = 10
+private const val TOTAL = 30
 private const val LIKE_WEIGHT = 3
 
 private fun ProviderId.isOurs() = this == ProviderId.JAMENDO || this == ProviderId.AUDIUS
