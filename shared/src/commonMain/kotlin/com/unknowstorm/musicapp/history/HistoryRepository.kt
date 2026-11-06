@@ -10,6 +10,7 @@ import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.PlaybackState
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +62,23 @@ class HistoryRepository(
             }
         }
         scope.launch { audio.state.collect { onState(it) } }
+    }
+
+    /** Последние прослушанные треки, новые сверху (без ссылок на звук). */
+    suspend fun recent(count: Long = 200L): List<Track> = try {
+        client.from("listening_history")
+            .select { order("played_at", Order.DESCENDING); limit(count) }
+            .decodeList<HistoryRow>()
+            .mapNotNull { r ->
+                ProviderId.entries.firstOrNull { it.name == r.provider }?.let {
+                    Track(r.trackId, it, r.title, r.artist, r.artworkUrl, r.durationMs)
+                }
+            }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        println("Solara: history load failed: ${e.message}")
+        emptyList()
     }
 
     private fun onState(s: PlaybackState) {

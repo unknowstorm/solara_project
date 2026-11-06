@@ -36,7 +36,9 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
+import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
@@ -57,6 +59,7 @@ fun MainScreen(
     authRepo: AuthRepository,
     likes: LikesRepository,
     playlists: PlaylistsRepository,
+    history: HistoryRepository,
     onOpenPlayer: () -> Unit,
     onOpenAuth: () -> Unit,
 ) {
@@ -73,6 +76,8 @@ fun MainScreen(
     val shownFeeds = remember(feeds, service) {
         if (service == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == service }
     }
+
+    val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
 
     val ytScope = rememberCoroutineScope()
     val session = remember { YouTubeSession(ytScope) }
@@ -121,7 +126,7 @@ fun MainScreen(
                         onServiceChange = { service = it },
                     )
                 } else {
-                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists)
+                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs)
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
                 Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth)

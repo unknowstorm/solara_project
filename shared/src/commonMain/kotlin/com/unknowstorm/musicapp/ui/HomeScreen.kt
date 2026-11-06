@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
+import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.Track
@@ -201,6 +202,7 @@ fun HomeScreen(
     onOpenLikes: () -> Unit,
     onOpenAuth: () -> Unit,
     playlists: PlaylistsRepository? = null,
+    recs: RecommendationsFeed? = null,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
@@ -208,6 +210,8 @@ fun HomeScreen(
     val noPlaylists = androidx.compose.runtime.remember { kotlinx.coroutines.flow.MutableStateFlow(emptyList<Playlist>()) }
     val myPlaylists by (playlists?.playlists ?: noPlaylists).collectAsState()
     val rows = buildRows(feeds, mixed)
+    val signedInForRecs by likes.signedIn.collectAsState()
+    LaunchedEffect(recs, signedInForRecs) { recs?.ensureLoaded(signedInForRecs) }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Новый верхний бар
@@ -267,6 +271,31 @@ fun HomeScreen(
 
             // Подборки
             item { SectionTitle("Подборки для вас") }
+            if (recs != null && recs.tracks.isNotEmpty()) {
+                item(key = "recs-label") {
+                    Text(
+                        "Ещё от тех, кого вы слушаете: " + recs.artists.joinToString(", "),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
+                    )
+                }
+                item(key = "recs-row") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(recs.tracks, key = { "rec:${it.provider}:${it.id}" }) { track ->
+                            HomeTrackCard(track, showBadge = true) {
+                                audio.playQueue(recs.tracks, recs.tracks.indexOf(track))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
             if (feeds.any { it.loading }) {
                 item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
             }
