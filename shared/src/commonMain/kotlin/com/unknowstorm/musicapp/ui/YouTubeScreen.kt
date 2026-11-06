@@ -131,7 +131,12 @@ private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceC
             .onGloballyPositioned { session.screenBounds = it.boundsInWindow() }
             .statusBarsPadding(),
     ) {
-        TopBar(Service.YOUTUBE, onServiceChange, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        TopBar(
+            Service.YOUTUBE,
+            onServiceChange,
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            onLikes = LocalOpenLikes.current,
+        )
         YouTubeFeed(audio, session, Modifier.weight(1f))
     }
 }
