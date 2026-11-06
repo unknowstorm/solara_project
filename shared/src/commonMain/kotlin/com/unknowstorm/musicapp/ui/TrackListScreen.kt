@@ -186,7 +186,7 @@ fun TrackListScreen(
             return@Column
         }
 
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f).serviceSwipe(current = selected, likesSelected = false, hasLikes = false, onSelect = { selected = it }, onLikes = {})) {
             items(visible, key = { "${it.provider}:${it.id}" }) { track ->
                 ListItem(
                     leadingContent = {
