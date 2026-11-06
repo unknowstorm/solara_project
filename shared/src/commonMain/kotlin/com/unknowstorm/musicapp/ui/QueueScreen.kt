@@ -22,8 +22,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,15 +36,54 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.model.ProviderId
+import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.RepeatMode
+import com.unknowstorm.musicapp.playlists.PlaylistsRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Вкладка «Очередь»: то, что сейчас стоит в нашем плеере (Jamendo, Audius). */
 @Composable
-fun QueueScreen(audio: AudioBackend) {
+fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth: () -> Unit) {
+    val scope = rememberCoroutineScope()
     val state by audio.state.collectAsState()
     val queue by audio.queue.collectAsState()
+    val signedIn by playlists.signedIn.collectAsState()
+    var showSave by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    var saved by remember { mutableStateOf(false) }
+
+    LaunchedEffect(saved) {
+        if (saved) {
+            delay(3_000)
+            saved = false
+        }
+    }
+
+    if (showSave) {
+        SavePlaylistDialog(
+            saving = saving,
+            error = saveError,
+            onSave = { name ->
+                val tracks = queue.mapNotNull { item ->
+                    item.provider?.let { Track(item.mediaId, it, item.title, item.artist, item.artworkUrl, 0L) }
+                }
+                scope.launch {
+                    saving = true
+                    saveError = null
+                    playlists.create(name, tracks).fold(
+                        onSuccess = { showSave = false; saved = true },
+                        onFailure = { saveError = it.message },
+                    )
+                    saving = false
+                }
+            },
+            onDismiss = { showSave = false; saveError = null },
+        )
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Row(
@@ -48,7 +92,21 @@ fun QueueScreen(audio: AudioBackend) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Очередь", style = MaterialTheme.typography.headlineMedium)
-            if (queue.isNotEmpty()) TextButton(onClick = { audio.stop() }) { Text("Очистить") }
+            if (queue.isNotEmpty()) {
+                Row {
+                    TextButton(onClick = { if (signedIn) showSave = true else onOpenAuth() }) { Text("Сохранить") }
+                    TextButton(onClick = { audio.stop() }) { Text("Очистить") }
+                }
+            }
+        }
+
+        if (saved) {
+            Text(
+                "Плейлист сохранён: он появится на Главной",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
         }
 
         if (queue.isEmpty()) {

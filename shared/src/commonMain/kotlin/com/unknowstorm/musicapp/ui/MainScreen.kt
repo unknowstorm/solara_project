@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -55,6 +56,7 @@ fun MainScreen(
     audio: AudioBackend,
     authRepo: AuthRepository,
     likes: LikesRepository,
+    playlists: PlaylistsRepository,
     onOpenPlayer: () -> Unit,
     onOpenAuth: () -> Unit,
 ) {
@@ -119,10 +121,10 @@ fun MainScreen(
                         onServiceChange = { service = it },
                     )
                 } else {
-                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth)
+                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists)
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
-                Tab.QUEUE -> QueueScreen(audio)
+                Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth)
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
             }
         }

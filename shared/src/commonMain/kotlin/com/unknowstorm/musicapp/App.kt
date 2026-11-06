@@ -19,7 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
+import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.player.rememberAudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.provider.audius.AudiusProvider
@@ -126,6 +128,9 @@ private fun AppContent(boot: AppBoot) {
     val authRepo = boot.authRepo
     val audio = rememberAudioBackend()
     val likes = remember { LikesRepository(authRepo) }
+    val playlists = remember { PlaylistsRepository(authRepo) }
+    // История слушается сама: пишет трек в облако после 30 секунд воспроизведения
+    remember(audio) { HistoryRepository(authRepo, audio) }
     val authState by authRepo.state.collectAsState()
     val pending by authRepo.pending.collectAsState()
     var showPlayer by remember { mutableStateOf(false) }
@@ -150,6 +155,7 @@ private fun AppContent(boot: AppBoot) {
                 audio = audio,
                 authRepo = authRepo,
                 likes = likes,
+                playlists = playlists,
                 onOpenPlayer = { showPlayer = true },
                 onOpenAuth = { showAuth = true },
             )
