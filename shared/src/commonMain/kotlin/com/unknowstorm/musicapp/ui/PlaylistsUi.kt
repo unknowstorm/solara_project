@@ -37,11 +37,14 @@ internal fun SavePlaylistDialog(
     error: String?,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
+    initialName: String = "Моя очередь",
+    title: String = "Сохранить как плейлист",
+    confirmLabel: String = "Сохранить",
 ) {
-    var name by remember { mutableStateOf("Моя очередь") }
+    var name by remember { mutableStateOf(initialName) }
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
-        title = { Text("Сохранить как плейлист") },
+        title = { Text(title) },
         text = {
             Column {
                 OutlinedTextField(
@@ -62,7 +65,7 @@ internal fun SavePlaylistDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(name) }, enabled = !saving && name.isNotBlank()) {
-                Text(if (saving) "Сохраняю…" else "Сохранить")
+                Text(if (saving) "Сохраняю…" else confirmLabel)
             }
         },
         dismissButton = {

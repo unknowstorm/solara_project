@@ -3,6 +3,7 @@ package com.unknowstorm.musicapp.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -203,12 +204,25 @@ fun HomeScreen(
     onOpenAuth: () -> Unit,
     playlists: PlaylistsRepository? = null,
     recs: RecommendationsFeed? = null,
+    onOpenPlaylist: (Playlist) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
     val mixed = service == Service.ALL
     val noPlaylists = androidx.compose.runtime.remember { kotlinx.coroutines.flow.MutableStateFlow(emptyList<Playlist>()) }
     val myPlaylists by (playlists?.playlists ?: noPlaylists).collectAsState()
+    var deleting by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Playlist?>(null) }
+    deleting?.let { target ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("Удалить плейлист?") },
+            text = { Text("«${target.name}» будет удалён без возможности восстановления.") },
+            confirmButton = {
+                TextButton(onClick = { playlists?.delete(target.id); deleting = null }) { Text("Удалить") }
+            },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Отмена") } },
+        )
+    }
     val rows = buildRows(feeds, mixed)
     val signedInForRecs by likes.signedIn.collectAsState()
     LaunchedEffect(recs, signedInForRecs) { recs?.ensureLoaded(signedInForRecs) }
@@ -366,7 +380,8 @@ fun HomeScreen(
                         PlaylistCard(
                             pl.name,
                             colors[index % colors.size],
-                            onClick = { scope.launch { playlists?.let { playPlaylist(it, pl, providers, audio) } } },
+                            onClick = { onOpenPlaylist(pl) },
+                            onLongClick = { deleting = pl },
                         )
                     }
                 }
@@ -515,14 +530,15 @@ private fun HomeTrackCard(track: Track, showBadge: Boolean, onClick: () -> Unit)
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PlaylistCard(title: String, color: Color, onClick: () -> Unit = {}) {
+fun PlaylistCard(title: String, color: Color, onClick: () -> Unit = {}, onLongClick: (() -> Unit)? = null) {
     Box(
         modifier = Modifier
             .size(90.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(color)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(12.dp),
         contentAlignment = Alignment.BottomStart
     ) {
