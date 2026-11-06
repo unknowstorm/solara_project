@@ -39,6 +39,7 @@ import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.player.AudioBackend
+import com.unknowstorm.musicapp.player.QueueItem
 import com.unknowstorm.musicapp.player.RepeatMode
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import kotlinx.coroutines.delay
@@ -51,16 +52,72 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
     val state by audio.state.collectAsState()
     val queue by audio.queue.collectAsState()
     val signedIn by playlists.signedIn.collectAsState()
+    val myPlaylists by playlists.playlists.collectAsState()
+    var addTarget by remember { mutableStateOf<Track?>(null) }
+    var newForTrack by remember { mutableStateOf<Track?>(null) }
+    var addBusy by remember { mutableStateOf(false) }
+    var addError by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf<String?>(null) }
     var showSave by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveError by remember { mutableStateOf<String?>(null) }
     var saved by remember { mutableStateOf(false) }
+
+    LaunchedEffect(note) {
+        if (note != null) {
+            delay(3_000)
+            note = null
+        }
+    }
 
     LaunchedEffect(saved) {
         if (saved) {
             delay(3_000)
             saved = false
         }
+    }
+
+    addTarget?.let { target ->
+        AddToPlaylistDialog(
+            playlists = myPlaylists,
+            busy = addBusy,
+            error = addError,
+            onPick = { pl ->
+                scope.launch {
+                    addBusy = true
+                    addError = null
+                    playlists.addTracks(pl.id, listOf(target)).fold(
+                        onSuccess = { n ->
+                            addTarget = null
+                            note = if (n > 0) "Добавлено в «${pl.name}»" else "Уже в плейлисте «${pl.name}»"
+                        },
+                        onFailure = { addError = it.message },
+                    )
+                    addBusy = false
+                }
+            },
+            onNew = { newForTrack = target; addTarget = null },
+            onDismiss = { addTarget = null; addError = null },
+        )
+    }
+    newForTrack?.let { target ->
+        SavePlaylistDialog(
+            saving = addBusy,
+            error = addError,
+            onSave = { name ->
+                scope.launch {
+                    addBusy = true
+                    addError = null
+                    playlists.create(name, listOf(target)).fold(
+                        onSuccess = { newForTrack = null; note = "Плейлист «${name.trim()}» создан" },
+                        onFailure = { addError = it.message },
+                    )
+                    addBusy = false
+                }
+            },
+            onDismiss = { newForTrack = null; addError = null },
+            initialName = target.title.take(60),
+        )
     }
 
     if (showSave) {
@@ -103,6 +160,15 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
         if (saved) {
             Text(
                 "Плейлист сохранён: он появится на Главной",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
+
+        note?.let {
+            Text(
+                it,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 24.dp),
@@ -169,6 +235,15 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    if (item.provider == ProviderId.JAMENDO || item.provider == ProviderId.AUDIUS) {
+                        IconButton(onClick = { if (signedIn) addTarget = item.toTrack() else onOpenAuth() }) {
+                            Text(
+                                "+",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     IconButton(onClick = { audio.removeAt(index) }) {
                         Text("✕", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -177,3 +252,6 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
         }
     }
 }
+
+private fun QueueItem.toTrack(): Track? =
+    provider?.let { Track(mediaId, it, title, artist, artworkUrl, 0L) }

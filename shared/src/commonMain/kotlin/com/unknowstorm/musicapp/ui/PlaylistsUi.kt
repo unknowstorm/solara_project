@@ -1,7 +1,11 @@
 package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -13,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.playlists.Playlist
@@ -71,5 +76,49 @@ internal fun SavePlaylistDialog(
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !saving) { Text("Отмена") }
         },
+    )
+}
+
+/** Выбор плейлиста, в который добавить трек, или создание нового. */
+@Composable
+internal fun AddToPlaylistDialog(
+    playlists: List<Playlist>,
+    busy: Boolean,
+    error: String?,
+    onPick: (Playlist) -> Unit,
+    onNew: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Добавить в плейлист") },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                TextButton(onClick = onNew, enabled = !busy) { Text("+ Новый плейлист") }
+                playlists.forEach { pl ->
+                    TextButton(
+                        onClick = { onPick(pl) },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(pl.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                error?.let {
+                    Text(
+                        it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") } },
     )
 }
