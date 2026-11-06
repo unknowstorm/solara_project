@@ -130,7 +130,7 @@ private fun AppContent(boot: AppBoot) {
     val likes = remember { LikesRepository(authRepo) }
     val playlists = remember { PlaylistsRepository(authRepo) }
     // История слушается сама: пишет трек в облако после 30 секунд воспроизведения
-    remember(audio) { HistoryRepository(authRepo, audio) }
+    val history = remember(audio) { HistoryRepository(authRepo, audio) }
     val authState by authRepo.state.collectAsState()
     val pending by authRepo.pending.collectAsState()
     var showPlayer by remember { mutableStateOf(false) }
@@ -156,6 +156,7 @@ private fun AppContent(boot: AppBoot) {
                 authRepo = authRepo,
                 likes = likes,
                 playlists = playlists,
+                history = history,
                 onOpenPlayer = { showPlayer = true },
                 onOpenAuth = { showAuth = true },
             )
