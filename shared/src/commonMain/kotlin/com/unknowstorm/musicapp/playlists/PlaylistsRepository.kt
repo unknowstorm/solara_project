@@ -22,6 +22,9 @@ import kotlinx.serialization.Serializable
 
 data class Playlist(val id: String, val name: String)
 
+/** Трек в плейлисте вместе с позицией (по ней его можно удалить). */
+data class PlaylistEntry(val position: Int, val track: Track)
+
 @Serializable
 private data class PlaylistRow(val id: String, val name: String)
 
@@ -143,6 +146,56 @@ class PlaylistsRepository(
     } catch (e: Exception) {
         println("Solara: playlist load failed: ${e.message}")
         emptyList()
+    }
+
+    /** Состав плейлиста по порядку; null, если загрузить не удалось. */
+    suspend fun loadEntries(playlistId: String): List<PlaylistEntry>? = try {
+        client.from("playlist_items")
+            .select {
+                filter { eq("playlist_id", playlistId) }
+                order("position", Order.ASCENDING)
+            }
+            .decodeList<ItemRow>()
+            .mapNotNull { r ->
+                ProviderId.entries.firstOrNull { it.name == r.provider }?.let { p ->
+                    PlaylistEntry(r.position, Track(r.trackId, p, r.title, r.artist, r.artworkUrl, r.durationMs))
+                }
+            }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        println("Solara: playlist entries load failed: ${e.message}")
+        null
+    }
+
+    suspend fun removeEntry(playlistId: String, position: Int): Boolean = try {
+        client.from("playlist_items").delete {
+            filter {
+                eq("playlist_id", playlistId)
+                eq("position", position)
+            }
+        }
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        println("Solara: playlist entry remove failed: ${e.message}")
+        false
+    }
+
+    suspend fun rename(playlistId: String, name: String): Result<Unit> {
+        val clean = name.trim().take(100)
+        if (clean.isEmpty()) return Result.failure(Exception("Введите название"))
+        return try {
+            client.from("playlists").update(PlaylistInsert(clean)) { filter { eq("id", playlistId) } }
+            _playlists.update { list -> list.map { if (it.id == playlistId) it.copy(name = clean) else it } }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Solara: playlist rename failed: ${e.message}")
+            Result.failure(Exception("Не удалось переименовать"))
+        }
     }
 
     fun delete(playlistId: String) {

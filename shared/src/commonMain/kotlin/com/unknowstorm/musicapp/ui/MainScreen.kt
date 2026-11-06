@@ -38,6 +38,7 @@ import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.model.Service
@@ -66,6 +67,7 @@ fun MainScreen(
     var tab by remember { mutableStateOf(Tab.HOME) }
     var service by remember { mutableStateOf(Service.ALL) }
     var showLikes by remember { mutableStateOf(false) }
+    var openPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
     val feeds = remember(providers) {
         providers.mapNotNull { provider ->
@@ -126,11 +128,14 @@ fun MainScreen(
                         onServiceChange = { service = it },
                     )
                 } else {
-                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs)
+                    HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it })
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
                 Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth)
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
+            }
+            openPlaylist?.let { pl ->
+                PlaylistScreen(pl, playlists, providers, audio, onBack = { openPlaylist = null })
             }
         }
 
@@ -154,7 +159,7 @@ fun MainScreen(
             Tab.entries.forEach { item ->
                 NavigationBarItem(
                     selected = tab == item,
-                    onClick = { tab = item },
+                    onClick = { tab = item; openPlaylist = null },
                     icon = {
                         when (item) {
                             Tab.HOME -> HomeIcon()
