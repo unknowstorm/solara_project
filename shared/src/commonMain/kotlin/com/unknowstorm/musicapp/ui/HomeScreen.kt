@@ -47,6 +47,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.playlists.Playlist
+import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.model.toService
@@ -198,10 +200,13 @@ fun HomeScreen(
     likesSelected: Boolean,
     onOpenLikes: () -> Unit,
     onOpenAuth: () -> Unit,
+    playlists: PlaylistsRepository? = null,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
     val mixed = service == Service.ALL
+    val noPlaylists = androidx.compose.runtime.remember { kotlinx.coroutines.flow.MutableStateFlow(emptyList<Playlist>()) }
+    val myPlaylists by (playlists?.playlists ?: noPlaylists).collectAsState()
     val rows = buildRows(feeds, mixed)
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -294,19 +299,27 @@ fun HomeScreen(
 
             // Плейлисты
             item { SectionTitle("Ваши плейлисты") }
+            if (myPlaylists.isEmpty()) item(key = "no-playlists") {
+                HintCard("Плейлистов пока нет. На вкладке «Очередь» можно сохранить очередь как плейлист.")
+            }
             item {
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(4) { index ->
+                    items(myPlaylists.size) { index ->
+                        val pl = myPlaylists.getOrNull(index) ?: return@items
                         val colors = listOf(
                             MaterialTheme.colorScheme.primaryContainer,
                             MaterialTheme.colorScheme.secondaryContainer,
                             MaterialTheme.colorScheme.tertiaryContainer,
                             MaterialTheme.colorScheme.surfaceVariant
                         )
-                        PlaylistCard("Плейлист", colors[index % colors.size])
+                        PlaylistCard(
+                            pl.name,
+                            colors[index % colors.size],
+                            onClick = { scope.launch { playlists?.let { playPlaylist(it, pl, providers, audio) } } },
+                        )
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -455,12 +468,13 @@ private fun HomeTrackCard(track: Track, showBadge: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-fun PlaylistCard(title: String, color: Color) {
+fun PlaylistCard(title: String, color: Color, onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .size(90.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(color)
+            .clickable(onClick = onClick)
             .padding(12.dp),
         contentAlignment = Alignment.BottomStart
     ) {
