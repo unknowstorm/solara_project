@@ -198,6 +198,31 @@ class PlaylistsRepository(
         }
     }
 
+    /** Добавляет треки в конец плейлиста, уже лежащие в нём пропускает. Возвращает, сколько добавлено. */
+    suspend fun addTracks(playlistId: String, tracks: List<Track>): Result<Int> {
+        val existing = loadEntries(playlistId)
+            ?: return Result.failure(Exception("Не удалось загрузить плейлист"))
+        val have = existing.map { "${it.track.provider}:${it.track.id}" }.toSet()
+        val fresh = tracks
+            .filter { it.provider.canBeSaved() && "${it.provider}:${it.id}" !in have }
+            .distinctBy { "${it.provider}:${it.id}" }
+        if (fresh.isEmpty()) return Result.success(0)
+        val start = (existing.maxOfOrNull { it.position } ?: -1) + 1
+        return try {
+            client.from("playlist_items").insert(
+                fresh.mapIndexed { i, t ->
+                    ItemRow(playlistId, start + i, t.provider.name, t.id, t.title, t.artist, t.artworkUrl, t.durationMs)
+                }
+            )
+            Result.success(fresh.size)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Solara: playlist add failed: ${e.message}")
+            Result.failure(Exception("Не удалось добавить в плейлист"))
+        }
+    }
+
     fun delete(playlistId: String) {
         _playlists.update { list -> list.filterNot { it.id == playlistId } }
         scope.launch {
