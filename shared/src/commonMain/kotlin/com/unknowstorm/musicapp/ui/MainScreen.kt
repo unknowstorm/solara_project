@@ -121,12 +121,16 @@ fun MainScreen(
                         onBeforePlay = { audio.stop(); session.close() },
                     )
                 } else if (service == Service.YOUTUBE) {
-                    YouTubeScreen(
-                        audio = audio,
-                        session = session,
-                        onBack = { service = Service.ALL },
-                        onServiceChange = { service = it },
-                    )
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalOpenLikes provides { service = Service.ALL; showLikes = true },
+                    ) {
+                        YouTubeScreen(
+                            audio = audio,
+                            session = session,
+                            onBack = { service = Service.ALL },
+                            onServiceChange = { service = it; showLikes = false },
+                        )
+                    }
                 } else {
                     HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it })
                 }

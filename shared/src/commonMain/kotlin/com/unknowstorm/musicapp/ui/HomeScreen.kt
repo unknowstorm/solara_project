@@ -430,7 +430,7 @@ fun TopBar(
     selected: Service,
     onSelect: (Service) -> Unit,
     modifier: Modifier = Modifier,
-    // Кнопка «Любимые» показывается, только если передан onLikes (на экране YouTube её нет)
+    // Кнопка «Любимые» показывается, только если передан onLikes
     likesSelected: Boolean = false,
     onLikes: (() -> Unit)? = null,
 ) {
