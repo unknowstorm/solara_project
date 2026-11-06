@@ -213,6 +213,8 @@ fun HomeScreen(
     val signedInForRecs by likes.signedIn.collectAsState()
     LaunchedEffect(recs, signedInForRecs) { recs?.ensureLoaded(signedInForRecs) }
     // На чипе источника рекомендации только его, на «Все» смешанные
+    // Deezer: только превью, общие лайки и рекомендации на его чипе не показываем
+    val isDeezer = service == Service.DEEZER
     val recProvider = when (service) {
         Service.JAMENDO -> com.unknowstorm.musicapp.model.ProviderId.JAMENDO
         Service.AUDIUS -> com.unknowstorm.musicapp.model.ProviderId.AUDIUS
@@ -252,7 +254,7 @@ fun HomeScreen(
 
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             // Секция "Вы лайкнули" с кнопкой фильтра
-            item {
+            if (!isDeezer) item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -261,7 +263,7 @@ fun HomeScreen(
                     Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
                 }
             }
-            item(key = "likes") {
+            if (!isDeezer) item(key = "likes") {
                 val liked by likes.tracks.collectAsState()
                 val signedIn by likes.signedIn.collectAsState()
                 val shown = liked
@@ -288,7 +290,7 @@ fun HomeScreen(
 
             // Подборки
             item { SectionTitle("Подборки для вас") }
-            if (shownRecs.isNotEmpty()) {
+            if (!isDeezer && shownRecs.isNotEmpty()) {
                 item(key = "recs-label") {
                     Text(
                         "Ещё от тех, кого вы слушаете: " + recArtists.joinToString(", "),
