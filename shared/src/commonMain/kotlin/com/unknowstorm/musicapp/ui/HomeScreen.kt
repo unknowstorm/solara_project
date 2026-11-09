@@ -1,5 +1,15 @@
 package com.unknowstorm.musicapp.ui
 
+import kotlin.math.sin
+import kotlin.math.floor
+import kotlin.math.PI
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,6 +50,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.lerp
+import kotlin.math.abs
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -436,15 +449,67 @@ fun TopBar(
     // Кнопка «Любимые» показывается, только если передан onLikes
     likesSelected: Boolean = false,
     onLikes: (() -> Unit)? = null,
+    // Непрерывная позиция пейджера: подсветка-капля едет за пальцем.
+    // null: старое поведение (подсветка по выбранному чипу)
+    position: (() -> Float)? = null,
 ) {
     val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val active = Service.entries.filter { it.ready && it != Service.SPOTIFY }
     val soon = Service.entries.filter { !it.ready }
+
+    val cs = MaterialTheme.colorScheme
+    val base = cs.surfaceVariant.copy(alpha = 0.5f)
+    val primary = cs.primary
+    val onPrimary = cs.onPrimary
+    val idle = cs.onSurfaceVariant
+
+    // Индекс чипа = индекс страницы пейджера: ♡ = 0 (если есть), дальше сервисы
+    val order = pagerOrder(onLikes != null)
+    val chipRects = remember { mutableStateMapOf<Int, Rect>() }
+    var rowWindow by remember { mutableStateOf(Offset.Zero) }
+
+    fun track(m: Modifier, idx: Int): Modifier =
+        if (position == null) m
+        else m.onGloballyPositioned {
+            chipRects[idx] = Rect(it.positionInWindow(), Size(it.size.width.toFloat(), it.size.height.toFloat()))
+        }
+
+    val pos = position?.invoke()
+    // 1 когда капля ровно на чипе, 0 когда дальше соседнего
+    fun weight(idx: Int): Float = if (pos == null) 0f else (1f - abs(pos - idx)).coerceIn(0f, 1f)
+    fun pill(picked: Boolean): Color = if (pos == null && picked) primary else Color.Transparent
+    fun tint(idx: Int, picked: Boolean): Color =
+        if (pos == null) (if (picked) onPrimary else idle) else lerp(idle, onPrimary, weight(idx))
+
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .onGloballyPositioned { rowWindow = it.positionInWindow() }
             .clip(RoundedCornerShape(32.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .drawBehind {
+                drawRect(base)
+                val p = position?.invoke() ?: return@drawBehind
+                if (order.isEmpty()) return@drawBehind
+                val last = order.lastIndex
+                val i = floor(p).toInt().coerceIn(0, last)
+                val j = (i + 1).coerceAtMost(last)
+                val f = (p - i).coerceIn(0f, 1f)
+                val a = chipRects[i] ?: return@drawBehind
+                val b = chipRects[j] ?: return@drawBehind
+                // Капля: центр идёт точно за позицией, в середине пути тело вытягивается и сплющивается
+                val stretch = sin(PI.toFloat() * f)
+                val cx = androidx.compose.ui.util.lerp(a.center.x, b.center.x, f) - rowWindow.x
+                val cy = androidx.compose.ui.util.lerp(a.center.y, b.center.y, f) - rowWindow.y
+                val dist = abs(b.center.x - a.center.x)
+                val w = androidx.compose.ui.util.lerp(a.width, b.width, f) + dist * 0.7f * stretch
+                val h = androidx.compose.ui.util.lerp(a.height, b.height, f) * (1f - 0.18f * stretch)
+                drawRoundRect(
+                    color = primary,
+                    topLeft = Offset(cx - w / 2f, cy - h / 2f),
+                    size = Size(w, h),
+                    cornerRadius = CornerRadius(h / 2f),
+                )
+            }
             .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
@@ -453,28 +518,27 @@ fun TopBar(
         if (onLikes != null) {
             IconButton(
                 onClick = onLikes,
-                modifier = Modifier.clip(CircleShape)
-                    .background(if (likesSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                modifier = track(Modifier.clip(CircleShape).background(pill(likesSelected)), 0)
             ) {
                 HeartIcon(
                     likesSelected,
                     Modifier.size(22.dp),
-                    if (likesSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint(0, likesSelected),
                 )
             }
         }
 
         active.forEach { service ->
             val isSelected = !likesSelected && selected == service
+            val idx = order.indexOf(service)
             IconButton(
                 onClick = { onSelect(service) },
-                modifier = Modifier.clip(CircleShape)
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                modifier = track(Modifier.clip(CircleShape).background(pill(isSelected)), idx)
             ) {
                 ServiceLogo(
                     service,
                     Modifier.size(22.dp),
-                    if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint(idx, isSelected),
                 )
             }
         }
@@ -485,11 +549,11 @@ fun TopBar(
                 IconButton(
                     onClick = { menuOpen.value = true },
                     modifier = Modifier.clip(CircleShape)
-                        .background(if (spotifyOn) MaterialTheme.colorScheme.primary else Color.Transparent),
+                        .background(if (spotifyOn) primary else Color.Transparent),
                 ) {
                     AddIcon(
                         Modifier.size(24.dp),
-                        if (spotifyOn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        if (spotifyOn) onPrimary else idle,
                     )
                 }
                 androidx.compose.material3.DropdownMenu(
