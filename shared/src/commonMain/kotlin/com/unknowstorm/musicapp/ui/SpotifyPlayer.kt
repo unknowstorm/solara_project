@@ -517,6 +517,8 @@ private fun SpSharedCover(
                 scaleY = sc
                 translationX = lerp(miniXY, bigX, p)
                 translationY = lerp(miniXY, bigY, p)
+                // Правила Spotify: обложку не анимируем, поэтому в пути она скрыта и появляется в крайних положениях
+                alpha = if (p < 0.02f || p > 0.98f) 1f else 0f
             }
     ) {
         Box(
@@ -626,7 +628,8 @@ private fun SpFullContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { showDetails = true }) { MoreIcon() }
-                    SpotifyOpenButton(remote::openSpotifyApp)
+                    // Ссылка ведёт на текущий трек в Spotify
+                    SpotifyOpenButton({ s.uri?.let { remote.openInSpotify(it) } ?: remote.openSpotifyApp() })
                     // «+» кладёт трек в Liked Songs самого Spotify, у нас ничего не хранится
                     IconButton(onClick = {
                         likeNote = if (!s.saved) "Added to Liked Songs" else "Removed from Liked Songs"

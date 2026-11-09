@@ -89,17 +89,35 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         _state.update { it.copy(appInstalled = true, connecting = true, error = null) }
         handler.removeCallbacks(connectTimeout)
         // Окно разрешения открываем из Solara, пока она на экране: из фона Android его блокирует
+        // Implicit grant (Type.TOKEN) Spotify снял: используем код авторизации с PKCE
         val request = AuthorizationRequest.Builder(
-            SpotifyConfig.CLIENT_ID, AuthorizationResponse.Type.TOKEN, SpotifyConfig.REDIRECT_URI,
-        ).setScopes(arrayOf("app-remote-control")).build()
+            SpotifyConfig.CLIENT_ID, AuthorizationResponse.Type.CODE, SpotifyConfig.REDIRECT_URI,
+        )
+            .setScopes(arrayOf("app-remote-control"))
+            .setCustomParam("code_challenge_method", "S256")
+            .setCustomParam("code_challenge", newPkceChallenge())
+            .build()
         AuthorizationClient.openLoginActivity(activity, AUTH_REQUEST, request)
     }
 
-    /** Вызывается из MainActivity. Токен из ответа не используется и не сохраняется. */
+    /**
+     * PKCE challenge для запроса согласия. Код из ответа мы не обмениваем на токен (App Remote нужно только
+     * согласие пользователя), поэтому проверочная строка после запроса не нужна и нигде не хранится.
+     */
+    private fun newPkceChallenge(): String {
+        val flags = android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP
+        val bytes = ByteArray(64).also { java.security.SecureRandom().nextBytes(it) }
+        val verifier = android.util.Base64.encodeToString(bytes, flags)
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
+        return android.util.Base64.encodeToString(digest, flags)
+    }
+
+    /** Вызывается из MainActivity. Код из ответа не используется и не сохраняется. */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode != AUTH_REQUEST) return
         val response = AuthorizationClient.getResponse(resultCode, data)
-        if (response.type == AuthorizationResponse.Type.TOKEN) {
+        android.util.Log.d("SpotifyAuth", "type=${response.type} error=${response.error}")
+        if (response.type == AuthorizationResponse.Type.CODE) {
             connectRemote()
         } else {
             _state.update {
@@ -372,6 +390,12 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
 
     override fun openSpotifyApp() {
         activity.packageManager.getLaunchIntentForPackage("com.spotify.music")?.let { activity.startActivity(it) }
+    }
+
+    /** Открывает конкретный трек, альбом или плейлист в приложении Spotify (метаданные должны вести на Spotify). */
+    override fun openInSpotify(uri: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage("com.spotify.music")
+        runCatching { activity.startActivity(intent) }.onFailure { openSpotifyApp() }
     }
 
     override fun getSpotifyApp() {

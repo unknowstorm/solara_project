@@ -50,6 +50,8 @@ interface SpotifyRemote {
     fun seekTo(ms: Long)
     fun toggleSaved()
     fun openSpotifyApp()
+    /** Открывает конкретный контент (spotify:track:…, spotify:album:…, spotify:playlist:…) в приложении Spotify. */
+    fun openInSpotify(uri: String)
     fun getSpotifyApp()
     fun loadRecommended()
     fun openItem(item: SpotifyItem)
