@@ -84,11 +84,14 @@ private val GENRES = listOf(
 
 /** Показывает содержимое, только если пользователь принял условия YouTube. */
 @Composable
-internal fun YouTubeConsentGate(onLeave: () -> Unit, content: @Composable () -> Unit) {
+internal fun YouTubeConsentGate(onLeave: () -> Unit, peek: Boolean = false, content: @Composable () -> Unit) {
     val flags = rememberFlagStore()
     var accepted by remember { mutableStateOf(flags.get(FLAG_ACCEPTED)) }
     if (accepted) {
         content()
+    } else if (peek) {
+        // Соседняя страница при листании: экран согласия не мелькает
+        Box(Modifier.fillMaxSize())
     } else {
         YouTubeConsentScreen(
             onAccept = {
@@ -106,15 +109,15 @@ fun YouTubeScreen(
     audio: AudioBackend,
     session: YouTubeSession,
     onBack: () -> Unit,
-    onServiceChange: (Service) -> Unit,
+    active: Boolean = true,
 ) {
-    YouTubeConsentGate(onLeave = onBack) {
-        YouTubeHome(audio, session, onServiceChange)
+    YouTubeConsentGate(onLeave = onBack, peek = !active) {
+        YouTubeHome(audio, session)
     }
 }
 
 @Composable
-private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceChange: (Service) -> Unit) {
+private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession) {
     // Ушли с экрана YouTube: играющее видео переезжает в плавающее окно
     DisposableEffect(Unit) { onDispose { session.minimize() } }
 
@@ -125,20 +128,8 @@ private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession, onServiceC
 
     // Лента всегда на месте. Большой плеер рисует YouTubeOverlay: контейнер растёт поверх ленты
     // до границ этого экрана, как у основного плеера.
-    Column(
-        Modifier
-            .fillMaxSize()
-            .onGloballyPositioned { session.screenBounds = it.boundsInWindow() }
-            .statusBarsPadding(),
-    ) {
-        TopBar(
-            Service.YOUTUBE,
-            onServiceChange,
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            onLikes = LocalOpenLikes.current,
-        )
-        YouTubeFeed(audio, session, Modifier.weight(1f))
-    }
+    // Панель чипов и границы экрана для плеера теперь у пейджера в MainScreen
+    YouTubeFeed(audio, session, Modifier.fillMaxSize())
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

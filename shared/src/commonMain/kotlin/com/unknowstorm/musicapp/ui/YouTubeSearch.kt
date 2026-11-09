@@ -36,9 +36,10 @@ fun YouTubeSearchPane(
     audio: AudioBackend,
     session: YouTubeSession,
     onLeave: () -> Unit,
+    active: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    YouTubeConsentGate(onLeave = onLeave) {
+    YouTubeConsentGate(onLeave = onLeave, peek = !active) {
         val store = rememberTextStore()
         val api = remember { YouTubeApi.shared.also { it.attach(store) } }
         val openLink = rememberExternalLinkOpener()

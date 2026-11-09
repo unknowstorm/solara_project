@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -21,16 +23,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.model.PlaybackKind
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.toService
@@ -40,7 +42,9 @@ import com.unknowstorm.musicapp.provider.MusicHub
 import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.provider.SourceResult
 import com.unknowstorm.musicapp.provider.interleave
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun TrackListScreen(
@@ -55,44 +59,52 @@ fun TrackListScreen(
     var likesSelected by remember { mutableStateOf(false) }
     var ytQuery by remember { mutableStateOf("") }
     var retry by remember { mutableStateOf(0) }
-    var results by remember { mutableStateOf<Map<ProviderId, SourceResult>>(emptyMap()) }
-    var loading by remember { mutableStateOf(false) }
+    // Результаты по страницам пейджера: соседние источники грузятся заранее
+    val cache = remember(providers) { mutableStateMapOf<Service, Map<ProviderId, SourceResult>>() }
+    val loadingFor = remember(providers) { mutableStateMapOf<Service, Boolean>() }
+    val loadedFor = remember(providers) { mutableMapOf<Service, Pair<String, Int>>() }
     val playback by audio.state.collectAsState()
     val hub = remember(providers) { MusicHub(providers) }
 
-    // ALL ищет во всех подключённых источниках, остальные чипы только в своём
-    val sourceId = ProviderId.entries.firstOrNull { it.name == selected.name }
-    val canSearch = selected == Service.ALL ||
-        (selected.ready && providers.any { it.id == sourceId })
-
-    LaunchedEffect(query, selected, retry, hub, likesSelected) {
-        if (!canSearch || likesSelected) {
-            results = emptyMap()
-            loading = false
-            return@LaunchedEffect
-        }
-        delay(400)
-        loading = true
-        val fresh = mutableMapOf<ProviderId, SourceResult>()
-        try {
-            // «Все» ищет только там, где играют полные треки; превью Deezer живут на своём чипе
-            val sources = sourceId?.let { setOf(it) }
-                ?: providers.filter { p ->
-                    Service.entries.firstOrNull { it.name == p.id.name }?.kind ==
-                        com.unknowstorm.musicapp.model.PlaybackKind.IN_APP
-                }.map { it.id }.toSet()
-            hub.search(query, sources).collect { result ->
-                fresh[result.provider] = result
-                results = fresh.toMap() // новые треки появляются, как только ответил любой источник
-            }
-        } finally {
-            loading = false
-        }
+    fun searchable(s: Service): Boolean = when (s) {
+        Service.ALL -> true
+        Service.YOUTUBE, Service.SPOTIFY -> false
+        else -> s.ready && providers.any { it.id.name == s.name }
     }
 
-    val visible = interleave(providers.mapNotNull { results[it.id]?.tracks })
-        .filterNot { DeadTracks.isDead(it) }
-    val failed = providers.mapNotNull { p -> results[p.id]?.takeIf { it.error != null } }
+    LaunchedEffect(query, selected, likesSelected, retry, hub) {
+        if (selected == Service.SPOTIFY) return@LaunchedEffect
+        val order = pagerOrder(likes != null)
+        val here = if (likesSelected) 0 else order.indexOf(selected)
+        val targets = listOf(here, here - 1, here + 1)
+            .mapNotNull { order.getOrNull(it) }
+            .filter { searchable(it) && loadedFor[it] != (query to retry) }
+        if (targets.isEmpty()) return@LaunchedEffect
+        delay(400)
+        coroutineScope {
+            targets.forEach { svc ->
+                launch {
+                    loadingFor[svc] = true
+                    val fresh = mutableMapOf<ProviderId, SourceResult>()
+                    try {
+                        val sourceId = ProviderId.entries.firstOrNull { it.name == svc.name }
+                        // «Все» ищет только там, где играют полные треки; превью Deezer живут на своём чипе
+                        val sources = sourceId?.let { setOf(it) }
+                            ?: providers.filter { p ->
+                                Service.entries.firstOrNull { it.name == p.id.name }?.kind == PlaybackKind.IN_APP
+                            }.map { it.id }.toSet()
+                        hub.search(query, sources).collect { result ->
+                            fresh[result.provider] = result
+                            cache[svc] = fresh.toMap()
+                        }
+                        loadedFor[svc] = query to retry
+                    } finally {
+                        loadingFor[svc] = false
+                    }
+                }
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         if (selected == Service.SPOTIFY) {
@@ -103,37 +115,102 @@ fun TrackListScreen(
             ) {
                 TextButton(onClick = { selected = Service.ALL }) { Text("← Назад") }
             }
-        } else TopBar(
-            selected,
-            { selected = it; likesSelected = false },
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            likesSelected = likesSelected,
-            onLikes = if (likes != null) ({ likesSelected = true; selected = Service.ALL }) else null,
-        )
-
-        if (selected != Service.SPOTIFY) OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Поиск") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(
-                onSearch = { if (selected == Service.YOUTUBE) ytQuery = query.trim() },
-            ),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-
-        if (loading) {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-
-        if (!canSearch && selected != Service.SPOTIFY && !(selected == Service.YOUTUBE && session != null)) {
-            Text(
-                text = if (selected == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube." else "${selected.title} скоро появится. ${selected.note}.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp)
+        } else {
+            TopBar(
+                selected,
+                { selected = it; likesSelected = false },
+                Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                likesSelected = likesSelected,
+                onLikes = if (likes != null) ({ likesSelected = true; selected = Service.ALL }) else null,
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Поиск") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = { if (selected == Service.YOUTUBE) ytQuery = query.trim() },
+                ),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
             )
         }
+
+        playback.error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+
+        if (selected == Service.SPOTIFY) {
+            // Выдача Spotify отдельная: с другими источниками не смешивается
+            SpotifySearchPane(
+                remote = com.unknowstorm.musicapp.spotify.LocalSpotifyRemote.current,
+                onBeforePlay = { audio.stop(); session?.close() },
+                onOpenSection = onOpenSpotify,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            ServicePager(
+                current = selected,
+                likesSelected = likesSelected,
+                hasLikes = likes != null,
+                swipeEnabled = true,
+                onSelect = { selected = it; likesSelected = false },
+                onLikes = { likesSelected = true; selected = Service.ALL },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            ) { svc, active ->
+                when {
+                    svc == null -> if (likes != null) {
+                        LikesSearchPane(likes, providers, audio, query, Modifier.fillMaxSize())
+                    }
+                    svc == Service.YOUTUBE && session != null -> {
+                        // Выдача YouTube отдельная: правила запрещают смешивать её с другими источниками
+                        YouTubeSearchPane(
+                            submitted = ytQuery,
+                            audio = audio,
+                            session = session,
+                            onLeave = { selected = Service.ALL; likesSelected = false },
+                            active = active,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    searchable(svc) -> SearchResultsPage(
+                        results = cache[svc],
+                        loading = loadingFor[svc] == true,
+                        providers = providers,
+                        audio = audio,
+                        onRetry = { retry++ },
+                    )
+                    else -> Text(
+                        text = if (svc == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube."
+                        else "${svc.title} скоро появится. ${svc.note}.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchResultsPage(
+    results: Map<ProviderId, SourceResult>?,
+    loading: Boolean,
+    providers: List<MusicProvider>,
+    audio: AudioBackend,
+    onRetry: () -> Unit,
+) {
+    val playback by audio.state.collectAsState()
+    val visible = interleave(providers.mapNotNull { results?.get(it.id)?.tracks })
+        .filterNot { DeadTracks.isDead(it) }
+    val failed = providers.mapNotNull { p -> results?.get(p.id)?.takeIf { it.error != null } }
+
+    Column(Modifier.fillMaxSize()) {
+        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 
         // Ошибка одного источника не мешает остальным
         failed.forEach { result ->
@@ -147,54 +224,18 @@ fun TrackListScreen(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { retry++ }) { Text("Повторить") }
+                TextButton(onClick = onRetry) { Text("Повторить") }
             }
         }
 
-        playback.error?.let {
-            Text(
-                text = it,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-
-        if (canSearch && !loading && results.isNotEmpty() && visible.isEmpty() && failed.isEmpty()) {
+        if (!loading && results != null && results.isNotEmpty() && visible.isEmpty() && failed.isEmpty()) {
             Text(
                 text = "Ничего не найдено",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
 
-        if (likesSelected && likes != null) {
-            LikesSearchPane(likes, providers, audio, query, Modifier.weight(1f))
-            return@Column
-        }
-
-        if (selected == Service.SPOTIFY) {
-            // Выдача Spotify отдельная: с другими источниками не смешивается
-            SpotifySearchPane(
-                remote = com.unknowstorm.musicapp.spotify.LocalSpotifyRemote.current,
-                onBeforePlay = { audio.stop(); session?.close() },
-                onOpenSection = onOpenSpotify,
-                modifier = Modifier.weight(1f),
-            )
-            return@Column
-        }
-
-        if (selected == Service.YOUTUBE && session != null) {
-            // Выдача YouTube отдельная: правила запрещают смешивать её с другими источниками
-            YouTubeSearchPane(
-                submitted = ytQuery,
-                audio = audio,
-                session = session,
-                onLeave = { selected = Service.ALL },
-                modifier = Modifier.weight(1f),
-            )
-            return@Column
-        }
-
-        LazyColumn(Modifier.weight(1f).serviceSwipe(current = selected, likesSelected = false, hasLikes = false, onSelect = { selected = it }, onLikes = {})) {
+        LazyColumn(Modifier.weight(1f)) {
             items(visible, key = { "${it.provider}:${it.id}" }) { track ->
                 ListItem(
                     leadingContent = {

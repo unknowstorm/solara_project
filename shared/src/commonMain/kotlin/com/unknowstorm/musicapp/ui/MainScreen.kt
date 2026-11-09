@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
@@ -75,9 +76,8 @@ fun MainScreen(
             s?.let { HomeFeed(it, provider, defaultMixes(it)) }
         }
     }
-    val shownFeeds = remember(feeds, service) {
-        if (service == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == service }
-    }
+    fun feedsFor(s: Service) =
+        if (s == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == s }
 
     val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
 
@@ -120,37 +120,45 @@ fun MainScreen(
                         onBack = { service = Service.ALL },
                         onBeforePlay = { audio.stop(); session.close() },
                     )
-                } else if (service == Service.YOUTUBE) {
-                    androidx.compose.runtime.CompositionLocalProvider(
-                        LocalOpenLikes provides { service = Service.ALL; showLikes = true },
-                    ) {
-                        Box(
-                            Modifier.fillMaxSize().serviceSwipe(
-                                current = service,
-                                likesSelected = false,
-                                enabled = { !(session.video != null && session.progress >= 0.999f) },
-                                onSelect = { service = it; showLikes = false },
-                                onLikes = { service = Service.ALL; showLikes = true },
-                            )
-                        ) {
-                            YouTubeScreen(
-                                audio = audio,
-                                session = session,
-                                onBack = { service = Service.ALL },
-                                onServiceChange = { service = it; showLikes = false },
-                            )
-                        }
-                    }
                 } else {
-                    HomeScreen(
-                        shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it },
-                        swipe = Modifier.serviceSwipe(
+                    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                        TopBar(
+                            service,
+                            { service = it; showLikes = false },
+                            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            likesSelected = showLikes,
+                            onLikes = { showLikes = true },
+                        )
+                        ServicePager(
                             current = service,
                             likesSelected = showLikes,
+                            hasLikes = true,
+                            // Развёрнутый плеер YouTube: листание выключено
+                            swipeEnabled = !(session.video != null && session.progress >= 0.999f),
                             onSelect = { service = it; showLikes = false },
                             onLikes = { service = Service.ALL; showLikes = true },
-                        ),
-                    )
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                // До этих границ растёт большой плеер YouTube
+                                .onGloballyPositioned { session.screenBounds = it.boundsInWindow() },
+                        ) { page, active ->
+                            when (page) {
+                                null -> LikedContent(likes, providers, audio, onOpenAuth)
+                                Service.YOUTUBE -> YouTubeScreen(
+                                    audio = audio,
+                                    session = session,
+                                    onBack = { service = Service.ALL },
+                                    active = active,
+                                )
+                                else -> HomeScreen(
+                                    feedsFor(page), page, { service = it; showLikes = false }, audio, likes, providers,
+                                    false, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it },
+                                    showBar = false,
+                                )
+                            }
+                        }
+                    }
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
                 Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth)
