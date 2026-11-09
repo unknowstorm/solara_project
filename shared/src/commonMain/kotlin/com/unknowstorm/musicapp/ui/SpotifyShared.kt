@@ -194,6 +194,12 @@ fun SpotifySearchPane(
                 link = ""
             }
         }) { Text("Играть по ссылке") }
+        // Эксперимент: список треков альбома или плейлиста через Content API App Remote
+        val browseUri = parseSpotifyLink(link)
+            ?.takeIf { it.startsWith("spotify:album:") || it.startsWith("spotify:playlist:") }
+        if (browseUri != null) {
+            OutlinedButton(onClick = { remote.openByUri(browseUri); link = ""; onOpenSection() }) { Text("Показать треки") }
+        }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (s.history.isNotEmpty()) {
             Text("Недавно играло", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))

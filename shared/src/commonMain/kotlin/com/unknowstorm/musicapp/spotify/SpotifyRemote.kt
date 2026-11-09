@@ -56,6 +56,8 @@ interface SpotifyRemote {
     fun loadRecommended()
     fun openItem(item: SpotifyItem)
     fun closeBrowse()
+    /** Список треков альбома или плейлиста по URI (spotify:album:… / spotify:playlist:…). Результат приходит в state.browse. */
+    fun openByUri(uri: String) {}
 }
 
 val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }
