@@ -51,13 +51,13 @@ fun SpotifyScreen(
         onBack = { if (s?.browse != null) remote?.closeBrowse() else onBack() },
     )
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        TopBar(
-            Service.SPOTIFY,
-            onServiceChange,
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            likesSelected = false,
-            onLikes = onOpenLikes,
-        )
+        // Правила Spotify: его бренд не соседствует с брендами других сервисов, поэтому здесь нет панели с их логотипами
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onBack) { Text("← Назад") }
+        }
         if (remote == null || s == null) {
             StatusColumn {
                 SpotifyHeader()

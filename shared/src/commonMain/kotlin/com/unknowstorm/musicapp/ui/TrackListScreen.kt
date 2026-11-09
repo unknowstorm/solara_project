@@ -95,7 +95,15 @@ fun TrackListScreen(
     val failed = providers.mapNotNull { p -> results[p.id]?.takeIf { it.error != null } }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        TopBar(
+        if (selected == Service.SPOTIFY) {
+            // Правила Spotify: его бренд не соседствует с брендами других сервисов
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { selected = Service.ALL }) { Text("← Назад") }
+            }
+        } else TopBar(
             selected,
             { selected = it; likesSelected = false },
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

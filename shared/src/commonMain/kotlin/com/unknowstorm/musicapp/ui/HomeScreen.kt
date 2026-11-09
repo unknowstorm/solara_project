@@ -493,12 +493,7 @@ fun TopBar(
                     expanded = menuOpen.value,
                     onDismissRequest = { menuOpen.value = false },
                 ) {
-                    if (Service.SPOTIFY.ready) {
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Spotify") },
-                            onClick = { menuOpen.value = false; onSelect(Service.SPOTIFY) },
-                        )
-                    }
+                    // Spotify вынесен из меню «+» в основную панель
                     soon.forEach { service ->
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(service.title + " · скоро") },
