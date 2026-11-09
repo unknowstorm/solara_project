@@ -1,6 +1,11 @@
 package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import kotlin.math.floor
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -21,7 +26,7 @@ fun pagerOrder(hasLikes: Boolean): List<Service?> =
  * Страницы-источники под неподвижной панелью. Соседние страницы рисуются во время жеста.
  * page(service, active): service == null это ♡; active = страница остановилась (не просто мелькает).
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ServicePager(
     current: Service,
@@ -31,6 +36,8 @@ fun ServicePager(
     onSelect: (Service) -> Unit,
     onLikes: () -> Unit,
     modifier: Modifier = Modifier,
+    // Непрерывная позиция: страница + доля сдвига. Меняется и при свайпе, и при тапе по чипу
+    onPosition: (Float) -> Unit = {},
     page: @Composable (service: Service?, active: Boolean) -> Unit,
 ) {
     val pages = remember(hasLikes) { pagerOrder(hasLikes) }
@@ -42,10 +49,18 @@ fun ServicePager(
     val likesNow by rememberUpdatedState(likesSelected)
     val select by rememberUpdatedState(onSelect)
     val openLikes by rememberUpdatedState(onLikes)
+    val positionNow by rememberUpdatedState(onPosition)
+    // Тап по чипу едет по пружине из MotionScheme темы (expressive)
+    val motion = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+
+    LaunchedEffect(state) {
+        snapshotFlow { state.currentPage + state.currentPageOffsetFraction }
+            .collect { positionNow(it) }
+    }
 
     // Чип нажали: пейджер едет к странице
     LaunchedEffect(target) {
-        if (state.currentPage != target) state.animateScrollToPage(target)
+        if (state.currentPage != target) state.animateScrollToPage(target, animationSpec = motion)
     }
     // Страница остановилась (свайп): обновляем выбранный чип
     LaunchedEffect(state, pages) {
@@ -67,3 +82,4 @@ fun ServicePager(
         key = { pages[it]?.name ?: "likes" },
     ) { index -> page(pages[index], state.settledPage == index) }
 }
+

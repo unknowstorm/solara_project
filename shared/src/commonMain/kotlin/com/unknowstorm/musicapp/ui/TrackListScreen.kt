@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,6 +60,9 @@ fun TrackListScreen(
     var likesSelected by remember { mutableStateOf(false) }
     var ytQuery by remember { mutableStateOf("") }
     var retry by remember { mutableStateOf(0) }
+    var pagerPos by remember {
+        mutableFloatStateOf(pagerOrder(likes != null).indexOf(if (likesSelected) null else selected).coerceAtLeast(0).toFloat())
+    }
     // Результаты по страницам пейджера: соседние источники грузятся заранее
     val cache = remember(providers) { mutableStateMapOf<Service, Map<ProviderId, SourceResult>>() }
     val loadingFor = remember(providers) { mutableStateMapOf<Service, Boolean>() }
@@ -122,6 +126,7 @@ fun TrackListScreen(
                 Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 likesSelected = likesSelected,
                 onLikes = if (likes != null) ({ likesSelected = true; selected = Service.ALL }) else null,
+                position = { pagerPos },
             )
             OutlinedTextField(
                 value = query,
@@ -160,6 +165,7 @@ fun TrackListScreen(
                 swipeEnabled = true,
                 onSelect = { selected = it; likesSelected = false },
                 onLikes = { likesSelected = true; selected = Service.ALL },
+                onPosition = { pagerPos = it },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
             ) { svc, active ->
                 when {

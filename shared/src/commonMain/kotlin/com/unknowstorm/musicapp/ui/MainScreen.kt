@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +70,10 @@ fun MainScreen(
     var service by remember { mutableStateOf(Service.ALL) }
     var showLikes by remember { mutableStateOf(false) }
     var openPlaylist by remember { mutableStateOf<Playlist?>(null) }
+    // Позиция пейджера для цвета острова; старт с текущей страницы, чтобы первый кадр не мигал
+    var pagerPos by remember {
+        mutableFloatStateOf(pagerOrder(true).indexOf(if (showLikes) null else service).coerceAtLeast(0).toFloat())
+    }
 
     val feeds = remember(providers) {
         providers.mapNotNull { provider ->
@@ -128,6 +133,7 @@ fun MainScreen(
                             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                             likesSelected = showLikes,
                             onLikes = { showLikes = true },
+                            position = { pagerPos },
                         )
                         ServicePager(
                             current = service,
@@ -137,6 +143,7 @@ fun MainScreen(
                             swipeEnabled = !(session.video != null && session.progress >= 0.999f),
                             onSelect = { service = it; showLikes = false },
                             onLikes = { service = Service.ALL; showLikes = true },
+                            onPosition = { pagerPos = it },
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
