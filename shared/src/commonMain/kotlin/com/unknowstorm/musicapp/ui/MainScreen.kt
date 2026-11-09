@@ -142,16 +142,15 @@ fun MainScreen(
                         }
                     }
                 } else {
-                    Box(
-                        Modifier.fillMaxSize().serviceSwipe(
+                    HomeScreen(
+                        shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it },
+                        swipe = Modifier.serviceSwipe(
                             current = service,
                             likesSelected = showLikes,
                             onSelect = { service = it; showLikes = false },
                             onLikes = { service = Service.ALL; showLikes = true },
-                        )
-                    ) {
-                        HomeScreen(shownFeeds, service, { service = it; showLikes = false }, audio, likes, providers, showLikes, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it })
-                    }
+                        ),
+                    )
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
                 Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth)
