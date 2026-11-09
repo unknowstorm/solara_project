@@ -384,6 +384,31 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             .setErrorCallback { _state.update { st -> st.copy(error = "Не удалось открыть подборку") } }
     }
 
+    /** Эксперимент: Content API по URI без Web API и токенов. Логи: adb logcat -s SpotifyBrowse */
+    override fun openByUri(uri: String) {
+        val r = remote ?: return
+        val kind = uri.split(":").getOrNull(1)
+        if (kind != "album" && kind != "playlist") return
+        val li = runCatching {
+            com.google.gson.Gson().fromJson(
+                """{"id":"$uri","uri":"$uri","title":"","playable":true,"hasChildren":true}""",
+                com.spotify.protocol.types.ListItem::class.java,
+            )
+        }.getOrNull() ?: run {
+            android.util.Log.d("SpotifyBrowse", "не удалось собрать ListItem для $uri")
+            return
+        }
+        r.contentApi.getChildrenOfItem(li, 50, 0)
+            .setResultCallback { res ->
+                android.util.Log.d("SpotifyBrowse", "$uri -> элементов: ${res.items?.size}")
+                showItems(if (kind == "album") "Альбом" else "Плейлист", res.items)
+            }
+            .setErrorCallback { e ->
+                android.util.Log.d("SpotifyBrowse", "ошибка $uri: ${e.message}")
+                _state.update { st -> st.copy(error = "Spotify не отдал список треков для этой ссылки") }
+            }
+    }
+
     override fun closeBrowse() {
         _state.update { it.copy(browse = null, browseTitle = null) }
     }
