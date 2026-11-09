@@ -205,6 +205,8 @@ fun HomeScreen(
     playlists: PlaylistsRepository? = null,
     recs: RecommendationsFeed? = null,
     onOpenPlaylist: (Playlist) -> Unit = {},
+    // Горизонтальный свайп между чипами: двигает только содержимое под панелью, сама панель стоит на месте
+    swipe: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
@@ -253,7 +255,7 @@ fun HomeScreen(
 
         // Вкладка «Любимые» стоит в панели слева от источников и заменяет ленту
         if (likesSelected) {
-            LikedContent(likes, providers, audio, onOpenAuth)
+            Box(swipe.weight(1f).fillMaxWidth()) { LikedContent(likes, providers, audio, onOpenAuth) }
             return@Column
         }
 
@@ -266,7 +268,7 @@ fun HomeScreen(
             return@Column
         }
 
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        LazyColumn(swipe.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             // Секция "Вы лайкнули" с кнопкой фильтра
             if (!isDeezer) item {
                 Row(
