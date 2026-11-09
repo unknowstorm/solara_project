@@ -207,6 +207,8 @@ fun HomeScreen(
     onOpenPlaylist: (Playlist) -> Unit = {},
     // Горизонтальный свайп между чипами: двигает только содержимое под панелью, сама панель стоит на месте
     swipe: Modifier = Modifier,
+    // false: верхнюю панель рисует родитель (пейджер), здесь только содержимое
+    showBar: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
@@ -243,9 +245,8 @@ fun HomeScreen(
         .filter { a -> shownRecs.any { it.artist.contains(a.removePrefix("@"), ignoreCase = true) } }
         .ifEmpty { recs?.artists.orEmpty() }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        // Новый верхний бар
-        TopBar(
+    Column(if (showBar) Modifier.fillMaxSize().statusBarsPadding() else Modifier.fillMaxSize()) {
+        if (showBar) TopBar(
             service,
             onServiceChange,
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -495,7 +496,11 @@ fun TopBar(
                     expanded = menuOpen.value,
                     onDismissRequest = { menuOpen.value = false },
                 ) {
-                    // Spotify вынесен из меню «+» в основную панель
+                    // Spotify: вход только через «+», текстом и без логотипа (правила бренда)
+                    if (Service.SPOTIFY.ready) androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Spotify") },
+                        onClick = { menuOpen.value = false; onSelect(Service.SPOTIFY) },
+                    )
                     soon.forEach { service ->
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(service.title + " · скоро") },
