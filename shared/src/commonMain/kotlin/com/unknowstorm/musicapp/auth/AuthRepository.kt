@@ -174,11 +174,35 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         }
     }
 
-    suspend fun signIn(email: String, password: String): Result<Unit> = safe {
+    /** Вход по почте или по логину (нику): логин сначала переводится в почту через RPC `email_by_username`. */
+    suspend fun signIn(login: String, password: String): Result<Unit> = safe {
+        val mail = resolveEmailOrNull(login) ?: error("Invalid login credentials")
         client.auth.signInWith(Email) {
-            this.email = email.trim()
+            this.email = mail
             this.password = password
         }
+    }
+
+    /** Если в [login] есть '@', это почта. Иначе ищем почту по нику на сервере; null, если такого ника нет. */
+    private suspend fun resolveEmailOrNull(login: String): String? {
+        val v = login.trim()
+        if ('@' in v) return v
+        if (v.isEmpty()) return null
+        val res = client.postgrest.rpc(
+            "email_by_username",
+            buildJsonObject { put("p_username", v) },
+        )
+        return Json.parseToJsonElement(res.data).jsonPrimitive.contentOrNull?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * Сброс пароля по почте или логину: находит почту, отправляет на неё код и возвращает эту почту.
+     * Её нужно передавать дальше в [resetPasswordWithCode] и [sendResetCode].
+     */
+    suspend fun startPasswordReset(login: String): Result<String> = safe {
+        val mail = resolveEmailOrNull(login) ?: error("login not found")
+        client.auth.resetPasswordForEmail(mail)
+        mail
     }
 
     /** Закрыть экран ожидания письма (например, «Изменить почту»). */
@@ -307,7 +331,8 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
     private fun friendly(e: Exception): String {
         val m = e.message.orEmpty()
         return when {
-            "Invalid login credentials" in m -> "Неверная почта или пароль"
+            "Invalid login credentials" in m -> "Неверный логин или пароль"
+            "login not found" in m -> "Аккаунт с таким логином не найден"
             "already registered" in m || "already been registered" in m -> "Эта почта уже зарегистрирована"
             "Password should be" in m -> "Пароль слишком простой (минимум 6 символов)"
             "Email not confirmed" in m -> "Сначала подтверди почту кодом из письма"

@@ -2,6 +2,7 @@ package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,7 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
@@ -43,13 +46,34 @@ fun AccountBlock(
             when (val s = state) {
                 AuthState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
                 is AuthState.SignedIn -> {
-                    UserAvatar(
-                        name = s.username ?: s.email,
-                        size = 72.dp,
-                        image = rememberAvatarImage(repo, s.profile?.avatar),
-                    )
-                    Text(s.username ?: "Пользователь", style = MaterialTheme.typography.headlineSmall)
-                    s.email?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    // Аватарка слева (крупная), ник и почта справа
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        UserAvatar(
+                            name = s.username ?: s.email,
+                            size = 96.dp,
+                            image = rememberAvatarImage(repo, s.profile?.avatar),
+                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                s.username ?: "Пользователь",
+                                style = MaterialTheme.typography.headlineSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            s.email?.let {
+                                Text(
+                                    it,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
                     Button(onClick = onEditProfile, enabled = s.profile != null) { Text("Изменить профиль") }
                     FilledTonalButton(onClick = { scope.launch { repo.signOut() } }) { Text("Выйти") }
                 }
