@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -98,6 +100,12 @@ internal fun SpotifyTrackList(
     val ui = LocalSpotifyMini.current
     val list = s.browse ?: return
     val kind = if (contextUri.startsWith("spotify:album:")) S.album else S.playlist
+    // Near the end of the list: ask for the next page (Spotify returns tracks in pages)
+    val listState = rememberLazyListState()
+    val nearEnd by remember(list.size) {
+        derivedStateOf { (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= list.size - 5 }
+    }
+    LaunchedEffect(nearEnd, list.size, s.browseMore) { if (nearEnd && s.browseMore) remote.loadMoreBrowse() }
     Column(modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -110,7 +118,7 @@ internal fun SpotifyTrackList(
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text(s.browseTitle ?: kind, style = MaterialTheme.typography.titleLarge)
             Text(
-                S.spotifyTracksCount(list.size),
+                S.spotifyTracksCount(if (s.browseMore) "${list.size}+" else list.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -123,7 +131,7 @@ internal fun SpotifyTrackList(
             }
             Spacer(Modifier.height(8.dp))
         }
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f), state = listState) {
             itemsIndexed(list, key = { index, item -> "$index:${item.uri}" }) { index, item ->
                 val current = s.uri == item.uri
                 Row(

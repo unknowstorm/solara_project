@@ -211,8 +211,6 @@ object S {
     val inTheSpotifyAppShare: String get() = tr("(in the Spotify app: Share → Copy link).", "(у застосунку Spotify: Поділитися → Копіювати посилання).")
     val spotifyLink: String get() = tr("Spotify link", "Посилання Spotify")
     val doesnTLookLikeA: String get() = tr("Doesn’t look like a Spotify link", "Не схоже на посилання Spotify")
-    val playFromLink: String get() = tr("Play from link", "Відтворити за посиланням")
-    val showTracks: String get() = tr("Show tracks", "Показати треки")
     val spotifyDidNotRespondOpen: String get() = tr("Spotify did not respond. Open the Spotify app and allow it to show pop-ups in the background, then try again.", "Spotify не відповів. Відкрийте застосунок Spotify і дозвольте йому спливаючі вікна у фоні, потім повторіть.")
     val spotifyClientIdIsNot: String get() = tr("Spotify Client ID is not set", "Не задано Client ID Spotify")
     val spotifyDidNotConfirmAccess: String get() = tr("Spotify did not confirm access. Check that your account is added to User Management.", "Spotify не підтвердив доступ. Перевірте, що ваш акаунт додано до User Management.")

@@ -34,6 +34,8 @@ data class SpotifyState(
     val history: List<SpotifyItem> = emptyList(),
     val browse: List<SpotifyItem>? = null,
     val browseTitle: String? = null,
+    /** More tracks can be loaded for the open album or playlist. */
+    val browseMore: Boolean = false,
     val covers: Map<String, ImageBitmap> = emptyMap(),
     val shelves: List<SpotifyShelf>? = null,
 )
@@ -56,6 +58,8 @@ interface SpotifyRemote {
     fun loadRecommended()
     fun openItem(item: SpotifyItem)
     fun closeBrowse()
+    /** Loads the next page of the open album or playlist (called when the list is scrolled to its end). */
+    fun loadMoreBrowse() {}
     /** Track list of an album or playlist by URI (spotify:album:… / spotify:playlist:…). The result arrives in state.browse. */
     fun openByUri(uri: String) {}
     /** Plays an album or playlist from the given track index, so "next" follows the list. */
