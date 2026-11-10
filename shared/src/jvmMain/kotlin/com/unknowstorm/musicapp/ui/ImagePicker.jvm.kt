@@ -40,11 +40,11 @@ actual fun decodeImageBitmap(bytes: ByteArray): ImageBitmap? =
 
 private val Extensions = setOf("jpg", "jpeg", "png", "bmp", "gif")
 
-/** Открывает окно выбора файла, обрезает фото по центру до квадрата и сжимает в JPEG. */
+/** Opens a file chooser window, crops the photo to a center square and compresses it to JPEG. */
 private fun pickAndPrepare(): ByteArray? {
     val dialog = FileDialog(null as Frame?, S.chooseAPhoto, FileDialog.LOAD).apply {
         setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in Extensions }
-        isVisible = true // блокирует поток, пока окно открыто
+        isVisible = true // blocks the thread while the window is open
     }
     val name = dialog.file ?: return null
     val src = ImageIO.read(File(dialog.directory, name)) ?: return null
@@ -53,7 +53,7 @@ private fun pickAndPrepare(): ByteArray? {
     val square = src.getSubimage((src.width - side) / 2, (src.height - side) / 2, side, side)
     val target = min(side, AvatarSizePx)
 
-    // JPEG не умеет прозрачность, поэтому рисуем на белом фоне в формате RGB
+    // JPEG has no transparency, so we draw on a white background in RGB format
     val out = BufferedImage(target, target, BufferedImage.TYPE_INT_RGB)
     val g = out.createGraphics()
     g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)

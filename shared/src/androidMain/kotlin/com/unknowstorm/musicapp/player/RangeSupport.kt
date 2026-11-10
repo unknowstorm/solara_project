@@ -3,8 +3,8 @@ package com.unknowstorm.musicapp.player
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Треки, которые сервер отдаёт только целиком (на запрос части файла отвечает 200).
- * Сервис воспроизведения и плеер живут в одном процессе, поэтому хватает общего объекта.
+ * Tracks that the server serves only in full (it answers 200 to a request for part of the file).
+ * The playback service and the player live in one process, so a shared object is enough.
  */
 object RangeSupport {
     private val noRange = ConcurrentHashMap.newKeySet<String>()

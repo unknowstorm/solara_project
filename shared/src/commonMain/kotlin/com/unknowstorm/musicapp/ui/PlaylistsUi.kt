@@ -25,7 +25,7 @@ import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
 
-/** Играет плейлист с первого трека (ссылки на звук берутся заново, как у лайков). */
+/** Plays a playlist from the first track (audio links are fetched again, as with likes). */
 internal suspend fun playPlaylist(
     repo: PlaylistsRepository,
     playlist: Playlist,
@@ -80,7 +80,7 @@ internal fun SavePlaylistDialog(
     )
 }
 
-/** Выбор плейлиста, в который добавить трек, или создание нового. */
+/** Choice of a playlist to add the track to, or creating a new one. */
 @Composable
 internal fun AddToPlaylistDialog(
     playlists: List<Playlist>,

@@ -17,14 +17,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.unknowstorm.musicapp.model.Service
 
-/** Порядок страниц как в панели: ♡ (null), затем чипы слева направо. Spotify вне пейджера: вход через «+». */
+/** Page order as in the bar: ♡ (null), then chips left to right. Spotify is outside the pager: entry via "+". */
 fun pagerOrder(hasLikes: Boolean): List<Service?> =
     (if (hasLikes) listOf<Service?>(null) else emptyList<Service?>()) +
         Service.entries.filter { it.ready && it != Service.SPOTIFY }
 
 /**
- * Страницы-источники под неподвижной панелью. Соседние страницы рисуются во время жеста.
- * page(service, active): service == null это ♡; active = страница остановилась (не просто мелькает).
+ * Source pages under the fixed bar. Neighboring pages are drawn during the gesture.
+ * page(service, active): service == null is ♡; active = the page has stopped (is not just flashing by).
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -36,7 +36,7 @@ fun ServicePager(
     onSelect: (Service) -> Unit,
     onLikes: () -> Unit,
     modifier: Modifier = Modifier,
-    // Непрерывная позиция: страница + доля сдвига. Меняется и при свайпе, и при тапе по чипу
+    // Continuous position: page + fraction of the offset. Changes both on swipe and on a chip tap
     onPosition: (Float) -> Unit = {},
     page: @Composable (service: Service?, active: Boolean) -> Unit,
 ) {
@@ -50,7 +50,7 @@ fun ServicePager(
     val select by rememberUpdatedState(onSelect)
     val openLikes by rememberUpdatedState(onLikes)
     val positionNow by rememberUpdatedState(onPosition)
-    // Тап по чипу едет по пружине из MotionScheme темы (expressive)
+    // A chip tap moves along a spring from the theme's MotionScheme (expressive)
     val motion = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
     LaunchedEffect(state) {
@@ -58,11 +58,11 @@ fun ServicePager(
             .collect { positionNow(it) }
     }
 
-    // Чип нажали: пейджер едет к странице
+    // A chip was tapped: the pager moves to the page
     LaunchedEffect(target) {
         if (state.currentPage != target) state.animateScrollToPage(target, animationSpec = motion)
     }
-    // Страница остановилась (свайп): обновляем выбранный чип
+    // The page has stopped (swipe): update the selected chip
     LaunchedEffect(state, pages) {
         snapshotFlow { state.settledPage }.collect { idx ->
             if (idx !in pages.indices) return@collect

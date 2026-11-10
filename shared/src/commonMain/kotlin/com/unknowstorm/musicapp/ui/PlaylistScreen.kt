@@ -44,7 +44,7 @@ import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
-/** Экран плейлиста поверх Главной: состав, «Слушать всё», удаление треков, переименование и удаление. */
+/** A playlist screen above Home: contents, "Play all", deleting tracks, renaming and deleting. */
 @Composable
 fun PlaylistScreen(
     playlist: Playlist,
@@ -109,7 +109,7 @@ fun PlaylistScreen(
         )
     }
 
-    // Фон и перехват касаний: Главная под экраном не должна быть видна и нажиматься
+    // Background and touch interception: Home under the screen must not be visible or clickable
     Box(
         Modifier
             .fillMaxSize()

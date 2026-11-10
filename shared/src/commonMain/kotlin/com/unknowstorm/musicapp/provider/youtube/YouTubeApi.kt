@@ -22,8 +22,8 @@ import kotlinx.serialization.encodeToString
 import com.unknowstorm.musicapp.ui.TextStore
 
 /**
- * Видео YouTube для раздела YouTube.
- * Намеренно не Track: данные YouTube нельзя класть в лайки, плейлисты, историю и рекомендации.
+ * A YouTube video for the YouTube section.
+ * Deliberately not a Track: YouTube data must not go into likes, playlists, history or recommendations.
  */
 @Serializable
 data class YouTubeVideo(
@@ -40,15 +40,15 @@ class YouTubeApi(
     private val apiKey: String,
     private val client: HttpClient = createClient(),
 ) {
-    // Только в памяти и только пока запущено приложение (правила YouTube: данные API нельзя хранить дольше 30 дней)
+    // In memory only and only while the app is running (YouTube rules: API data must not be stored longer than 30 days)
     private val cache = LinkedHashMap<String, List<YouTubeVideo>>()
 
-    /** Результат поиска из кэша приложения (без запроса и без траты квоты), если он есть. */
+    /** A search result from the app cache (no request and no quota spent), if there is one. */
     fun cachedSearch(query: String): List<YouTubeVideo>? = cachedByKey("search:${query.trim().lowercase()}")
 
     private var cacheDay = Long.MIN_VALUE
 
-    /** Память и диск с проверкой квотного дня: после сброса квоты (полночь Pacific Time, 10:00 по Киеву) старое не используется. */
+    /** Memory and disk with a quota-day check: after the quota reset (midnight Pacific Time, 10:00 Kyiv time) old data is not used. */
     private fun cachedByKey(key: String): List<YouTubeVideo>? {
         rollover()
         cache[key]?.let { return it }
@@ -64,8 +64,8 @@ class YouTubeApi(
     }
 
     /**
-     * Общий суточный кэш подборок на сервере (Supabase, обновляется раз в сутки после сброса квоты YouTube).
-     * Читаем одним запросом: квоту YouTube это не тратит. Если сервер недоступен или пуст, ничего не меняется.
+     * A shared daily cache of selections on the server (Supabase, updated once a day after the YouTube quota reset).
+     * Read with one request: it does not spend YouTube quota. If the server is unavailable or empty, nothing changes.
      */
     suspend fun syncShared(): Boolean {
         val store = disk ?: return false
@@ -78,7 +78,7 @@ class YouTubeApi(
             }.body()
             var any = false
             for (r in rows) {
-                // Вчерашние данные тоже принимаем: между сбросом квоты и обновлением на сервере проходят минуты
+                // Yesterday's data is accepted too: minutes pass between the quota reset and the server update
                 if (r.quotaDay < today - 1 || r.videos.isEmpty()) continue
                 cache[r.key] = r.videos
                 if (r.key.startsWith("search:") || r.key.startsWith("popular:")) saveToDisk(r.key, r.videos)
@@ -94,7 +94,7 @@ class YouTubeApi(
 
     private var disk: TextStore? = null
 
-    /** Подключает постоянное хранилище: поиски живут в нём до сброса дневной квоты YouTube (полночь по Pacific Time). */
+    /** Connects persistent storage: searches live in it until the daily YouTube quota resets (midnight Pacific Time). */
     fun attach(store: TextStore) {
         if (disk == null) disk = store
     }
@@ -119,7 +119,7 @@ class YouTubeApi(
         runCatching { store.set(DISK_KEY, diskJson.encodeToString(all)) }
     }
 
-    /** Поиск музыкальных видео, которые разрешено встраивать. Один поиск стоит 100 единиц квоты. */
+    /** Search for music videos that may be embedded. One search costs 100 quota units. */
     suspend fun search(query: String): List<YouTubeVideo> {
         val q = query.trim()
         if (q.isEmpty()) return emptyList()
@@ -138,7 +138,7 @@ class YouTubeApi(
         return store(key, details(ids))
     }
 
-    /** «Популярная музыка» через videos.list: стоит 1 единицу квоты. Может быть недоступна для региона. */
+    /** "Popular music" via videos.list: costs 1 quota unit. May be unavailable for a region. */
     suspend fun popularMusic(region: String = "UA"): List<YouTubeVideo> {
         val key = "popular:$region"
         cachedByKey(key)?.let { return it }
@@ -184,7 +184,7 @@ class YouTubeApi(
         return value
     }
 
-    // Берём только публичные, встраиваемые видео, не «для детей» (их показываем только на youtube.com)
+    // Take only public, embeddable videos that are not "made for kids" (those are shown only on youtube.com)
     private fun YtVideosResponse.toVideos(): List<YouTubeVideo> =
         items.filter { v ->
             val s = v.status
@@ -195,7 +195,7 @@ class YouTubeApi(
                 id = v.id,
                 title = v.snippet?.title.orEmpty(),
                 channel = v.snippet?.channelTitle.orEmpty(),
-                // medium = 320x180 без чёрных полос, нужный формат 16:9
+                // medium = 320x180 without black bars, the needed 16:9 format
                 thumbnailUrl = thumbs?.medium?.url ?: thumbs?.high?.url ?: thumbs?.default?.url,
                 durationMs = parseIsoDuration(v.contentDetails?.duration),
             )
@@ -205,12 +205,12 @@ class YouTubeApi(
         private const val BASE_URL = "https://www.googleapis.com/youtube/v3"
         private const val MAX_CACHED = 30
         private const val DISK_KEY = "yt_search_cache_v1"
-        // Публичный (publishable) ключ Supabase: он создан для встраивания в приложение, секретов в нём нет
+        // The public (publishable) Supabase key: it is made to be embedded in an app, there are no secrets in it
         private const val SHARED_URL = "https://llyjvonszkahqmyxcqbi.supabase.co"
         private const val SHARED_KEY = "sb_publishable_kPXbz4ayg5E2GszNuzdy5g_SmcAhuqn"
         private val diskJson = Json { ignoreUnknownKeys = true }
 
-        /** Один экземпляр на приложение, чтобы кэш не терялся при смене экранов. */
+        /** One instance per app so the cache is not lost when screens change. */
         val shared: YouTubeApi by lazy { YouTubeApi(Secrets.YOUTUBE_API_KEY) }
 
         private fun createClient() = HttpClient {

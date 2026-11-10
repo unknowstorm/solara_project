@@ -2,9 +2,9 @@ package com.unknowstorm.musicapp.ui
 
 import androidx.compose.ui.geometry.Offset
 
-// Контуры логотипов, которых нет в Simple Icons. Каждый задан в своей сетке (minX, minY, size).
-// Товарные знаки принадлежат владельцам сервисов. Перед публичным релизом заменить
-// на материалы из их брендбуков.
+// Outlines of logos that are not in Simple Icons. Each is set in its own grid (minX, minY, size).
+// Trademarks belong to the service owners. Before a public release replace
+// them with materials from their brand books.
 internal class LogoSpec(val path: String, val minX: Float, val minY: Float, val size: Float)
 
 internal val EXTRA_LOGOS: Map<String, LogoSpec> = mapOf(

@@ -34,14 +34,14 @@ fun AuthScreen(
 ) {
     val scope = rememberCoroutineScope()
     var register by remember { mutableStateOf(false) }
-    // При входе сюда можно ввести и почту, и логин (ник); при регистрации нужна именно почта
+    // Here you can enter either an email or a login (nickname) when signing in; registration needs an email
     var login by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var password2 by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
-    // Сохраняем между сворачиванием и пересозданием Activity, чтобы шторка не пропадала сама
+    // Saved across minimizing and Activity recreation so the sheet does not disappear by itself
     var showForgot by rememberSaveable { mutableStateOf(false) }
 
     fun run(block: suspend () -> Result<*>, onOk: () -> Unit = {}) {
@@ -81,7 +81,7 @@ fun AuthScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Переключатель режима
+            // Mode switch
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     selected = !register,
@@ -136,7 +136,7 @@ fun AuthScreen(
             Button(
                 onClick = {
                     if (register) {
-                        // После регистрации App сам покажет экран ожидания письма (pending) или откроет профиль
+                        // After registration App will itself show the waiting-for-email screen (pending) or open the profile
                         run({ repo.signUp(login, password) })
                     } else {
                         run({ repo.signIn(login, password) }, onOk = onClose)
@@ -192,11 +192,11 @@ fun AuthScreen(
 private enum class ResetStep { Login, Code, Password }
 
 /**
- * Шторка сброса пароля: выезжает снизу.
- * Шаг 1: почта или логин, мы находим почту и отправляем на неё код ([AuthRepository.startPasswordReset]).
- * Шаг 2: 8-значный код. Шаг 3: новый пароль.
- * Только после шага 3 вызывается resetPasswordWithCode: проверка кода создаёт сессию,
- * и пользователь сразу оказывается вошедшим (App закрывает экран входа).
+ * Password reset sheet: slides up from the bottom.
+ * Step 1: email or login, we find the email and send a code to it ([AuthRepository.startPasswordReset]).
+ * Step 2: the 8-digit code. Step 3: the new password.
+ * Only after step 3 is resetPasswordWithCode called: checking the code creates a session,
+ * and the user immediately ends up signed in (App closes the sign-in screen).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -206,10 +206,10 @@ private fun ForgotPasswordSheet(
     onDismiss: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    // Шаг, почта и код переживают сворачивание приложения; пароли намеренно не сохраняем
+    // The step, email and code survive minimizing the app; passwords are deliberately not saved
     var step by rememberSaveable { mutableStateOf(ResetStep.Login) }
     var login by rememberSaveable { mutableStateOf(initialLogin) }
-    // Реальная почта аккаунта: нужна для повторной отправки и проверки кода
+    // The account's real email: needed for resending and checking the code
     var mail by rememberSaveable { mutableStateOf("") }
     var code by rememberSaveable { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
@@ -219,7 +219,7 @@ private fun ForgotPasswordSheet(
     var info by remember { mutableStateOf<String?>(null) }
     var cooldown by rememberSaveable { mutableIntStateOf(0) }
 
-    // Шторка закрывается только кнопкой «Отмена»: свайп вниз, тап по затемнению и «Назад» ничего не делают
+    // The sheet closes only with the "Cancel" button: swipe down, tap on the scrim and "Back" do nothing
     var allowClose by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true,
@@ -282,7 +282,7 @@ private fun ForgotPasswordSheet(
                 repo.resetPasswordWithCode(mail, code, newPassword)
                     .onFailure {
                         error = it.message
-                        // Код не подошёл: возвращаем на ввод кода
+                        // The code did not fit: return to code entry
                         if (it.message?.contains(S.code) == true) {
                             step = ResetStep.Code
                             code = ""
@@ -294,7 +294,7 @@ private fun ForgotPasswordSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = { /* закрытие только через «Отмена» */ },
+        onDismissRequest = { /* closing only via "Cancel" */ },
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
@@ -344,7 +344,7 @@ private fun ForgotPasswordSheet(
                         onValueChange = { input ->
                             code = input.filter { it.isDigit() }.take(RESET_CODE_LENGTH)
                             error = null
-                            // Код введён целиком: переходим к вводу нового пароля
+                            // The code is fully entered: go to entering the new password
                             if (code.length == RESET_CODE_LENGTH) { step = ResetStep.Password; info = null }
                         },
                         singleLine = true,

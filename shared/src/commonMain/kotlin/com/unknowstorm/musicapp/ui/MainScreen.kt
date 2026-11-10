@@ -56,7 +56,7 @@ enum class Tab(private val labelFn: () -> String) {
     QUEUE({ S.queue }),
     SETTINGS({ S.settings });
 
-    /** Подпись берётся при каждом чтении, поэтому меняется вместе с языком. */
+    /** The caption is read on every access, so it changes together with the language. */
     val label: String get() = labelFn()
 }
 
@@ -75,7 +75,7 @@ fun MainScreen(
     var service by remember { mutableStateOf(Service.ALL) }
     var showLikes by remember { mutableStateOf(false) }
     var openPlaylist by remember { mutableStateOf<Playlist?>(null) }
-    // Позиция пейджера для цвета острова; старт с текущей страницы, чтобы первый кадр не мигал
+    // Pager position for the island color; start from the current page so the first frame does not blink
     var pagerPos by remember {
         mutableFloatStateOf(pagerOrder(true).indexOf(if (showLikes) null else service).coerceAtLeast(0).toFloat())
     }
@@ -95,7 +95,7 @@ fun MainScreen(
     val session = remember { YouTubeSession(ytScope) }
     var rootOrigin by remember { mutableStateOf(Offset.Zero) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
-    // Большой плеер YouTube развёрнут полностью: нижняя панель навигации прячется (портрет и альбом).
+    // The big YouTube player is fully expanded: the bottom navigation bar hides (portrait and landscape).
     val hideNavBar by remember {
         derivedStateOf {
             session.video != null && session.progress >= 0.999f &&
@@ -104,10 +104,10 @@ fun MainScreen(
     }
     val playback by audio.state.collectAsState()
     val spotify = LocalSpotifyRemote.current
-    // Наша музыка или YouTube заиграли: Spotify на паузу
+    // Our music or YouTube started playing: pause Spotify
     LaunchedEffect(playback.isPlaying) { if (playback.isPlaying) spotify?.pause() }
     LaunchedEffect(session.video) { if (session.video != null) spotify?.pause() }
-    // Включили нашу музыку: видео YouTube закрывается, два звука одновременно не играют
+    // Our music started: the YouTube video closes, two sounds do not play at once
     LaunchedEffect(playback.mediaId) {
         if (playback.mediaId != null && session.video != null) session.close()
     }
@@ -118,7 +118,7 @@ fun MainScreen(
             .onGloballyPositioned { rootOrigin = it.positionInWindow() }
             .onSizeChanged { rootSize = it }
     ) {
-    // Делаем фон колонки прозрачным (чтобы не было черных полос)
+    // Make the column background transparent (so there are no black bars)
     Column(Modifier.fillMaxSize().background(Color.Transparent)) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
@@ -144,7 +144,7 @@ fun MainScreen(
                             current = service,
                             likesSelected = showLikes,
                             hasLikes = true,
-                            // Развёрнутый плеер YouTube: листание выключено
+                            // The expanded YouTube player: swiping is off
                             swipeEnabled = !(session.video != null && session.progress >= 0.999f),
                             onSelect = { service = it; showLikes = false },
                             onLikes = { service = Service.ALL; showLikes = true },
@@ -152,7 +152,7 @@ fun MainScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                // До этих границ растёт большой плеер YouTube
+                                // The big YouTube player grows up to these bounds
                                 .onGloballyPositioned { session.screenBounds = it.boundsInWindow() },
                         ) { page, active ->
                             when (page) {
@@ -181,21 +181,21 @@ fun MainScreen(
             }
         }
 
-        // Место под мини-плеер Spotify (рисует его SpotifyExpandablePlayer)
+        // The place for the Spotify mini player (it is drawn by SpotifyExpandablePlayer)
         SpotifyMiniSlot(hidden = playback.title != null)
 
-        // Мини-плеер лежит над нижней панелью
+        // The mini player lies above the bottom bar
         NowPlayingBar(
             audio = audio,
             onOpen = onOpenPlayer,
-            // Убираем лишние отступы, чтобы плеер прилегал вплотную
+            // Remove extra padding so the player sits flush
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         )
 
-        // ИСПРАВЛЕНИЕ: Убираем тень у NavigationBar и делаем его прозрачным
+        // FIX: remove the shadow of the NavigationBar and make it transparent
         if (!hideNavBar) NavigationBar(
             containerColor = MaterialTheme.colorScheme.background,
-            tonalElevation = 0.dp, // Убирает черную тень!
+            tonalElevation = 0.dp, // Removes the black shadow!
             modifier = Modifier.background(Color.Transparent)
         ) {
             Tab.entries.forEach { item ->
@@ -216,7 +216,7 @@ fun MainScreen(
         }
     }
 
-        // Единственный плеер YouTube: на экране YouTube большой, в остальных местах плавающее окно
+        // The only YouTube player: big on the YouTube screen, a floating window everywhere else
         YouTubeOverlay(
             session = session,
             containerOrigin = rootOrigin,
@@ -254,7 +254,7 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         var editingProfile by remember { mutableStateOf(false) }
         AccountBlock(authRepo, onOpenAuth, onEditProfile = { editingProfile = true })
 
-        // Кнопка смены пароля: только для вошедшего пользователя
+        // Password change button: only for a signed-in user
         val authState by authRepo.state.collectAsState()
         var showChangePassword by remember { mutableStateOf(false) }
         if (authState is AuthState.SignedIn) {

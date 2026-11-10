@@ -99,10 +99,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Сколько нужно удерживать обложку, чтобы её можно было вращать. */
+/** How long the cover must be held for it to be rotatable. */
 private const val HOLD_TO_TILT_MS = 1500L
 
-/** Максимальный угол наклона обложки (градусы). */
+/** The maximum tilt angle of the cover (degrees). */
 private const val MAX_TILT_DEG = 12f
 
 internal val MiniHeight = 64.dp
@@ -113,13 +113,13 @@ private val MiniCorner = 16.dp
 private val MiniCoverCorner = 8.dp
 private val FullCoverCorner = 28.dp
 
-/** Примерная высота блока «название … кнопки», который идёт под обложкой. */
+/** The approximate height of the "title … buttons" block that goes under the cover. */
 private val BelowCoverBlock = 340.dp
 private val ScreenSideMargin = 24.dp
 private val CoverDownShift = 40.dp
 /**
- * Сюда старый [NowPlayingBar] (теперь невидимая «метка») сообщает, где в MainScreen
- * должен стоять мини-плеер. ExpandablePlayer рисует мини-плеер ровно в этом месте.
+ * The old [NowPlayingBar] (now an invisible "marker") reports here where in MainScreen
+ * the mini player should stand. ExpandablePlayer draws the mini player exactly in that place.
  */
 @Stable
 class MiniPlayerAnchor {
@@ -129,11 +129,11 @@ class MiniPlayerAnchor {
 val LocalMiniPlayerAnchor = staticCompositionLocalOf { MiniPlayerAnchor() }
 
 /**
- * Один компонент вместо PlayerScreen + NowPlayingBar.
- * Мини-плеер и полный экран — это один и тот же контейнер, который плавно растёт
- * (progress 0f..1f), а обложка «перетекает» из маленькой в большую.
+ * One component instead of PlayerScreen + NowPlayingBar.
+ * The mini player and the full screen are one and the same container that grows smoothly
+ * (progress 0f..1f), and the cover "flows" from small to large.
  *
- * Ставить в корневой Box поверх основного контента.
+ * Put it into the root Box above the main content.
  */
 @Composable
 fun ExpandablePlayer(
@@ -147,15 +147,15 @@ fun ExpandablePlayer(
     val onChange by rememberUpdatedState(onExpandedChange)
     val anchor = LocalMiniPlayerAnchor.current
 
-    // derivedStateOf: рекомпозиция только когда трек появился/пропал, а не на каждый тик позиции
+    // derivedStateOf: recomposition only when a track appeared/disappeared, not on every position tick
     val playerState = audio.state.collectAsState()
     val hasTrack by remember { derivedStateOf { playerState.value.title != null } }
 
     val scope = rememberCoroutineScope()
 
-    // Единственный источник правды для анимации: 0 = мини-плеер, 1 = полный экран.
-    // Читаем его ТОЛЬКО внутри lambda (layout / graphicsLayer / draw), поэтому кадры анимации
-    // не вызывают рекомпозицию.
+    // The only source of truth for the animation: 0 = mini player, 1 = full screen.
+    // Read it ONLY inside lambdas (layout / graphicsLayer / draw), so animation frames
+    // do not cause recomposition.
     val progress = remember { mutableFloatStateOf(if (expanded) 1f else 0f) }
     var animJob by remember { mutableStateOf<Job?>(null) }
     val settling = remember { floatArrayOf(-1f) }
@@ -177,14 +177,14 @@ fun ExpandablePlayer(
         }
     }
 
-    // Родитель поменял expanded (тап по мини-плееру, кнопка «назад») — запускаем анимацию.
-    // Если анимацию уже запустил жест (с учётом скорости), второй раз не стартуем.
+    // The parent changed expanded (tap on the mini player, the "back" button): start the animation.
+    // If a gesture already started the animation (taking the velocity into account), do not start a second time.
     LaunchedEffect(expanded) {
         val target = if (expanded) 1f else 0f
         if (settling[0] != target && progress.floatValue != target) settle(target)
     }
 
-    // Трек закончился или нажали ✕: всё прячем
+    // The track ended or ✕ was pressed: hide everything
     LaunchedEffect(hasTrack) {
         if (!hasTrack) {
             animJob?.cancel()
@@ -223,7 +223,7 @@ fun ExpandablePlayer(
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-        // --- Где стоит мини-плеер (в координатах этого оверлея) ---
+        // --- Where the mini player stands (in this overlay's coordinates) ---
         val fbMargin = with(density) { MiniSideMargin.toPx() }
         val fbBottom = with(density) { (bottomInset + 8.dp).toPx() }
         val miniHpx = with(density) { MiniHeight.toPx() }
@@ -232,14 +232,14 @@ fun ExpandablePlayer(
             return if (b != null) {
                 Rect(b.left - origin.x, b.top - origin.y, b.right - origin.x, b.bottom - origin.y)
             } else {
-                // Запасной вариант, пока MainScreen не сообщил положение
+                // Fallback until MainScreen has reported the position
                 Rect(fbMargin, fullH - fbBottom - miniHpx, fullW - fbMargin, fullH - fbBottom)
             }
         }
         val miniNow = miniRect()
         val miniWidthDp = with(density) { miniNow.width.toDp() }
 
-        // --- Геометрия полного экрана (в dp) ---
+        // --- Full-screen geometry (in dp) ---
         val layoutDirection = LocalLayoutDirection.current
         val sideInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
         val leftInset = with(density) { sideInsets.getLeft(density, layoutDirection).toDp() }
@@ -250,7 +250,7 @@ fun ExpandablePlayer(
         val coverSize: Dp
         val coverLeft: Dp
         if (landscape) {
-            // Альбомная ориентация: обложка слева по центру, справа название и кнопки управления
+            // Landscape orientation: the cover on the left in the center, the title and controls on the right
             val availH = maxHeight - topInset - bottomInset
             coverSize = maxOf(120.dp, minOf(availH - 24.dp, maxWidth * 0.42f))
             coverTop = topInset + (availH - coverSize) / 2f
@@ -271,7 +271,7 @@ fun ExpandablePlayer(
         val miniColor = MaterialTheme.colorScheme.secondaryContainer
         val fullColor = MaterialTheme.colorScheme.surface
 
-        // Запоминаем в момент расстановки, стоит ли плеер на измеренном месте: до этого он невидим
+        // Remember at layout time whether the player stands at the measured place: until then it is invisible
         val placedOnAnchor = remember { mutableStateOf(false) }
         val miniVisible by remember { derivedStateOf { progress.floatValue < 0.999f } }
         val fullVisible by remember { derivedStateOf { progress.floatValue > 0.001f } }
@@ -283,13 +283,13 @@ fun ExpandablePlayer(
 
         Box(
             modifier = Modifier
-                // позиция: из мини-плеера в левый верхний угол экрана
+                // position: from the mini player to the top-left corner of the screen
                 .offset {
                     val m = miniRect()
                     val p = progress.floatValue
                     IntOffset(lerp(m.left, 0f, p).roundToInt(), lerp(m.top, 0f, p).roundToInt())
                 }
-                // размер: из мини-плеера на весь экран
+                // size: from the mini player to the whole screen
                 .layout { measurable, _ ->
                     placedOnAnchor.value = anchor.bounds != null
                     val m = miniRect()
@@ -299,20 +299,20 @@ fun ExpandablePlayer(
                     val placeable = measurable.measure(Constraints.fixed(w, h))
                     layout(w, h) { placeable.place(0, 0) }
                 }
-                // скругления и тень тоже «стекают» к полному экрану
+                // corners and shadow also "flow" toward the full screen
                 .graphicsLayer {
                     val p = progress.floatValue
                     translationX = miniOffsetX
-                    // Пока место под мини-плеер не измерено, не рисуем его: иначе он мелькает поверх нижней панели
+                    // Until the place for the mini player is measured, do not draw it: otherwise it flickers over the bottom bar
                     alpha = if (!placedOnAnchor.value && p < 0.01f) 0f else 1f
                     shape = RoundedCornerShape(CornerSize(lerp(miniCornerPx, 0f, p)))
                     clip = true
                     shadowElevation = lerp(shadowPx, 0f, p)
                 }
-                // цвет: secondaryContainer -> surface (только палитра Material You, без блюра)
+                // color: secondaryContainer -> surface (Material You palette only, no blur)
                 .drawBehind { drawRect(lerpColor(miniColor, fullColor, progress.floatValue)) }
-                // Вертикальный жест и в свёрнутом, и в развёрнутом виде:
-                // вниз сворачивает, вверх разворачивает вслед за пальцем
+                // A vertical gesture in both the collapsed and the expanded state:
+                // down collapses, up expands following the finger
                 .then(
                     Modifier.draggable(
                             state = dragState,
@@ -339,7 +339,7 @@ fun ExpandablePlayer(
                     if (expanded) {
                         Modifier
                     } else {
-                        // Свёрнут: свайп в сторону закрывает, тап разворачивает
+                        // Collapsed: a sideways swipe closes, a tap expands
                         Modifier
                             .pointerInput(Unit) {
                                 detectHorizontalDragGestures(
@@ -382,7 +382,7 @@ fun ExpandablePlayer(
                     rightInset = rightInset,
                 )
             }
-            // Обложка — общий элемент: одна и та же картинка в мини и в полном плеере
+            // The cover is a shared element: the same picture in the mini and in the full player
             SharedCover(
                 audio = audio,
                 expanded = expanded,
@@ -396,7 +396,7 @@ fun ExpandablePlayer(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Мини-плеер (содержимое). Обложки здесь нет — вместо неё пустое место, обложку рисует SharedCover.
+// Mini player (content). There is no cover here, an empty place instead; the cover is drawn by SharedCover.
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -410,7 +410,7 @@ private fun MiniContent(audio: AudioBackend, progress: () -> Float, width: Dp) {
             Modifier
                 .wrapContentSize(Alignment.TopStart, unbounded = true)
                 .size(width = width, height = MiniHeight)
-                // мини-контент быстро растворяется в начале разворачивания
+                // the mini content quickly dissolves at the start of expanding
                 .graphicsLayer { alpha = (1f - progress() / 0.25f).coerceIn(0f, 1f) }
                 .padding(MiniInset),
             verticalAlignment = Alignment.CenterVertically,
@@ -459,7 +459,7 @@ private fun MiniContent(audio: AudioBackend, progress: () -> Float, width: Dp) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Общая обложка: морфинг 48dp -> большая + наклон после удержания 1.5 с
+// Shared cover: morphing 48dp -> large + tilt after holding for 1.5 s
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -483,7 +483,7 @@ private fun SharedCover(
     val miniCornerPx = with(density) { MiniCoverCorner.toPx() }
     val fullCornerPx = with(density) { FullCoverCorner.toPx() }
 
-    // --- Наклон обложки ---
+    // --- Cover tilt ---
     var tilting by remember { mutableStateOf(false) }
     var targetX by remember { mutableFloatStateOf(0f) }
     var targetY by remember { mutableFloatStateOf(0f) }
@@ -509,7 +509,7 @@ private fun SharedCover(
         Modifier
             .wrapContentSize(Alignment.TopStart, unbounded = true)
             .size(coverSize)
-            // морфинг: позиция + масштаб от левого верхнего угла
+            // morphing: position + scale from the top-left corner
             .graphicsLayer {
                 val p = progress()
                 val s = lerp(miniSizePx / sizePx, 1f, p)
@@ -525,12 +525,12 @@ private fun SharedCover(
                 .fillMaxSize()
                 .then(
                     if (expanded) {
-                        // Жест стоит до graphicsLayer, чтобы координаты не искажались поворотом.
-                        // Не потребляем события, пока не прошло 1.5 с, поэтому свайп вниз работает как обычно.
+                        // The gesture stands before graphicsLayer so the coordinates are not distorted by the rotation.
+                        // We do not consume events until 1.5 s have passed, so a swipe down works as usual.
                         Modifier.pointerInput(Unit) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
-                                // Ждём 1.5 с: если палец поднят или сдвинут раньше — это не наш жест
+                                // Wait 1.5 s: if the finger is lifted or moved earlier, it is not our gesture
                                 val interrupted = withTimeoutOrNull(HOLD_TO_TILT_MS) {
                                     while (true) {
                                         val event = awaitPointerEvent()
@@ -544,7 +544,7 @@ private fun SharedCover(
                                 }
                                 if (interrupted != null) return@awaitEachGesture
 
-                                // Прошло 1.5 с: включаем наклон
+                                // 1.5 s have passed: turn on the tilt
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 tilting = true
 
@@ -583,7 +583,7 @@ private fun SharedCover(
             Box(
                 Modifier
                     .fillMaxSize()
-                    // скругление меняется вместе с морфингом (с поправкой на масштаб)
+                    // the corner rounding changes together with the morphing (corrected for scale)
                     .graphicsLayer {
                         val p = progress()
                         val s = lerp(miniSizePx / sizePx, 1f, p)
@@ -594,7 +594,7 @@ private fun SharedCover(
             ) {
                 CoverImage(artworkUrl, Modifier.fillMaxSize(), RoundedCornerShape(0.dp))
 
-                // Блик уходит на сторону, противоположную пальцу
+                // The glare moves to the side opposite the finger
                 Canvas(Modifier.fillMaxSize()) {
                     val pr = press.value
                     if (pr > 0f) {
@@ -612,7 +612,7 @@ private fun SharedCover(
                     }
                 }
 
-                // Значок источника текущего трека (Jamendo, Audius, Deezer), виден только в полном плеере
+                // The source badge of the current track (Jamendo, Audius, Deezer), visible only in the full player
                 ServiceBadge(
                     playerState.value.provider?.toService(),
                     Modifier
@@ -627,7 +627,7 @@ private fun SharedCover(
 }
 
 // ---------------------------------------------------------------------------------------------
-// Полный плеер (содержимое без обложки и без блюра)
+// Full player (content without the cover and without blur)
 // ---------------------------------------------------------------------------------------------
 
 @Composable
@@ -670,10 +670,10 @@ private fun FullContent(
             Modifier
                 .wrapContentSize(Alignment.TopStart, unbounded = true)
                 .size(width = width, height = height)
-                // полный контент проявляется во второй половине разворачивания
+                // the full content fades in during the second half of the expansion
                 .graphicsLayer { alpha = ((expandProgress() - 0.3f) / 0.5f).coerceIn(0f, 1f) }
         ) {
-            // Ручка для свайпа
+            // The handle for swiping
             Box(
                 Modifier
                     .align(Alignment.TopCenter)
@@ -686,7 +686,7 @@ private fun FullContent(
 
             Column(
                 modifier = if (landscape) {
-                    // Альбом: обложка слева, всё остальное в правой колонке по центру высоты
+                    // Landscape: the cover on the left, everything else in the right column centered in height
                     Modifier
                         .fillMaxSize()
                         .padding(
@@ -703,7 +703,7 @@ private fun FullContent(
                 },
                 verticalArrangement = if (landscape) Arrangement.Center else Arrangement.Top,
             ) {
-                // Здесь сверху лежит общая обложка (её рисует SharedCover)
+                // Here at the top lies the shared cover (it is drawn by SharedCover)
                 if (!landscape) Spacer(Modifier.height(belowCoverStart))
 
                 Text(
@@ -756,7 +756,7 @@ private fun FullContent(
                     }
                 }
 
-                // Волнистый таймлайн; поверх невидимый Slider принимает перемотку
+                // A wavy timeline; an invisible Slider on top accepts seeking
                 Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.Center) {
                     LinearWavyProgressIndicator(
                         progress = { shownProgress },

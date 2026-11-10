@@ -103,26 +103,26 @@ import kotlin.math.roundToInt
 private val SpMiniInset = 8.dp
 private val SpMiniCoverSize = 48.dp
 private val SpMiniCorner = 16.dp
-/** Правила Spotify: углы обложки 4 dp, без изменений формы. */
+/** Spotify rules: cover corners 4 dp, shape unchanged. */
 private val SpCoverCorner = 4.dp
 private val SpBelowCoverBlock = 340.dp
 private val SpScreenSideMargin = 24.dp
 private val SpCoverDownShift = 40.dp
 
-/** Общее состояние мини-плеера Spotify. Живёт только в памяти. */
+/** Shared state of the Spotify mini player. Lives only in memory. */
 @Stable
 class SpotifyMiniState {
-    /** Мини-плеер сейчас должен быть виден (трек есть, наш плеер не играет). */
+    /** The mini player should be visible now (there is a track, our player is not playing). */
     var shown by mutableStateOf(false)
     var expanded by mutableStateOf(false)
-    /** Трек, который пользователь закрыл крестиком или свайпом. */
+    /** The track the user closed with the cross or a swipe. */
     var dismissedUri by mutableStateOf<String?>(null)
     val anchor = MiniPlayerAnchor()
 }
 
 val LocalSpotifyMini = staticCompositionLocalOf { SpotifyMiniState() }
 
-/** Пустое место в MainScreen, где стоит мини-плеер Spotify (рисует его SpotifyExpandablePlayer). */
+/** The empty spot in MainScreen where the Spotify mini player stands (it is drawn by SpotifyExpandablePlayer). */
 @Composable
 fun SpotifyMiniSlot(hidden: Boolean = false) {
     val ui = LocalSpotifyMini.current
@@ -137,9 +137,9 @@ fun SpotifyMiniSlot(hidden: Boolean = false) {
 }
 
 /**
- * Мини-плеер и полный плеер Spotify: тот же морфинг, что у ExpandablePlayer,
- * но отдельный компонент: ничего общего с AudioBackend и нашими источниками.
- * Ставить в корневой Box поверх основного контента.
+ * Spotify mini player and full player: the same morphing as ExpandablePlayer,
+ * but a separate component: nothing in common with AudioBackend and our sources.
+ * Put it into the root Box above the main content.
  */
 @Composable
 fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier: Modifier = Modifier) {
@@ -148,7 +148,7 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
     val ownAnchor = LocalMiniPlayerAnchor.current
     val stateHolder = remote.state.collectAsState()
     val audioHolder = audio.state.collectAsState()
-    // Сырое условие. Spotify при смене трека может на секунду прислать «пустое» состояние
+    // The raw condition. Spotify may send an "empty" state for a second when the track changes
     val rawHasTrack by remember {
         derivedStateOf {
             val st = stateHolder.value
@@ -158,18 +158,18 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
         }
     }
     val audioBusy by remember { derivedStateOf { audioHolder.value.title != null } }
-    // Последнее состояние с названием трека: его показываем, пока длится короткий разрыв
+    // The last state with a track title: we show it while a short gap lasts
     val held = remember { mutableStateOf(stateHolder.value) }
     LaunchedEffect(Unit) {
         snapshotFlow { stateHolder.value }.collect { if (it.title != null) held.value = it }
     }
-    // Spotify на миг присылает пустое состояние при смене трека: держим плеер до 1,2 с, но только в неявных случаях
+    // Spotify sends an empty state for a moment when the track changes: keep the player up to 1.2 s, but only in implicit cases
     var everShown by remember { mutableStateOf(false) }
     var graceExpired by remember { mutableStateOf(false) }
     val explicitHide by remember {
         derivedStateOf {
             val st = stateHolder.value
-            // Наш плеер должен сначала занять своё место, и только потом Spotify скрывается: без разрыва между ними
+            // Our player must take its place first, and only then Spotify hides: no gap between them
             (audioBusy && ownAnchor.bounds != null) || !st.connected || st.premium == false ||
                 (ui.dismissedUri != null && ui.dismissedUri == st.uri && st.isPaused)
         }
@@ -183,7 +183,7 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
             graceExpired = true
         }
     }
-    // Считаем прямо в композиции: плеер скрывается и появляется в том же кадре, что и смена источника
+    // Computed right in the composition: the player hides and appears in the same frame as the source change
     val hasTrack = rawHasTrack || (everShown && !graceExpired && !explicitHide)
     val expanded = ui.expanded
     val scope = rememberCoroutineScope()
@@ -195,7 +195,7 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
         }
     }
     DisposableEffect(Unit) { onDispose { ui.shown = false } }
-    // Снова нажали play: закрытый ранее трек опять показываем
+    // Play was pressed again: show the previously closed track again
     LaunchedEffect(Unit) {
         snapshotFlow { stateHolder.value.isPaused }.collect { paused -> if (!paused) ui.dismissedUri = null }
     }
@@ -312,7 +312,7 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
         val miniColor = MaterialTheme.colorScheme.secondaryContainer
         val fullColor = MaterialTheme.colorScheme.surface
 
-        // Запоминаем в момент расстановки, стоит ли плеер на измеренном месте: до этого он невидим
+        // Remember at layout time whether the player stands at the measured place: until then it is invisible
         val placedOnAnchor = remember { mutableStateOf(false) }
         val miniVisible by remember { derivedStateOf { progress.floatValue < 0.999f } }
         val fullVisible by remember { derivedStateOf { progress.floatValue > 0.001f } }
@@ -341,7 +341,7 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
                 .graphicsLayer {
                     val p = progress.floatValue
                     translationX = miniOffsetX
-                    // Пока место под мини-плеер не измерено, не рисуем его: иначе он мелькает поверх нижней панели
+                    // Until the place for the mini player is measured, do not draw it: otherwise it flickers over the bottom bar
                     alpha = if (!placedOnAnchor.value && p < 0.01f) 0f else 1f
                     shape = RoundedCornerShape(CornerSize(lerp(miniCornerPx, 0f, p)))
                     clip = true
@@ -424,7 +424,7 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
     }
 }
 
-/** Полный логотип Spotify на чёрной плашке, без изменений. */
+/** The full Spotify logo on a black plate, unchanged. */
 @Composable
 private fun SpotifyLogoChip(logoHeight: Dp, modifier: Modifier = Modifier) {
     Image(
@@ -434,7 +434,7 @@ private fun SpotifyLogoChip(logoHeight: Dp, modifier: Modifier = Modifier) {
     )
 }
 
-/** Иконка Spotify без надписи на чёрной плашке: в мини-плеере не хватает места под полный логотип. */
+/** The Spotify icon without the wordmark on a black plate: the mini player has no room for the full logo. */
 @Composable
 private fun SpotifyIconChip(iconSize: Dp, modifier: Modifier = Modifier) {
     Image(
@@ -489,7 +489,7 @@ private fun SpMiniContent(
     }
 }
 
-/** Общая обложка: морфинг 48 dp -> большая. Без наклона, блика, значков и блюра, углы 4 dp, без обрезки. */
+/** Shared cover: morphing 48 dp -> large. No tilt, glare, badges or blur, 4 dp corners, no cropping. */
 @Composable
 private fun SpSharedCover(
     stateHolder: State<SpotifyState>,
@@ -518,7 +518,7 @@ private fun SpSharedCover(
                 scaleY = sc
                 translationX = lerp(miniXY, bigX, p)
                 translationY = lerp(miniXY, bigY, p)
-                // Правила Spotify: обложку не анимируем, поэтому в пути она скрыта и появляется в крайних положениях
+                // Spotify rules: we do not animate the cover, so it is hidden along the way and appears in the end positions
                 alpha = if (p < 0.02f || p > 0.98f) 1f else 0f
             }
     ) {
@@ -526,7 +526,7 @@ private fun SpSharedCover(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    // 4 dp на экране при любом масштабе
+                    // 4 dp on screen at any scale
                     val sc = lerp(miniSizePx / sizePx, 1f, progress())
                     shape = RoundedCornerShape(CornerSize(cornerPx / sc))
                     clip = true
@@ -555,7 +555,7 @@ private fun SpFullContent(
     val s by stateHolder
     var dragValue by remember { mutableStateOf<Float?>(null) }
     var showDetails by remember { mutableStateOf(false) }
-    // Сообщение при лайке по правилам Spotify; пропадает само
+    // A message on like per Spotify rules; disappears by itself
     var likeNote by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(likeNote) { if (likeNote != null) { delay(2000); likeNote = null } }
 
@@ -581,8 +581,8 @@ private fun SpFullContent(
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
             )
-            // Логотип Spotify на экране с его контентом
-            // В портрете он стоит над обложкой; в альбоме он первой строкой колонки (см. ниже), чтобы не налезать на текст
+            // Spotify logo on the screen with its content
+            // In portrait it stands above the cover; in landscape it is the first row of the column (see below) so it does not overlap the text
             if (!landscape) {
                 SpotifyLogoChip(24.dp, Modifier.align(Alignment.TopCenter).padding(top = topInset + 28.dp))
             }
@@ -598,7 +598,7 @@ private fun SpFullContent(
                 verticalArrangement = if (landscape) Arrangement.Center else Arrangement.Top,
             ) {
                 if (!landscape) Spacer(Modifier.height(belowCoverStart))
-                // Логотип первой строкой колонки: двигается вместе с текстом и не может на него наложиться
+                // The logo is the first row of the column: it moves together with the text and cannot overlap it
                 if (landscape) {
                     SpotifyLogoChip(24.dp)
                     Spacer(Modifier.height(8.dp))
@@ -629,9 +629,9 @@ private fun SpFullContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = { showDetails = true }) { MoreIcon() }
-                    // Ссылка ведёт на текущий трек в Spotify
+                    // The link leads to the current track in Spotify
                     SpotifyOpenButton({ s.uri?.let { remote.openInSpotify(it) } ?: remote.openSpotifyApp() })
-                    // «+» кладёт трек в Liked Songs самого Spotify, у нас ничего не хранится
+                    // "+" puts the track into Spotify's own Liked Songs, nothing is stored on our side
                     IconButton(onClick = {
                         likeNote = if (!s.saved) "Added to Liked Songs" else "Removed from Liked Songs"
                         remote.toggleSaved()
@@ -644,7 +644,7 @@ private fun SpFullContent(
                     }
                 }
 
-                // Место под подпись зарезервировано всегда: полоса воспроизведения не прыгает
+                // The place for the caption is always reserved: the playback bar does not jump
                 Box(Modifier.fillMaxWidth().height(20.dp), contentAlignment = Alignment.CenterEnd) {
                     likeNote?.let {
                         Text(it, style = MaterialTheme.typography.labelMedium, color = active)

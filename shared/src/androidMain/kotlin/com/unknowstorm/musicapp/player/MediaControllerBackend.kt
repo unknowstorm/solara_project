@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Управляет плеером в PlaybackService и отдаёт его состояние интерфейсу. */
+/** Controls the player in PlaybackService and exposes its state to the UI. */
 class MediaControllerBackend(context: Context) : AudioBackend {
     private val appContext = context.applicationContext
     private val _state = MutableStateFlow(PlaybackState())
@@ -59,11 +59,11 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         override fun onPlayerError(error: PlaybackException) {
             Log.e("Solara", "player error: ${error.errorCodeName}", error)
             val c = controller ?: return
-            // Первый сбой трека: тихо пробуем ещё раз с того же места
+            // First failure of a track: quietly retry from the same position
             val httpCode = generateSequence<Throwable>(error) { it.cause }
                 .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
                 .firstOrNull()?.responseCode
-            // 4xx (кроме 408 и 429) повтором не лечится
+            // 4xx errors (except 408 and 429) are not fixed by retrying
             val permanent = httpCode != null && httpCode in 400..499 && httpCode != 408 && httpCode != 429 && httpCode != 401 && httpCode != 403
             val id = c.currentMediaItem?.mediaId
             if (httpCode == 404 || httpCode == 410) {
@@ -78,7 +78,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 return
             }
             errorStreak++
-            // При повторе одного трека «следующий» это он же, поэтому повтор выключаем
+            // When repeating a single track, "next" is the same track, so repeat is turned off
             if (c.repeatMode == Player.REPEAT_MODE_ONE) c.repeatMode = Player.REPEAT_MODE_OFF
             if (errorStreak < c.mediaItemCount && c.hasNextMediaItem()) {
                 showError(S.trackUnavailablePlayingTheNext)

@@ -25,7 +25,7 @@ import kotlinx.coroutines.launch
 
 private const val MIN_PASSWORD = 6
 
-/** Диалог смены пароля для вошедшего пользователя. Закрывается сам после успешного сохранения. */
+/** Password change dialog for a signed-in user. Closes by itself after a successful save. */
 @Composable
 fun ChangePasswordDialog(repo: AuthRepository, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()

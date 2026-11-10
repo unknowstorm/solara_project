@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.dp
 
-// Все иконки нарисованы в сетке 24x24 и масштабируются под размер
+// All icons are drawn on a 24x24 grid and scaled to the size
 
 private fun lineStyle(width: Float = 2f) = Stroke(width, cap = StrokeCap.Round, join = StrokeJoin.Round)
 

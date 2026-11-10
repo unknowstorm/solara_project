@@ -64,13 +64,13 @@ actual fun rememberExternalLinkOpener(): (String) -> Unit {
                     Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
             } catch (e: ActivityNotFoundException) {
-                // нет приложения для ссылки
+                // no app to handle the link
             }
         }
     }
 }
 
-/** Принимает коды ошибок плеера из JavaScript и передаёт их в основной поток. */
+/** Receives player error codes from JavaScript and passes them to the main thread. */
 class YouTubePlayerBridge(
     private val onError: (Int) -> Unit,
     private val onState: (Int) -> Unit = {},
@@ -99,7 +99,7 @@ class YouTubePlayerBridge(
     }
 }
 
-/** Полноэкранный режим плеера: стандартная кнопка в плеере YouTube разворачивает видео на всё окно. */
+/** Fullscreen mode of the player: the standard button in the YouTube player expands the video to the whole window. */
 private class FullscreenChrome(private val activity: Activity?) : WebChromeClient() {
     private var customView: View? = null
     private var callback: CustomViewCallback? = null
@@ -203,14 +203,14 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
     val chrome = remember(context) { FullscreenChrome(context.findActivity()) }
 
     val webView = remember {
-        // Referer = идентификатор приложения в виде https://com.example.app (требование YouTube)
+        // Referer = the app identifier as https://com.example.app (a YouTube requirement)
         val origin = "https://" + context.packageName.lowercase()
         WebView(context).apply {
             setBackgroundColor(android.graphics.Color.BLACK)
             settings.javaScriptEnabled = true
             WebView.setWebContentsDebuggingEnabled((context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
             settings.domStorageEnabled = true
-            settings.mediaPlaybackRequiresUserGesture = false // автозапуск только после тапа по видео в списке
+            settings.mediaPlaybackRequiresUserGesture = false // autoplay only after a tap on a video in the list
             webChromeClient = chrome
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -232,13 +232,13 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                     val req = request ?: return false
                     if (!req.isForMainFrame) return false
-                    // Ссылки из плеера не блокируем, а открываем во внешнем приложении
+                    // Links from the player are not blocked but opened in an external app
                     try {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, req.url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
                     } catch (e: ActivityNotFoundException) {
-                        // нет приложения для ссылки
+                        // no app to handle the link
                     }
                     return true
                 }
@@ -251,7 +251,7 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         }
     }
 
-    // Другое видео: тот же плеер, новый ролик (старое остаётся на экране, пока новое не загрузится)
+    // Another video: the same player, a new clip (the old one stays on screen until the new one loads)
     val loadedId = remember { arrayOf(videoId) }
     LaunchedEffect(videoId) {
         if (videoId != loadedId[0]) {
@@ -261,7 +261,7 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         }
     }
 
-    // Фоновое воспроизведение YouTube запрещено: при уходе из приложения ставим на паузу
+    // Background playback of YouTube is forbidden: pause when leaving the app
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
         webView.evaluateJavascript("try { player.pauseVideo(); } catch (e) {}", null)
         webView.onPause()
@@ -290,7 +290,7 @@ actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int)
         }
     }
 
-    // factory вызывается один раз за жизнь AndroidView, поэтому при смене WebView его нужно пересоздать
+    // factory is called once per AndroidView lifetime, so the WebView has to be recreated when it changes
     key(webView) {
         AndroidView(factory = { webView }, modifier = modifier)
     }

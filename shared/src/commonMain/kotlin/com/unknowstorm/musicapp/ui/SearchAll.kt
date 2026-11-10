@@ -8,7 +8,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-/** Ищет во всех источниках сразу и перемешивает результаты. Ошибка одного источника не ломает остальные. */
+/** Searches all sources at once and mixes the results. An error of one source does not break the others. */
 suspend fun searchAll(providers: List<MusicProvider>, query: String): List<Track> {
     var firstError: Exception? = null
     var failures = 0

@@ -41,7 +41,7 @@ actual fun rememberAvatarPicker(onPicked: (ByteArray) -> Unit): () -> Unit {
 actual fun decodeImageBitmap(bytes: ByteArray): ImageBitmap? =
     runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
 
-/** Обрезает фото по центру до квадрата, учитывает поворот из EXIF и сжимает в JPEG. */
+/** Crops the photo to a center square, respects the EXIF rotation and compresses it to JPEG. */
 private fun prepareAvatar(context: Context, uri: Uri): ByteArray? {
     val resolver = context.contentResolver
 
@@ -49,7 +49,7 @@ private fun prepareAvatar(context: Context, uri: Uri): ByteArray? {
     resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-    // Не читаем гигантское фото целиком: уменьшаем при чтении, пока сторона не станет близка к нужной
+    // Do not read a huge photo whole: downscale while reading until the side is close to the needed size
     var sample = 1
     while (bounds.outWidth / (sample * 2) >= AvatarSizePx && bounds.outHeight / (sample * 2) >= AvatarSizePx) {
         sample *= 2

@@ -22,7 +22,7 @@ class JamendoProvider(
     override val id = ProviderId.JAMENDO
 
     override suspend fun search(query: String): List<Track> {
-        // Jamendo иногда отвечает пустым списком при успешном статусе, поэтому повторяем
+        // Jamendo sometimes answers with an empty list on a successful status, so we retry
         repeat(MAX_ATTEMPTS) { attempt ->
             val tracks = fetchTracks {
                 parameter("limit", 30)

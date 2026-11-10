@@ -20,7 +20,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
-/** Фоновый сервис: держит плеер, уведомление и кнопки на экране блокировки. */
+/** Background service: holds the player, the notification and the lock-screen buttons. */
 @OptIn(UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
@@ -30,7 +30,7 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setAllowCrossProtocolRedirects(true)
-        // Редиректы Audius проходим один раз на трек, а не при каждой перемотке
+        // Audius redirects are followed once per track, not on every seek
         val resolvingFactory = ResolvingDataSource.Factory(
             dataSourceFactory,
             ResolvingDataSource.Resolver { spec ->
@@ -89,7 +89,7 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                resolvedUrls.clear() // адрес мог устареть, при повторе разрешим заново
+                resolvedUrls.clear() // the address may have expired; we will resolve it again on retry
                 val http = generateSequence<Throwable>(error) { it.cause }
                     .filterIsInstance<HttpDataSource.InvalidResponseCodeException>().firstOrNull()
                 android.util.Log.e(
@@ -111,7 +111,7 @@ class PlaybackService : MediaSessionService() {
         mediaSession = builder.build()
     }
 
-    /** Идёт по редиректам до файла. Возвращает null, если узел ответил не 200/206. */
+    /** Follows redirects to the file. Returns null if the node answered something other than 200/206. */
     private fun resolveRedirects(start: Uri): Uri? {
         if (resolvedUrls.size > 200) resolvedUrls.clear()
         var current = URL(start.toString())
@@ -128,7 +128,7 @@ class PlaybackService : MediaSessionService() {
                     current = URL(current, location)
                 } else {
                     if (code == 200 || code == 206) {
-                        // 200 на запрос части файла: сервер отдаёт файл только целиком
+                        // 200 for a partial-file request: the server serves the file only in full
                         val id = start.pathSegments.getOrNull(start.pathSegments.size - 2)
                         RangeSupport.set("AUDIUS:$id", code == 200)
                         return Uri.parse(current.toString())

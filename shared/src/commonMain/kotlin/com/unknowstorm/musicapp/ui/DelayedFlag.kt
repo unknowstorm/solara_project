@@ -9,8 +9,8 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 
 /**
- * Возвращает true, только если [value] остаётся true дольше [delayMs].
- * При смене [resetKey] (например, id трека) отсчёт начинается заново.
+ * Returns true only if [value] stays true longer than [delayMs].
+ * When [resetKey] changes (e.g. the track id) the countdown starts over.
  */
 @Composable
 fun rememberDelayedFlag(value: Boolean, delayMs: Long = 900, resetKey: Any? = null): Boolean {
@@ -25,5 +25,5 @@ fun rememberDelayedFlag(value: Boolean, delayMs: Long = 900, resetKey: Any? = nu
     return shown
 }
 
-/** Через сколько миллисекунд буферизации показывать спиннер. Меняйте здесь. */
+/** After how many milliseconds of buffering to show the spinner. Change it here. */
 const val SPINNER_DELAY_MS = 3000L

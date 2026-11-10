@@ -24,7 +24,7 @@ import com.unknowstorm.musicapp.player.DeadTracks
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
-/** Поиск по своим лайкам: локальный фильтр, без запросов в сеть. */
+/** Search within your own likes: a local filter, no network requests. */
 @Composable
 internal fun LikesSearchPane(
     likes: LikesRepository,

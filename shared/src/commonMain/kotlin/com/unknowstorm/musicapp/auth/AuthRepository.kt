@@ -30,9 +30,9 @@ import kotlinx.serialization.json.put
 import kotlin.random.Random
 
 /**
- * Данные профиля из таблицы `account`.
- * [avatar] — null (показываем первую букву ника) или метка версии загруженного фото вида "u1a2b3c":
- * сам файл лежит в бакете `avatars` по пути `<user_id>/avatar.jpg`.
+ * Profile data from the `account` table.
+ * [avatar] is null (we show the first letter of the nickname) or a version tag of the uploaded photo like "u1a2b3c":
+ * the file itself lies in the `avatars` bucket at the path `<user_id>/avatar.jpg`.
  */
 data class Profile(
     val username: String? = null,
@@ -42,15 +42,15 @@ data class Profile(
     val onboarded: Boolean = false,
 )
 
-/** Что сделать с аватаркой при сохранении профиля. */
+/** What to do with the avatar when saving the profile. */
 sealed interface AvatarUpdate {
-    /** Оставить как есть. */
+    /** Leave as is. */
     data object Keep : AvatarUpdate
 
-    /** Убрать фото: вернётся буква ника. */
+    /** Remove the photo: the nickname letter returns. */
     data object Remove : AvatarUpdate
 
-    /** Загрузить новое фото (JPEG, уже обрезанный под квадрат). */
+    /** Upload a new photo (JPEG, already cropped to a square). */
     class Upload(val jpeg: ByteArray) : AvatarUpdate
 }
 
@@ -61,7 +61,7 @@ sealed interface AuthState {
         val userId: String,
         val email: String?,
         val username: String?,
-        /** null — профиль ещё не загрузился (или не удалось загрузить). */
+        /** null: the profile has not loaded yet (or failed to load). */
         val profile: Profile? = null,
     ) : AuthState
     data class Error(val message: String) : AuthState
@@ -69,7 +69,7 @@ sealed interface AuthState {
 
 enum class SignUpResult { SignedIn, ConfirmEmail }
 
-/** Регистрация отправлена, ждём подтверждения письма. Пароль живёт только в памяти. */
+/** Registration was sent, waiting for email confirmation. The password lives only in memory. */
 data class PendingConfirmation(val email: String, val password: String)
 
 @Serializable
@@ -82,7 +82,7 @@ private data class AccountRow(
     val onboarded: Boolean = false,
 )
 
-/** Параметры серверной функции `complete_onboarding`. */
+/** Parameters of the server function `complete_onboarding`. */
 @Serializable
 private data class OnboardingParams(
     @SerialName("p_username") val username: String,
@@ -101,7 +101,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
     private val _pending = MutableStateFlow<PendingConfirmation?>(null)
     val pending: StateFlow<PendingConfirmation?> = _pending.asStateFlow()
 
-    /** Скачанные аватарки: ключ "<user_id>/<метка версии>". */
+    /** Downloaded avatars: the key is "<user_id>/<version tag>". */
     private val avatarCache = mutableMapOf<String, ByteArray>()
 
     init {
@@ -111,7 +111,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
                     is SessionStatus.Initializing -> _state.value = AuthState.Loading
                     is SessionStatus.Authenticated -> publishUser()
                     is SessionStatus.NotAuthenticated -> _state.value = AuthState.Guest
-                    // нет сети при обновлении токена: сессия сохранена, пользователь остаётся «вошедшим»
+                    // no network while refreshing the token: the session is saved, the user stays "signed in"
                     is SessionStatus.RefreshFailure -> {
                         if (client.auth.currentUserOrNull() != null) publishUser()
                         else _state.value = AuthState.Guest
@@ -127,10 +127,10 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
             return
         }
         _pending.value = null
-        // Если это тот же пользователь (например, обновился токен), не сбрасываем уже загруженный профиль,
-        // иначе экран онбординга мигнёт и потеряет введённое
+        // If this is the same user (e.g. the token was refreshed), we do not reset the already loaded profile,
+        // otherwise the onboarding screen would blink and lose what was entered
         val prev = (_state.value as? AuthState.SignedIn)?.takeIf { it.userId == user.id }
-        // Копия ника лежит в сессии на устройстве, поэтому видна и без сети
+        // A copy of the nickname lives in the session on the device, so it is visible without a network
         val cached = user.userMetadata?.get("username")?.jsonPrimitive?.contentOrNull
         _state.value = prev ?: AuthState.SignedIn(user.id, user.email, cached)
         val profile = runCatching { loadProfile(user.id) }.getOrNull()
@@ -141,7 +141,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         if (fresh != null && fresh != cached) cacheUsername(fresh)
     }
 
-    /** Пишем ник в метаданные сессии (только для показа без сети; источник правды остаётся база). */
+    /** Writes the nickname to the session metadata (only for display offline; the source of truth stays the database). */
     private suspend fun cacheUsername(name: String) {
         runCatching { client.auth.updateUser { data = buildJsonObject { put("username", name) } } }
     }
@@ -150,8 +150,8 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         val row = client.from("account")
             .select { filter { eq("user_id", userId) } }
             .decodeSingleOrNull<AccountRow>()
-        // Строка в `account` появляется только после «Готово» в онбординге.
-        // Нет строки: почта подтверждена, но профиль ещё не заполнен, поэтому покажем онбординг
+        // The row in `account` appears only after "Done" in onboarding.
+        // No row: the email is confirmed but the profile is not filled in yet, so we show onboarding
         return row?.let {
             Profile(it.username, it.avatar, it.syncPalette, it.services, it.onboarded)
         } ?: Profile()
@@ -165,17 +165,17 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         if (client.auth.currentSessionOrNull() != null) {
             SignUpResult.SignedIn
         } else if (created != null && created.identities.isNullOrEmpty()) {
-            // Supabase не говорит прямо, что почта занята: возвращает «успех» без письма и без identities.
-            // Без этой проверки человек ждал бы письмо, которого не будет.
+            // Supabase does not say directly that the email is taken: it returns "success" without a letter and without identities.
+            // Without this check a person would wait for a letter that will never come.
             error("already registered")
         } else {
-            // App увидит это и покажет экран «Ожидаем подтверждение письма»
+            // App will see this and show the "Waiting for email confirmation" screen
             _pending.value = PendingConfirmation(email.trim(), password)
             SignUpResult.ConfirmEmail
         }
     }
 
-    /** Вход по почте или по логину (нику): логин сначала переводится в почту через RPC `email_by_username`. */
+    /** Sign-in by email or by login (nickname): the login is first turned into an email via the RPC `email_by_username`. */
     suspend fun signIn(login: String, password: String): Result<Unit> = safe {
         val mail = resolveEmailOrNull(login) ?: error("Invalid login credentials")
         client.auth.signInWith(Email) {
@@ -184,7 +184,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         }
     }
 
-    /** Если в [login] есть '@', это почта. Иначе ищем почту по нику на сервере; null, если такого ника нет. */
+    /** If [login] contains '@', it is an email. Otherwise we look up the email by nickname on the server; null if there is no such nickname. */
     private suspend fun resolveEmailOrNull(login: String): String? {
         val v = login.trim()
         if ('@' in v) return v
@@ -197,8 +197,8 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
     }
 
     /**
-     * Сброс пароля по почте или логину: находит почту, отправляет на неё код и возвращает эту почту.
-     * Её нужно передавать дальше в [resetPasswordWithCode] и [sendResetCode].
+     * Password reset by email or login: finds the email, sends a code to it and returns this email.
+     * It must be passed on to [resetPasswordWithCode] and [sendResetCode].
      */
     suspend fun startPasswordReset(login: String): Result<String> = safe {
         val mail = resolveEmailOrNull(login) ?: error("login not found")
@@ -206,7 +206,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         mail
     }
 
-    /** Закрыть экран ожидания письма (например, «Изменить почту»). */
+    /** Close the waiting-for-email screen (e.g. "Change email"). */
     fun cancelPending() {
         _pending.value = null
     }
@@ -216,8 +216,8 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
     }
 
     /**
-     * Подтверждение регистрации 8-значным кодом из письма.
-     * При успехе Supabase создаёт сессию, [state] становится SignedIn, а [pending] сбрасывается в publishUser().
+     * Registration confirmation with the 8-digit code from the email.
+     * On success Supabase creates a session, [state] becomes SignedIn, and [pending] is reset in publishUser().
      */
     suspend fun verifyEmailCode(email: String, code: String): Result<Unit> = safe {
         client.auth.verifyEmailOtp(
@@ -227,7 +227,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         )
     }
 
-    /** Фото текущего пользователя по метке версии из [Profile.avatar]; null, если не удалось скачать. */
+    /** The current user's photo by the version tag from [Profile.avatar]; null if it could not be downloaded. */
     suspend fun loadAvatar(version: String): ByteArray? {
         val uid = client.auth.currentUserOrNull()?.id ?: return null
         val key = "$uid/$version"
@@ -239,7 +239,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         return bytes
     }
 
-    /** Сохраняет онбординг; при успехе профиль помечается заполненным и App закрывает экран. */
+    /** Saves onboarding; on success the profile is marked as filled and App closes the screen. */
     suspend fun saveOnboarding(
         username: String,
         avatar: AvatarUpdate,
@@ -250,7 +250,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         val current = (_state.value as? AuthState.SignedIn)?.profile?.avatar
         val path = "${user.id}/avatar.jpg"
 
-        // Новая метка версии нужна, чтобы устройства не показывали старое фото из кэша
+        // A new version tag is needed so that devices do not show the old photo from the cache
         val marker: String? = when (avatar) {
             is AvatarUpdate.Keep -> current
             is AvatarUpdate.Remove -> null
@@ -268,7 +268,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         }
 
         val list = services.toList()
-        // Профиль в `account` создаётся только здесь, на сервере, по нажатию «Готово»
+        // The profile in `account` is created only here, on the server, when "Done" is pressed
         client.postgrest.rpc(
             "complete_onboarding",
             Json.encodeToJsonElement(
@@ -284,18 +284,18 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         cacheUsername(username)
     }
 
-    /** Открывает браузер; результат вернётся через диплинк (Android) или локальный сервер (Desktop). */
+    /** Opens the browser; the result comes back via a deep link (Android) or a local server (Desktop). */
     suspend fun signInWithGoogle(): Result<Unit> = safe { client.auth.signInWith(Google) }
 
-    /** Шаг 1 сброса пароля по коду: отправляет на почту письмо с кодом (без ссылки-редиректа). */
+    /** Step 1 of the code password reset: sends an email with a code to the address (without a redirect link). */
     suspend fun sendResetCode(email: String): Result<Unit> = safe {
         client.auth.resetPasswordForEmail(email.trim())
     }
 
     /**
-     * Шаг 2: проверяет код из письма и сразу задаёт новый пароль.
-     * После проверки кода Supabase создаёт сессию, поэтому пароль меняется в том же вызове,
-     * а пользователь после успеха оказывается вошедшим.
+     * Step 2: checks the code from the email and sets the new password right away.
+     * After the code is verified Supabase creates a session, so the password is changed in the same call,
+     * and after success the user ends up signed in.
      */
     suspend fun resetPasswordWithCode(email: String, code: String, newPassword: String): Result<Unit> = safe {
         client.auth.verifyEmailOtp(
@@ -306,7 +306,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         client.auth.updateUser { password = newPassword }
     }
 
-    /** Смена пароля из настроек для уже вошедшего пользователя. */
+    /** Password change from settings for an already signed-in user. */
     suspend fun changePassword(newPassword: String): Result<Unit> = safe {
         client.auth.updateUser { password = newPassword }
     }

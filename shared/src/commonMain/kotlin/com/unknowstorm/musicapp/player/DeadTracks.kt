@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 
-/** Треки, файлы которых сервис не отдаёт (404/410). Живёт до закрытия приложения. */
+/** Tracks whose files the service does not serve (404/410). Lives until the app is closed. */
 object DeadTracks {
     private var keys by mutableStateOf<Set<String>>(emptySet())
 

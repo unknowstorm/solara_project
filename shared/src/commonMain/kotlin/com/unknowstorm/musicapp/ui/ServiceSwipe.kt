@@ -26,10 +26,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Горизонтальный свайп по свободному месту листает чипы сервисов, как панель: ♡ Любимые (если hasLikes),
- * затем сервисы слева направо. Жесты, которые забрали карусели и списки, сюда не доходят.
- * Содержимое едет за пальцем; после отпускания уезжает, чип меняется, новое содержимое въезжает пружиной.
- * Spotify и «скоро» в порядок не входят (вход через «+»).
+ * A horizontal swipe on free space flips the service chips like the bar: ♡ Favorites (if hasLikes),
+ * then the services left to right. Gestures taken by carousels and lists do not reach here.
+ * The content follows the finger; after release it slides away, the chip changes, the new content slides in on a spring.
+ * Spotify and "soon" are not part of the order (entry is via "+").
  */
 @Composable
 fun Modifier.serviceSwipe(
@@ -53,7 +53,7 @@ fun Modifier.serviceSwipe(
     var width by remember { mutableFloatStateOf(1f) }
     var job by remember { mutableStateOf<Job?>(null) }
 
-    // direction: -1 = палец ведут влево (следующий чип), 1 = вправо (предыдущий). null = за краем списка
+    // direction: -1 = finger moves left (next chip), 1 = right (previous chip). null = past the edge of the list
     fun targetFor(direction: Int): Int? {
         val idx = if (likes) -1 else order.indexOf(cur)
         if (!likes && idx < 0) return null
@@ -78,9 +78,9 @@ fun Modifier.serviceSwipe(
         val out = if (direction < 0) -width else width
         job?.cancel()
         job = scope.launch {
-            // старый экран быстро уезжает за край
+            // the old screen quickly slides off the edge
             animate(offsetPx, out, velocity, tween(150, easing = FastOutLinearInEasing)) { v, _ -> offsetPx = v }
-            // чип меняется и новый экран появляется с противоположной стороны в том же кадре
+            // the chip changes and the new screen appears from the opposite side in the same frame
             if (target == -1) openLikes() else select(order[target])
             offsetPx = -out
             animate(-out, 0f, 0f, slideSpring()) { v, _ -> offsetPx = v }
@@ -121,7 +121,7 @@ fun Modifier.serviceSwipe(
                         change.consume()
                         total += dx
                         tracker.addPosition(change.uptimeMillis, Offset(total, 0f))
-                        // за краем списка экран тянется с сопротивлением
+                        // past the edge of the list the screen is pulled with resistance
                         offsetPx = if (targetFor(if (total < 0f) -1 else 1) != null) total else total * 0.25f
                     }
                 },

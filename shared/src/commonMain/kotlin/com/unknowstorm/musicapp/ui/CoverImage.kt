@@ -28,17 +28,17 @@ import com.unknowstorm.musicapp.resources.logo
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 
-/** Сколько раз повторять загрузку картинки после ошибки (например, пропал интернет). */
+/** How many times to retry loading the image after an error (e.g. the internet disappeared). */
 private const val MAX_RETRIES = 10
 
-/** Пауза перед повтором: 1.5 с, 3 с, 4.5 с, потом по 6 с (всего около минуты). */
+/** Pause before a retry: 1.5 s, 3 s, 4.5 s, then 6 s each (about a minute in total). */
 private fun retryDelayMs(attempt: Int): Long = (1_500L * (attempt + 1)).coerceAtMost(6_000L)
 
 /**
- * Картинка с автоматическим повтором после ошибки.
- * [placeholder] показывается только во время первой загрузки (обычно null: нейтральный фон).
- * [error] показывается, когда адреса нет или загрузка не удалась; при повторах он же стоит
- * вместо заглушки, чтобы картинка не мигала между попытками.
+ * An image with automatic retry after an error.
+ * [placeholder] is shown only during the first load (usually null: a neutral background).
+ * [error] is shown when there is no address or the load failed; during retries it stands
+ * instead of a stub so the image does not blink between attempts.
  */
 @Composable
 fun RetryAsyncImage(
@@ -64,7 +64,7 @@ fun RetryAsyncImage(
         ImageRequest.Builder(context).data(url).crossfade(true).build()
     }
 
-    // key(attempt) пересоздаёт загрузчик, то есть запрос уходит заново
+    // key(attempt) recreates the loader, i.e. the request goes out again
     key(attempt) {
         AsyncImage(
             model = request,
@@ -80,7 +80,7 @@ fun RetryAsyncImage(
     }
 }
 
-/** Обложка трека. Лого показывается, только если обложки нет или она не загрузилась. */
+/** A track cover. The logo is shown only if there is no cover or it failed to load. */
 @Composable
 fun CoverImage(
     url: String?,

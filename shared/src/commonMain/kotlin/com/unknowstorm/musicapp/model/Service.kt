@@ -2,12 +2,12 @@ package com.unknowstorm.musicapp.model
 
 import com.unknowstorm.musicapp.i18n.S
 
-/** Как источник играет музыку. */
+/** How a source plays music. */
 enum class PlaybackKind {
-    IN_APP,     // звук идёт в наш плеер
-    REMOTE,     // пульт к чужому приложению (Spotify)
-    EMBEDDED,   // встроенный видимый плеер (YouTube)
-    PREVIEW,    // только 30-секундные превью (Deezer)
+    IN_APP,     // sound goes into our player
+    REMOTE,     // remote control for another app (Spotify)
+    EMBEDDED,   // embedded visible player (YouTube)
+    PREVIEW,    // 30-second previews only (Deezer)
 }
 
 enum class Service(
@@ -23,10 +23,10 @@ enum class Service(
     YOUTUBE({ "YouTube" }, PlaybackKind.EMBEDDED, true, { S.videoInTheBuiltIn }),
     DEEZER({ "Deezer" }, PlaybackKind.PREVIEW, true, { S.catalogAnd30SecondPreviews });
 
-    /** Название и описание берутся при каждом чтении, поэтому меняются вместе с языком. */
+    /** Name and description are read on every access, so they change together with the language. */
     val title: String get() = titleFn()
     val note: String get() = noteFn()
 }
 
-/** Источник трека как значок/чип интерфейса. */
+/** The source of a track as an icon/chip of the UI. */
 fun ProviderId.toService(): Service? = Service.entries.firstOrNull { it.name == name }

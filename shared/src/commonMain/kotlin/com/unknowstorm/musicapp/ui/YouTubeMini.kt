@@ -91,31 +91,31 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-// Минимум по правилам YouTube (Required Minimum Functionality): окно плеера не меньше 200x200
+// Minimum per YouTube rules (Required Minimum Functionality): the player window is not smaller than 200x200
 private val MINI_SIZE = 200.dp
 private val STRIP_HEIGHT = 36.dp
 private val EDGE = 8.dp
-private val MINI_CORNER = 12.dp // подберите под скругление мини-плеера аудио
-private val HEADER_ESTIMATE = 56.dp // высота шапки экрана YouTube, пока реальное место плеера неизвестно
-private val FLICK_VELOCITY = 400.dp // скорость рывка в dp/с (раньше 1200: приходилось дёргать слишком резко)
-private val FULL_SIDE_MARGIN = 24.dp // поля большого экрана
-private val FULL_VIDEO_TOP = 72.dp // отступ видео от верха (под статус-баром)
-private val MINI_BOTTOM_RESERVE = 80.dp // отступ мини-окна от низа: над нижней панелью навигации
+private val MINI_CORNER = 12.dp // adjust to the corner radius of the audio mini player
+private val HEADER_ESTIMATE = 56.dp // height of the YouTube screen header while the real player place is unknown
+private val FLICK_VELOCITY = 400.dp // flick speed in dp/s (was 1200: you had to flick too sharply)
+private val FULL_SIDE_MARGIN = 24.dp // margins of the big screen
+private val FULL_VIDEO_TOP = 72.dp // video offset from the top (under the status bar)
+private val MINI_BOTTOM_RESERVE = 80.dp // mini window offset from the bottom: above the bottom navigation bar
 private val FULL_HANDLE_AREA = 28.dp
-private val FULL_INFO_HEIGHT = 120.dp // название + канал (+ ошибка), фиксированная высота
-private val FULL_LINKS_HEIGHT = 56.dp // ряд ссылок под информацией
-private val FULL_TIMELINE_HEIGHT = 64.dp // таймлайн + время
-private val FULL_CONTROLS_HEIGHT = 126.dp // 16 сверху + кнопка 86 + 24 снизу
+private val FULL_INFO_HEIGHT = 120.dp // title + channel (+ error), fixed height
+private val FULL_LINKS_HEIGHT = 56.dp // the row of links under the info
+private val FULL_TIMELINE_HEIGHT = 64.dp // timeline + time
+private val FULL_CONTROLS_HEIGHT = 126.dp // 16 at the top + the 86 button + 24 at the bottom
 private val FULL_BLOCK_GAP = 20.dp
-private val YT_TRAVEL_CAP = 200.dp // путь пальца, за который окно полностью разворачивается (было почти пол-экрана)
-private val RAIL_SIZE = 112.dp // боковая (или нижняя) панель кнопок в полноэкранном режиме
+private val YT_TRAVEL_CAP = 200.dp // the finger path over which the window fully expands (it used to be almost half the screen)
+private val RAIL_SIZE = 112.dp // the side (or bottom) button panel in fullscreen mode
 
 /**
- * Текущее видео YouTube на уровне всего приложения.
+ * The current YouTube video at the level of the whole app.
  *
- * progress: 0 = мини-окно, 1 = видео развёрнуто на экране YouTube. Им управляет палец (dragBy),
- * а после отпускания его довершает пружина (settle), как у ExpandablePlayer.
- * docked: куда движемся (true = развернуть). queue: список для кнопок «предыдущее/следующее».
+ * progress: 0 = mini window, 1 = the video is expanded on the YouTube screen. It is driven by the finger (dragBy),
+ * and after release a spring finishes it (settle), as in ExpandablePlayer.
+ * docked: where we are heading (true = expand). queue: the list for the "previous/next" buttons.
  */
 class YouTubeSession(private val scope: CoroutineScope) {
     var video by mutableStateOf<YouTubeVideo?>(null)
@@ -123,23 +123,23 @@ class YouTubeSession(private val scope: CoroutineScope) {
     var queue by mutableStateOf<List<YouTubeVideo>>(emptyList())
         private set
     var docked by mutableStateOf(false)
-    /** Последнее известное место большого плеера в координатах окна (его сообщает экран YouTube). */
+    /** The last known place of the big player in window coordinates (reported by the YouTube screen). */
     var dockBounds by mutableStateOf<Rect?>(null)
-    /** Область экрана YouTube в координатах окна: до неё растёт контейнер. Её сообщает YouTubeHome. */
+    /** The YouTube screen area in window coordinates: the container grows up to it. Reported by YouTubeHome. */
     var screenBounds by mutableStateOf<Rect?>(null)
     var errorCode by mutableStateOf<Int?>(null)
-    /** Полноэкранный режим: видео на всё окно, кнопки рядом с ним (не поверх). */
+    /** Fullscreen mode: the video takes the whole window, the buttons are next to it (not over it). */
     var fullscreen by mutableStateOf(false)
-    /** Состояние плеера по IFrame API: 1 играет, 2 пауза, 3 буферизация, 0 конец, -1 нет данных. */
+    /** Player state from the IFrame API: 1 playing, 2 paused, 3 buffering, 0 ended, -1 no data. */
     var playerState by mutableStateOf(-1)
-    /** Позиция и длительность текущего видео в секундах (0 у прямых трансляций). */
+    /** Position and duration of the current video in seconds (0 for live streams). */
     var positionSec by mutableStateOf(0.0)
     var durationSec by mutableStateOf(0.0)
 
     var progress by mutableFloatStateOf(0f)
         private set
 
-    /** Путь пальца, за который progress проходит от 0 до 1. Обновляет оверлей. */
+    /** The finger path over which progress goes from 0 to 1. Updated by the overlay. */
     var travelPx = 800f
     var flickPx = 2500f
 
@@ -152,7 +152,7 @@ class YouTubeSession(private val scope: CoroutineScope) {
     val hasPrev: Boolean get() = currentIndex() > 0
     val hasNext: Boolean get() = currentIndex().let { it >= 0 && it < queue.size - 1 }
 
-    /** Видео из списка всегда стартует в мини-окне. То же видео, уже играющее в окне, разворачивается. */
+    /** A video from the list always starts in the mini window. The same video already playing in the window is expanded. */
     fun open(v: YouTubeVideo, list: List<YouTubeVideo> = listOf(v)) {
         val same = video?.id == v.id
         if (!same) errorCode = null
@@ -161,7 +161,7 @@ class YouTubeSession(private val scope: CoroutineScope) {
         docked = same
     }
 
-    /** Только по тапу пользователя. Автоматического перехода в конце ролика нет (правила YouTube). */
+    /** Only on a user tap. There is no automatic transition at the end of a clip (YouTube rules). */
     fun next() {
         val i = currentIndex()
         if (i >= 0 && i < queue.size - 1) {
@@ -212,7 +212,7 @@ class YouTubeSession(private val scope: CoroutineScope) {
         }
     }
 
-    /** Смена docked без жеста (кнопки, «назад», уход с экрана): просто едем к цели. */
+    /** A docked change without a gesture (buttons, "back", leaving the screen): just move to the target. */
     fun syncTo(expanded: Boolean) {
         val target = if (expanded) 1f else 0f
         if (dragging || video == null) return
@@ -225,12 +225,12 @@ class YouTubeSession(private val scope: CoroutineScope) {
         settleTarget = -1f
     }
 
-    /** dy > 0: палец вниз (сворачиваем), dy < 0: вверх (разворачиваем). */
+    /** dy > 0: finger down (collapsing), dy < 0: up (expanding). */
     fun dragBy(dy: Float) {
         progress = (progress - dy / travelPx).coerceIn(0f, 1f)
     }
 
-    /** Возвращает true, если решено развернуть. Дальше пружина довершает движение. */
+    /** Returns true if it was decided to expand. A spring then finishes the movement. */
     fun endDrag(velocityY: Float): Boolean {
         dragging = false
         if (video == null) return false
@@ -246,12 +246,12 @@ class YouTubeSession(private val scope: CoroutineScope) {
 }
 
 /**
- * Единственный плеер YouTube в приложении. Он всегда рисуется здесь, в одном и том же месте
- * дерева, поэтому при сворачивании видео не перезапускается.
+ * The only YouTube player in the app. It is always drawn here, in the same place of
+ * the tree, so the video does not restart when collapsing.
  *
- * Как у ExpandablePlayer: один контейнер растёт от мини-окна до экрана YouTube (progress 0..1),
- * цвет и скругления перетекают, видео едет внутри него, а название, таймлайн и кнопки открываются
- * внутри контейнера. Размер и положение считаются в layout-фазе, без рекомпозиции на каждый кадр.
+ * Like ExpandablePlayer: one container grows from the mini window to the YouTube screen (progress 0..1),
+ * the color and corners flow, the video moves inside it, and the title, timeline and buttons open
+ * inside the container. Size and position are computed in the layout phase, without recomposition on every frame.
  */
 @Composable
 fun YouTubeOverlay(
@@ -267,7 +267,7 @@ fun YouTubeOverlay(
     val openLink = rememberExternalLinkOpener()
 
     LaunchedEffect(session.docked) { session.syncTo(session.docked) }
-    // Полный экран: прячем системные панели и (на Android) поворачиваем в альбом. «Назад» сначала выходит из него.
+    // Fullscreen: hide the system bars and (on Android) rotate to landscape. "Back" exits it first.
     FullscreenWindowEffect(session.fullscreen)
     PlatformBackHandler(enabled = session.fullscreen, onBack = { session.fullscreen = false })
     DisposableEffect(session) {
@@ -313,10 +313,10 @@ fun YouTubeOverlay(
     val roomPx = with(density) { 8.dp.toPx() }
     val travelCapPx = with(density) { YT_TRAVEL_CAP.toPx() }
 
-    // Куда растёт контейнер: область экрана YouTube (её сообщает YouTubeHome), а пока её не знаем, весь контейнер.
-    // В полноэкранном режиме контейнер занимает всё окно, в том числе поверх нижней панели.
+    // Where the container grows to: the YouTube screen area (reported by YouTubeHome), and while it is unknown, the whole container.
+    // In fullscreen mode the container takes the whole window, including over the bottom bar.
     val rootRect = Rect(0f, 0f, containerSize.width.toFloat(), containerSize.height.toFloat())
-    // Нижняя панель при большом плеере прячется: контейнер растёт до низа окна.
+    // The bottom bar hides with the big player: the container grows to the bottom of the window.
     val full: Rect = if (fullscreen) rootRect else (
         session.screenBounds?.translate(-containerOrigin)
             ?.let { Rect(it.left, it.top, it.right, rootRect.bottom) } ?: rootRect
@@ -324,22 +324,22 @@ fun YouTubeOverlay(
     val topPadPx = (topInset - full.top).coerceAtLeast(0f)
     val landscape = full.width >= full.height
 
-    // Место видео внутри большого контейнера (в его координатах)
+    // The video place inside the big container (in its coordinates)
     val lay: YtLayout = when {
-        // Полный экран в альбоме: видео по центру, справа панель кнопок
+        // Fullscreen in landscape: the video in the center, the button panel on the right
         fullscreen && landscape -> {
             val availW = (full.width - leftInsetPx - rightInsetPx - railPx).coerceAtLeast(1f)
             val availH = full.height
             val w = min(availW, availH * 16f / 9f)
             YtLayout(leftInsetPx + (availW - w) / 2f, (availH - w * 9f / 16f) / 2f, w, w * 9f / 16f)
         }
-        // Полный экран в портрете (например, окно на ПК): видео сверху, панель кнопок снизу
+        // Fullscreen in portrait (e.g. a window on a PC): the video on top, the button panel at the bottom
         fullscreen -> {
             val availH = (full.height - railPx - topPadPx - bottomInsetPx).coerceAtLeast(1f)
             val w = min(full.width, availH * 16f / 9f)
             YtLayout((full.width - w) / 2f, topPadPx + (availH - w * 9f / 16f) / 2f, w, w * 9f / 16f)
         }
-        // Альбом: видео слева, название, таймлайн и кнопки справа
+        // Landscape: the video on the left, the title, timeline and buttons on the right
         landscape -> {
             val areaTop = topPadPx + roomPx
             val areaH = (full.height - areaTop - roomPx * 2f - bottomInsetPx).coerceAtLeast(1f)
@@ -353,7 +353,7 @@ fun YouTubeOverlay(
                 panelRight = full.width - rightInsetPx - sidePx,
             )
         }
-        // Портрет: блок «видео + информация + ссылки» по центру свободной области между ручкой и таймлайном
+        // Portrait: the "video + info + links" block in the center of the free area between the handle and the timeline
         else -> {
             val w = (full.width - sidePx * 2f).coerceAtLeast(1f)
             val h = w * 9f / 16f
@@ -379,7 +379,7 @@ fun YouTubeOverlay(
     val pos = clamp(floatPos ?: Offset(maxX, maxY - reservePx))
 
     SideEffect {
-        // Короткий путь пальца: окно разворачивается, как основной плеер, а не только у самого верха экрана
+        // A short finger path: the window expands like the main player, not only near the very top of the screen
         session.travelPx = min(abs(full.top - pos.y), travelCapPx).coerceAtLeast(1f)
         session.flickPx = with(density) { FLICK_VELOCITY.toPx() }
     }
@@ -409,14 +409,14 @@ fun YouTubeOverlay(
             val p = session.progress
             shadowElevation = lerp(shadowPx, 0f, p)
             val r = lerp(cornerPx, 0f, p)
-            // нижние углы не скругляем: там край самого плеера
+            // the bottom corners are not rounded: that is the edge of the player itself
             shape = RoundedCornerShape(topStart = r, topEnd = r, bottomEnd = 0f, bottomStart = 0f)
             clip = true
         }
-        // цвет: surfaceVariant -> surface, как у контейнера основного плеера
+        // color: surfaceVariant -> surface, like the main player's container
         .drawBehind { drawRect(lerpColor(miniColor, fullColor, session.progress)) }
 
-    // Жест на плашке: вверх тянет окно к большому видео (за пальцем), в стороны и вниз двигает окно
+    // The gesture on the strip: up pulls the window toward the big video (following the finger), sideways and down move the window
     val onBegin: (Boolean) -> Unit = { expand ->
         if (expand) {
             session.beginDrag()
@@ -451,7 +451,7 @@ fun YouTubeOverlay(
     }
 
     Box(outer) {
-        // Нижний слой: название, ссылки, таймлайн и кнопки большого экрана. Раскрываются вместе с контейнером.
+        // The lower layer: the title, links, timeline and buttons of the big screen. They open together with the container.
         if (fullVisible) {
             YouTubeFullContent(
                 session = session,
@@ -471,7 +471,7 @@ fun YouTubeOverlay(
         }
 
         if (stripVisible) {
-            // Плашка схлопывается по высоте и гаснет по мере разворачивания
+            // The strip collapses in height and fades as it expands
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -496,7 +496,7 @@ fun YouTubeOverlay(
             }
         }
 
-        // Видео: едет внутри контейнера из мини-окна на своё место в большом экране. Ничем не перекрыто.
+        // The video: moves inside the container from the mini window to its place on the big screen. Nothing covers it.
         Box(
             Modifier
                 .offset {
@@ -516,8 +516,8 @@ fun YouTubeOverlay(
                 .clipToBounds()
                 .background(Color.Black),
         ) {
-            // Пока окно в движении, плеер держит большой размер и только масштабируется:
-            // перестраивать страницу плеера на каждом кадре дорого
+            // While the window is moving, the player keeps the big size and only scales:
+            // rebuilding the player page on every frame is expensive
             YouTubePlayerView(
                 videoId = video.id,
                 modifier = Modifier
@@ -550,7 +550,7 @@ fun YouTubeOverlay(
     }
 }
 
-/** Положение видео (и, в альбоме, правой панели) внутри большого контейнера, в пикселях. */
+/** The position of the video (and, in landscape, of the right panel) inside the big container, in pixels. */
 private class YtLayout(
     val left: Float,
     val top: Float,
@@ -561,12 +561,12 @@ private class YtLayout(
 )
 
 /**
- * Содержимое большого экрана (FULL-CONTENT-V3). Три раскладки:
- *  - портрет: видео сверху, под ним название, ссылки, пояснение, таймлайн и кнопки;
- *  - альбом: видео слева, справа название, ссылки, таймлайн и кнопки;
- *  - полный экран: видео по центру, кнопки в боковой (или нижней) панели рядом с ним, не поверх.
- * Рисуется внутри растущего контейнера в полный размер и обрезается им; видео сюда не входит.
- * Плеер без родной панели (controls=0): таймлайн и play/pause у нас, команды идут через IFrame API.
+ * The content of the big screen (FULL-CONTENT-V3). Three layouts:
+ *  - portrait: the video on top, under it the title, links, a note, the timeline and buttons;
+ *  - landscape: the video on the left, on the right the title, links, timeline and buttons;
+ *  - fullscreen: the video in the center, the buttons in a side (or bottom) panel next to it, not over it.
+ * Drawn inside the growing container at full size and clipped by it; the video is not part of this.
+ * A player without its native panel (controls=0): the timeline and play/pause are ours, commands go through the IFrame API.
  */
 @Composable
 private fun YouTubeFullContent(
@@ -592,11 +592,11 @@ private fun YouTubeFullContent(
             Modifier
                 .wrapContentSize(Alignment.TopStart, unbounded = true)
                 .size(width = width, height = height)
-                // содержимое проявляется во второй половине разворачивания
+                // the content fades in during the second half of the expansion
                 .graphicsLayer { alpha = ((session.progress - 0.3f) / 0.5f).coerceIn(0f, 1f) }
-                // не пускаем нажатия сквозь контейнер в ленту под ним
+                // do not let taps through the container into the feed under it
                 .clickable(interactionSource = blocker, indication = null) {}
-                // Свайп вниз сворачивает видео за пальцем (в полном экране выходим кнопкой). Плеер лежит выше и жестов не получает.
+                // A swipe down collapses the video following the finger (in fullscreen we exit with the button). The player lies above and gets no gestures.
                 .then(
                     if (fullscreen) {
                         Modifier
@@ -665,7 +665,7 @@ private fun YouTubeFullContent(
                 }
 
                 else -> {
-                    // Ручка: показывает, что экран сворачивается, и сворачивает по тапу
+                    // The handle: shows that the screen collapses, and collapses it on tap
                     Box(
                         Modifier
                             .align(Alignment.TopCenter)
@@ -690,7 +690,7 @@ private fun YouTubeFullContent(
                             .padding(horizontal = FULL_SIDE_MARGIN)
                             .padding(bottom = 24.dp + bottomInset),
                     ) {
-                        // Здесь сверху лежит видео (его рисует сам оверлей)
+                        // Here at the top lies the video (it is drawn by the overlay itself)
                         Spacer(Modifier.height(belowVideoStart))
 
                         Column(Modifier.fillMaxWidth().height(FULL_INFO_HEIGHT)) {
@@ -699,7 +699,7 @@ private fun YouTubeFullContent(
 
                         YtLinksRow(session, video, openLink, rowHeight = FULL_LINKS_HEIGHT, showMinimize = false)
 
-                        // Свободное место: пояснение. Если места мало, оно просто обрезается и ничего не сдвигает.
+                        // Free space: the note. If there is little space, it is simply cut off and shifts nothing.
                         Box(Modifier.weight(1f).fillMaxWidth()) {
                             Text(
                                 S.theVideoPlaysWhileIt +

@@ -41,9 +41,9 @@ private const val CODE_LENGTH = 8
 private const val MIN_PASSWORD = 6
 
 /**
- * Сброс пароля по коду из письма: сначала почта, затем код + новый пароль.
- * Когда пароль сохранён, пользователь автоматически оказывается вошедшим,
- * App видит это и закрывает экран входа, поэтому [onClose] после успеха вызывать не нужно.
+ * Password reset with a code from the email: first the email, then the code + new password.
+ * When the password is saved the user automatically ends up signed in,
+ * App sees this and closes the sign-in screen, so [onClose] does not need to be called after success.
  */
 @Composable
 fun ResetPasswordScreen(

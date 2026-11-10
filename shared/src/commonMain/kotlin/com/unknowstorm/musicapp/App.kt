@@ -52,12 +52,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-// Сколько показываем вращение заставки, когда приложение готово: минимум и потолок (например, нет сети).
-// Время считается уже после входа логотипа и первой сборки интерфейса.
+// How long the splash spinning is shown once the app is ready: minimum and ceiling (e.g. no network).
+// The time is counted after the logo has entered and the first UI composition.
 private const val SPLASH_MIN_MS = 450L
 private const val SPLASH_MAX_MS = 1000L
 
-/** Всё тяжёлое, что создаётся в фоне, пока главный поток рисует заставку. */
+/** Everything heavy that is created in the background while the main thread draws the splash. */
 private class AppBoot(
     val providers: List<MusicProvider>,
     val authRepo: AuthRepository,
@@ -67,15 +67,15 @@ private class AppBoot(
 fun App() {
     SolaraTheme {
         Surface(Modifier.fillMaxSize()) {
-            // Язык интерфейса: сохранённый выбор, иначе язык системы (по умолчанию английский)
+            // UI language: the saved choice, otherwise the system language (English by default)
             val languageStore = rememberTextStore()
-            // Язык выставляем синхронно, до первой композиции экранов: иначе значения,
-            // вычисляемые один раз, запомнят английский
+            // The language is set synchronously, before the first composition of the screens: otherwise values
+            // computed once would remember the default language
             remember(languageStore) {
                 I18n.language = AppLanguage.fromCode(languageStore.get(LANGUAGE_KEY)) ?: AppLanguage.system()
                 Unit
             }
-            // HTTP-клиенты, Supabase и провайдеры создаём в фоновом потоке: главный в это время свободен для анимации
+            // HTTP clients, Supabase and providers are created on a background thread: the main one is free for animation meanwhile
             val boot by produceState<AppBoot?>(initialValue = null) {
                 value = withContext(Dispatchers.Default) {
                     AppBoot(
@@ -93,8 +93,8 @@ fun App() {
             var leaving by remember { mutableStateOf(false) }
             var splashDone by remember { mutableStateOf(false) }
 
-            // Тяжёлую первую сборку интерфейса запускаем, когда готов фон и логотип уже вошёл:
-            // подвисание (если оно будет) приходится на неподвижную заставку, а не на вращение.
+            // The heavy first UI composition is started when the background is ready and the logo has already entered:
+            // a stall (if any) falls on the still splash, not on the spinning
             val ready = if (entered) boot else null
 
             Box(Modifier.fillMaxSize()) {
@@ -102,7 +102,7 @@ fun App() {
                     AppContent(ready)
 
                     val authState by ready.authRepo.state.collectAsState()
-                    // Вход «готов», когда понятно, гость это или вошедший пользователь с загруженным профилем
+                    // Sign-in is "ready" when it is clear whether this is a guest or a signed-in user with a loaded profile
                     val authSettled = when (val s = authState) {
                         AuthState.Loading -> false
                         is AuthState.SignedIn -> s.profile != null
@@ -110,7 +110,7 @@ fun App() {
                     }
                     val settled by rememberUpdatedState(authSettled)
                     LaunchedEffect(Unit) {
-                        // два кадра: тяжёлый первый кадр интерфейса уже нарисован, вращение стартует с чистого листа
+                        // two frames: the heavy first UI frame is already drawn, the spinning starts from a clean slate
                         withFrameNanos { }
                         withFrameNanos { }
                         spinning = true
@@ -141,7 +141,7 @@ private fun AppContent(boot: AppBoot) {
     val audio = rememberAudioBackend()
     val likes = remember { LikesRepository(authRepo) }
     val playlists = remember { PlaylistsRepository(authRepo) }
-    // История слушается сама: пишет трек в облако после 30 секунд воспроизведения
+    // History listens by itself: writes the track to the cloud after 30 seconds of playback
     val history = remember(audio) { HistoryRepository(authRepo, audio) }
     val authState by authRepo.state.collectAsState()
     val pending by authRepo.pending.collectAsState()
@@ -151,9 +151,9 @@ private fun AppContent(boot: AppBoot) {
     val spotify = LocalSpotifyRemote.current
     val spotifyMini = remember { SpotifyMiniState() }
     val focusManager = LocalFocusManager.current
-    // Снимаем фокус с поля поиска, иначе его «капля» остаётся поверх плеера
+    // Clear focus from the search field, otherwise its "drop" stays on top of the player
     LaunchedEffect(showPlayer) { if (showPlayer) focusManager.clearFocus() }
-    // Вошли (в том числе через Google после возврата из браузера): закрываем экран входа
+    // Signed in (including via Google after returning from the browser): close the sign-in screen
     LaunchedEffect(authState) {
         if (authState is AuthState.SignedIn) showAuth = false
     }
@@ -172,29 +172,29 @@ private fun AppContent(boot: AppBoot) {
                 onOpenPlayer = { showPlayer = true },
                 onOpenAuth = { showAuth = true },
             )
-            // Мини-плеер и полный плеер — один компонент: плавно перетекает из одного в другой
+            // Mini player and full player are one component: it flows smoothly from one into the other
             ExpandablePlayer(
                 audio = audio,
                 likes = likes,
                 expanded = showPlayer,
                 onExpandedChange = { showPlayer = it },
-                // Гость нажал ♡: сворачиваем плеер и открываем вход
+                // A guest tapped ♡: collapse the player and open sign-in
                 onNeedAuth = {
                     showPlayer = false
                     showAuth = true
                 },
             )
-            // Мини-плеер Spotify: отдельный компонент, не связан с нашим AudioBackend-плеером
+            // Spotify mini player: a separate component, not connected to our AudioBackend player
             if (spotify != null) {
                 SpotifyExpandablePlayer(remote = spotify, audio = audio)
             }
-            // Экран входа и регистрации поверх всего
+            // Sign-in and registration screen on top of everything
             if (showAuth) {
                 PlatformBackHandler(enabled = true, onBack = { showAuth = false })
                 AuthScreen(repo = authRepo, onClose = { showAuth = false })
             }
-            // После регистрации: «Ожидаем подтверждение письма».
-            // Закрывается сам, когда письмо подтверждено и пользователь вошёл.
+            // After registration: "Waiting for email confirmation".
+            // Closes by itself when the email is confirmed and the user is signed in.
             pending?.let { p ->
                 AwaitEmailScreen(
                     repo = authRepo,
@@ -202,8 +202,8 @@ private fun AppContent(boot: AppBoot) {
                     onBack = { authRepo.cancelPending() },
                 )
             }
-            // Первый вход: ник, аватарка, сервисы, синхронизация палитры.
-            // Закрывается сам, когда профиль сохранён (onboarded = true).
+            // First sign-in: nickname, avatar, services, palette sync.
+            // Closes by itself when the profile is saved (onboarded = true).
             val signedIn = authState as? AuthState.SignedIn
             val profile = signedIn?.profile
             if (profile != null && !profile.onboarded) {

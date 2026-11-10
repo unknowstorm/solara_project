@@ -27,7 +27,7 @@ data class PlaybackState(
     val currentIndex: Int = -1,
 )
 
-/** Строка очереди воспроизведения. */
+/** A row of the playback queue. */
 data class QueueItem(
     val mediaId: String,
     val title: String,
@@ -38,25 +38,25 @@ data class QueueItem(
 
 private val EmptyQueue: StateFlow<List<QueueItem>> = MutableStateFlow(emptyList<QueueItem>()).asStateFlow()
 
-/** Воспроизведение звука. На каждой платформе своя реализация. */
+/** Sound playback. Each platform has its own implementation. */
 interface AudioBackend {
     val state: StateFlow<PlaybackState>
 
-    /** Ставит список в очередь и начинает с трека под номером startIndex. */
+    /** Puts the list into the queue and starts from the track at startIndex. */
     fun playQueue(tracks: List<Track>, startIndex: Int)
     fun pause()
     fun resume()
     fun next()
     fun previous()
     fun seekTo(positionMs: Long)
-    /** Останавливает воспроизведение и очищает очередь (кнопка ✕). */
+    /** Stops playback and clears the queue (the ✕ button). */
     fun stop()
-    /** Без повтора, затем весь список, затем один трек. */
+    /** No repeat, then the whole list, then a single track. */
     fun cycleRepeat()
     fun toggleShuffle()
     fun release()
 
-    /** Очередь. Платформы без поддержки очереди могут не переопределять. */
+    /** The queue. Platforms without queue support may leave it unimplemented. */
     val queue: StateFlow<List<QueueItem>> get() = EmptyQueue
     fun playAt(index: Int) {}
     fun removeAt(index: Int) {}

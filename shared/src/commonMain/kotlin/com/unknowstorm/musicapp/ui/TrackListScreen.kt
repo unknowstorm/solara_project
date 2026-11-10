@@ -64,7 +64,7 @@ fun TrackListScreen(
     var pagerPos by remember {
         mutableFloatStateOf(pagerOrder(likes != null).indexOf(if (likesSelected) null else selected).coerceAtLeast(0).toFloat())
     }
-    // Результаты по страницам пейджера: соседние источники грузятся заранее
+    // Results by pager pages: neighboring sources are loaded in advance
     val cache = remember(providers) { mutableStateMapOf<Service, Map<ProviderId, SourceResult>>() }
     val loadingFor = remember(providers) { mutableStateMapOf<Service, Boolean>() }
     val loadedFor = remember(providers) { mutableMapOf<Service, Pair<String, Int>>() }
@@ -93,7 +93,7 @@ fun TrackListScreen(
                     val fresh = mutableMapOf<ProviderId, SourceResult>()
                     try {
                         val sourceId = ProviderId.entries.firstOrNull { it.name == svc.name }
-                        // «Все» ищет только там, где играют полные треки; превью Deezer живут на своём чипе
+                        // "All" searches only where full tracks are played; Deezer previews live on their own chip
                         val sources = sourceId?.let { setOf(it) }
                             ?: providers.filter { p ->
                                 Service.entries.firstOrNull { it.name == p.id.name }?.kind == PlaybackKind.IN_APP
@@ -113,7 +113,7 @@ fun TrackListScreen(
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         if (selected == Service.SPOTIFY) {
-            // Правила Spotify: его бренд не соседствует с брендами других сервисов
+            // Spotify rules: its brand does not stand next to the brands of other services
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -151,7 +151,7 @@ fun TrackListScreen(
         }
 
         if (selected == Service.SPOTIFY) {
-            // Выдача Spotify отдельная: с другими источниками не смешивается
+            // Spotify results are separate: they are not mixed with other sources
             SpotifySearchPane(
                 remote = com.unknowstorm.musicapp.spotify.LocalSpotifyRemote.current,
                 onBeforePlay = { audio.stop(); session?.close() },
@@ -174,7 +174,7 @@ fun TrackListScreen(
                         LikesSearchPane(likes, providers, audio, query, Modifier.fillMaxSize())
                     }
                     svc == Service.YOUTUBE && session != null -> {
-                        // Выдача YouTube отдельная: правила запрещают смешивать её с другими источниками
+                        // YouTube results are separate: the rules forbid mixing them with other sources
                         YouTubeSearchPane(
                             submitted = ytQuery,
                             audio = audio,
@@ -219,7 +219,7 @@ private fun SearchResultsPage(
     Column(Modifier.fillMaxSize()) {
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 
-        // Ошибка одного источника не мешает остальным
+        // An error of one source does not disturb the others
         failed.forEach { result ->
             Row(
                 Modifier.padding(horizontal = 16.dp),

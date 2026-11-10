@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Заглушка для ПК: очередь и состояние меняются, но звука пока нет. */
+/** Desktop stub: the queue and state change, but there is no sound yet. */
 class StubAudioBackend : AudioBackend {
     private val _state = MutableStateFlow(PlaybackState())
     override val state: StateFlow<PlaybackState> = _state.asStateFlow()

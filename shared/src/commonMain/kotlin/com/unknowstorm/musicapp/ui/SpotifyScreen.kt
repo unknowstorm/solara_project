@@ -34,8 +34,8 @@ import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.SpotifyState
 
 /**
- * Страница Spotify на главной, в том же стиле, что и остальные сервисы: общая панель сверху и ряды подборок.
- * Ряды Spotify занимают строку целиком, с другими источниками не смешиваются. Запуск по ссылке живёт на вкладке «Поиск».
+ * The Spotify page on Home: a plain header without the other services' logos (brand rules) and rows of selections.
+ * Spotify rows take a whole line and are not mixed with other sources. Launching by link lives on the "Search" tab.
  */
 @Composable
 fun SpotifyScreen(
@@ -52,7 +52,7 @@ fun SpotifyScreen(
         onBack = { if (s?.browse != null) remote?.closeBrowse() else onBack() },
     )
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        // Правила Spotify: его бренд не соседствует с брендами других сервисов, поэтому здесь нет панели с их логотипами
+        // Spotify rules: its brand does not stand next to the brands of other services, so there is no bar with their logos here
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -111,7 +111,7 @@ private fun ColumnScope.StatusColumn(content: @Composable ColumnScope.() -> Unit
     )
 }
 
-/** Полный логотип Spotify (атрибуция контента) и необязательная подсказка. */
+/** The full Spotify logo (content attribution) and an optional hint. */
 @Composable
 private fun SpotifyHeader(hint: String? = null) {
     Row(
@@ -176,7 +176,7 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
 
         val browse = s.browse
         if (browse != null) {
-            // Открыта внутренняя подборка: показываем её вместо рядов
+            // An internal selection is open: show it instead of the rows
             item(key = "browse-head") {
                 Row(
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),

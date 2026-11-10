@@ -24,7 +24,7 @@ actual fun FullscreenWindowEffect(active: Boolean) {
         val activity = context.activityOrNull()
         if (active && activity != null) {
             val previous = activity.requestedOrientation
-            // Альбом (любая из двух сторон), системные панели прячутся и выезжают по свайпу от края
+            // Landscape (either side): the system bars are hidden and slide in on a swipe from the edge
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

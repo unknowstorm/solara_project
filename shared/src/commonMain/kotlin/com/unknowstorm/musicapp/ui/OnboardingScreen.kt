@@ -65,7 +65,7 @@ private val ServiceChoices = listOf(
     "youtube" to "YouTube",
 )
 
-/** Иконка «цепочка» (Material Symbols, link). Нарисована здесь, чтобы не тянуть пакет иконок. */
+/** The "chain" icon (Material Symbols, link). Drawn here so as not to pull in an icon package. */
 private val LinkIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Link",
@@ -97,7 +97,7 @@ fun OnboardingScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Аватарка: уже сохранённое фото, только что выбранное или «убрать фото»
+    // Avatar: an already saved photo, a just picked one, or "remove photo"
     val savedImage = rememberAvatarImage(repo, profile.avatar)
     var pickedBytes by remember { mutableStateOf<ByteArray?>(null) }
     var removePhoto by remember { mutableStateOf(false) }
@@ -134,7 +134,7 @@ fun OnboardingScreen(
                     Text(S.tellUsAboutYourself, style = MaterialTheme.typography.headlineLarge)
                 }
 
-                // Аватарка: фото или первая буква ника на цвете палитры
+                // Avatar: a photo or the first letter of the nickname on a palette color
                 Column(
                     Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -159,7 +159,7 @@ fun OnboardingScreen(
                     }
                 }
 
-                // Ник
+                // Nickname
                 OutlinedTextField(
                     value = nick,
                     onValueChange = { nick = it.take(20); error = null },
@@ -171,7 +171,7 @@ fun OnboardingScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                // Синхронизация палитры
+                // Palette sync
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = cardColors) {
                     ListItem(
                         headlineContent = { Text(S.syncTheColorPalette) },
@@ -181,7 +181,7 @@ fun OnboardingScreen(
                     )
                 }
 
-                // Сервисы: квадратные кнопки со скруглёнными углами
+                // Services: square buttons with rounded corners
                 Text(S.services, style = MaterialTheme.typography.titleMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ServiceChoices.forEach { (key, title) ->
@@ -213,7 +213,7 @@ fun OnboardingScreen(
                                 removePhoto -> AvatarUpdate.Remove
                                 else -> AvatarUpdate.Keep
                             }
-                            // При успехе профиль помечается заполненным, и App сам закроет этот экран
+                            // On success the profile is marked as filled and App will close this screen itself
                             repo.saveOnboarding(nick.trim(), avatarUpdate, syncPalette, services)
                                 .onSuccess { onDone?.invoke() }
                                 .onFailure { error = it.message }

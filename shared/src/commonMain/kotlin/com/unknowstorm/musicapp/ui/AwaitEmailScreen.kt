@@ -47,15 +47,15 @@ import com.unknowstorm.musicapp.auth.AuthRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Пароль хранится только в памяти, пока открыт этот экран. Сейчас для подтверждения нужен только email. */
+/** The password is kept only in memory while this screen is open. For now only the email is needed for confirmation. */
 class PendingSignUp(val email: String, val password: String)
 
 private const val RESEND_COOLDOWN_SEC = 30
 private const val CODE_LENGTH = 8
 
 /**
- * Экран подтверждения почты 8-значным кодом из письма.
- * Когда код принят, Supabase создаёт сессию, меняется состояние входа и App сам убирает этот экран.
+ * Email confirmation screen with the 8-digit code from the email.
+ * When the code is accepted, Supabase creates a session, the sign-in state changes and App removes this screen itself.
  */
 @Composable
 fun AwaitEmailScreen(
@@ -135,7 +135,7 @@ fun AwaitEmailScreen(
                         val digits = input.filter { it.isDigit() }.take(CODE_LENGTH)
                         code = digits
                         error = null
-                        // Код введён целиком: проверяем сразу, без нажатия кнопки
+                        // The code is fully entered: verify right away, without pressing a button
                         if (digits.length == CODE_LENGTH) submit()
                     },
                     modifier = Modifier.fillMaxWidth(),

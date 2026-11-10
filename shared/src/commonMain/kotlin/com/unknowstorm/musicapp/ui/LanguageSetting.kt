@@ -15,7 +15,7 @@ import com.unknowstorm.musicapp.i18n.I18n
 import com.unknowstorm.musicapp.i18n.LANGUAGE_KEY
 import com.unknowstorm.musicapp.i18n.S
 
-/** Выбор языка интерфейса. Выбор сохраняется и применяется сразу, без перезапуска. */
+/** Interface language picker. The choice is saved and applied immediately, without a restart. */
 @Composable
 fun LanguageSetting() {
     val texts = rememberTextStore()

@@ -47,7 +47,7 @@ fun AccountBlock(
             when (val s = state) {
                 AuthState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
                 is AuthState.SignedIn -> {
-                    // Аватарка слева (крупная), ник и почта справа
+                    // Avatar on the left (large), nickname and email on the right
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
