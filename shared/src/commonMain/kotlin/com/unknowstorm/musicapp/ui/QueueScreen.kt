@@ -46,7 +46,7 @@ import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-/** Вкладка «Очередь»: то, что сейчас стоит в нашем плеере (Jamendo, Audius). */
+/** The “Queue” tab: what is currently in our player (Jamendo, Audius). */
 @Composable
 fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth: () -> Unit) {
     val scope = rememberCoroutineScope()

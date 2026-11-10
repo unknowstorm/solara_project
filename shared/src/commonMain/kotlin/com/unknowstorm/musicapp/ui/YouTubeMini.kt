@@ -720,7 +720,7 @@ private fun YouTubeFullContent(
     }
 }
 
-/** Название видео, канал и ошибка плеера (если есть). */
+/** Video title, channel and player error (if any). */
 @Composable
 private fun YtTitleBlock(video: YouTubeVideo, session: YouTubeSession, compact: Boolean) {
     Text(
@@ -744,7 +744,7 @@ private fun YtTitleBlock(video: YouTubeVideo, session: YouTubeSession, compact: 
 }
 
 /**
- * Ссылки: официальные логотипы ведут на это видео. Справа: полный экран, (в альбоме) свернуть, закрыть.
+ * Links: the official logos lead to this video. On the right: fullscreen, (in landscape) minimize, close.
  */
 @Composable
 private fun YtLinksRow(
@@ -773,7 +773,7 @@ private fun YtLinksRow(
     }
 }
 
-/** Таймлайн: волна и невидимый Slider для перемотки, как у основного плеера. */
+/** Timeline: a wave and an invisible Slider for seeking, like in the main player. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun YtTimeline(session: YouTubeSession, playing: Boolean) {
@@ -813,7 +813,7 @@ private fun YtTimeline(session: YouTubeSession, playing: Boolean) {
     }
 }
 
-/** Предыдущее, play/pause, следующее. compact: меньшие кнопки для альбома. */
+/** Previous, play/pause, next. compact: smaller buttons for landscape. */
 @Composable
 private fun YtControls(session: YouTubeSession, playing: Boolean, compact: Boolean, modifier: Modifier = Modifier) {
     val side = if (compact) 52.dp else 60.dp
@@ -839,8 +839,8 @@ private fun YtControls(session: YouTubeSession, playing: Boolean, compact: Boole
 }
 
 /**
- * Панель кнопок полноэкранного режима. Стоит рядом с видео, а не на нём (правила YouTube запрещают
- * что-либо поверх плеера). Логотип YouTube остаётся и ведёт на это видео.
+ * Fullscreen mode button panel. It stands next to the video, not on it (the YouTube rules forbid
+ * anything on top of the player). The YouTube logo stays and leads to this video.
  */
 @Composable
 private fun YtRail(
@@ -874,7 +874,7 @@ private fun YtRail(
     }
 }
 
-/** Значок «во весь экран» (четыре уголка наружу) и «выйти» (уголки внутрь). */
+/** “Fullscreen” icon (four corners pointing outward) and “exit” (corners pointing inward). */
 @Composable
 private fun FullscreenGlyph(exit: Boolean, modifier: Modifier = Modifier, tint: Color = LocalContentColor.current) {
     Canvas(modifier) {
@@ -904,8 +904,8 @@ private fun FullscreenGlyph(exit: Boolean, modifier: Modifier = Modifier, tint: 
 }
 
 /**
- * Жест на нашей плашке (на плеер жесты не вешаем: правило Mouseovers).
- * fixedMode: 1 = окно едет за пальцем в любую сторону, 2 = палец вверх тянет окно к большому видео.
+ * Gesture on our strip (we do not attach gestures to the player: the Mouseovers rule).
+ * fixedMode: 1 = the window follows the finger in any direction, 2 = a finger swipe up pulls the window toward the big video.
  */
 @Composable
 private fun Modifier.dragHandle(
@@ -939,9 +939,9 @@ private fun Modifier.dragHandle(
 }
 
 /**
- * Полоса над видео: логотип YouTube (обязателен по правилам бренда), play/pause, развернуть, закрыть.
- * Окно двигают за логотип; тап или свайп вверх по остальной плашке разворачивает его.
- * Плеер без родной панели, поэтому пауза на нашей плашке, а не поверх видео.
+ * Strip above the video: YouTube logo (required by the brand rules), play/pause, expand, close.
+ * The window is dragged by the logo; a tap or a swipe up on the rest of the strip expands it.
+ * The player has no native control bar, so pause is on our strip, not over the video.
  */
 @Composable
 private fun MiniStrip(
@@ -978,7 +978,7 @@ private fun MiniStrip(
     }
 }
 
-/** Значок «предыдущее/следующее»: треугольник с чёрточкой. */
+/** “Previous/next” icon: a triangle with a bar. */
 @Composable
 internal fun YtSkipGlyph(
     next: Boolean,
@@ -1007,7 +1007,7 @@ internal fun YtSkipGlyph(
 }
 
 // --- YT-MUSIC-LINK-BEGIN ---
-/** Пока нет официального логотипа (drawable/youtube_music_logo): текстовая кнопка. */
+/** Until there is an official logo (drawable/youtube_music_logo): a text button. */
 @Composable
 private fun YouTubeMusicLink(onClick: () -> Unit) {
     TextButton(onClick = onClick) { Text("YouTube Music") }

@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.unknowstorm.musicapp.auth.AuthRepository
 
 /**
- * Аватарка: своё фото, а если его нет — первая буква ника на фоне из цветовой палитры приложения.
+ * Avatar: the user's own photo, or if there is none, the first letter of the nickname on a background from the app color palette.
  */
 @Composable
 fun UserAvatar(
@@ -54,7 +54,7 @@ fun UserAvatar(
     }
 }
 
-/** Фото текущего пользователя из облака по метке версии из профиля (null — фото нет). */
+/** Photo of the current user from the cloud by the version stamp from the profile (null: no photo). */
 @Composable
 fun rememberAvatarImage(repo: AuthRepository, version: String?): ImageBitmap? {
     val image by produceState<ImageBitmap?>(initialValue = null, version) {

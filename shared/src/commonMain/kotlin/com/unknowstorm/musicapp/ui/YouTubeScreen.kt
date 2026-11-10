@@ -72,8 +72,8 @@ import org.jetbrains.compose.resources.painterResource
 private const val FLAG_ACCEPTED = "youtube_terms_accepted_v1"
 internal const val YOUTUBE_HOME = "https://www.youtube.com"
 
-// Подборки по жанрам: это поиск, один запрос стоит 100 единиц квоты. Обычно берём готовые с сервера,
-// а свои запросы делаем только по свайпу вниз, если на сервере чего-то не хватает
+// Genre mixes: these are searches, one request costs 100 quota units. Normally we take ready-made ones from the server,
+// and we make our own requests only on swipe-down, if something is missing on the server
 private val GENRES: List<Pair<String, String>>
     get() = listOf(
     S.jazz to "jazz music",
@@ -84,7 +84,7 @@ private val GENRES: List<Pair<String, String>>
     S.loFi to "lofi",
 )
 
-/** Показывает содержимое, только если пользователь принял условия YouTube. */
+/** Shows the content only if the user has accepted the YouTube terms. */
 @Composable
 internal fun YouTubeConsentGate(onLeave: () -> Unit, peek: Boolean = false, content: @Composable () -> Unit) {
     val flags = rememberFlagStore()
@@ -92,7 +92,7 @@ internal fun YouTubeConsentGate(onLeave: () -> Unit, peek: Boolean = false, cont
     if (accepted) {
         content()
     } else if (peek) {
-        // Соседняя страница при листании: экран согласия не мелькает
+        // Neighboring page while paging: the consent screen does not flicker
         Box(Modifier.fillMaxSize())
     } else {
         YouTubeConsentScreen(
@@ -105,7 +105,7 @@ internal fun YouTubeConsentGate(onLeave: () -> Unit, peek: Boolean = false, cont
     }
 }
 
-/** Главная, чип YouTube: популярное и подборки; при открытом видео большой плеер. */
+/** Home, YouTube chip: popular and mixes; with a video open, the big player. */
 @Composable
 fun YouTubeScreen(
     audio: AudioBackend,
@@ -120,7 +120,7 @@ fun YouTubeScreen(
 
 @Composable
 private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession) {
-    // Ушли с экрана YouTube: играющее видео переезжает в плавающее окно
+    // Left the YouTube screen: the playing video moves to the floating window
     DisposableEffect(Unit) { onDispose { session.minimize() } }
 
     val showPlayer by remember {
@@ -128,9 +128,9 @@ private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession) {
     }
     PlatformBackHandler(enabled = showPlayer, onBack = { session.minimize() })
 
-    // Лента всегда на месте. Большой плеер рисует YouTubeOverlay: контейнер растёт поверх ленты
-    // до границ этого экрана, как у основного плеера.
-    // Панель чипов и границы экрана для плеера теперь у пейджера в MainScreen
+    // The feed is always in place. The big player is drawn by YouTubeOverlay: the container grows over the feed
+    // to the bounds of this screen, like the main player.
+    // The chips bar and the screen bounds for the player are now handled by the pager in MainScreen
     YouTubeFeed(audio, session, Modifier.fillMaxSize())
 }
 
@@ -143,19 +143,19 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
     val scope = rememberCoroutineScope()
 
     var popular by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
-    // Первая загрузка при открытии экрана: пока она идёт, подборки и кнопки не рисуем, чтобы ничего не мигало
+    // First load when the screen opens: while it runs, we do not draw mixes and buttons, so nothing flickers
     var loading by remember { mutableStateOf(true) }
-    // Обновление свайпом вниз или кнопкой
+    // Refresh by swiping down or with a button
     var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    // Уже загруженные раньше подборки берём из кэша приложения: это не тратит квоту
+    // Mixes loaded earlier are taken from the app cache: this does not spend quota
     val genres = remember {
         mutableStateMapOf<String, List<YouTubeVideo>>().also { map ->
             GENRES.forEach { (title, query) -> api.cachedSearch(query)?.let { map[title] = it } }
         }
     }
 
-    // fillMissing = false: только общий кэш сервера (при открытии). true: ещё и свои запросы за недостающим (свайп)
+    // fillMissing = false: only the shared server cache (on open). true: also our own requests for what is missing (swipe)
     suspend fun load(fillMissing: Boolean) {
         error = null
         try {
@@ -200,7 +200,7 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
     }
 
     fun play(video: YouTubeVideo, list: List<YouTubeVideo>) {
-        // Звук нашего плеера и YouTube не должны играть одновременно
+        // The sound of our player and YouTube must not play at the same time
         audio.stop()
         session.open(video, list)
     }
@@ -292,7 +292,7 @@ private fun VideoStrip(videos: List<YouTubeVideo>, onClick: (YouTubeVideo) -> Un
 @Composable
 private fun VideoCard(video: YouTubeVideo, onClick: () -> Unit) {
     Column(Modifier.width(220.dp).clickable(onClick = onClick)) {
-        // Миниатюра без обрезки, скруглений и значков поверх: по правилам её нельзя менять
+        // Thumbnail without cropping, rounding or badges on top: the rules do not allow changing it
         AsyncImage(
             model = video.thumbnailUrl,
             contentDescription = null,
@@ -324,7 +324,7 @@ internal fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        // Миниатюра без обрезки и без значков поверх: по правилам её нельзя менять
+        // Thumbnail without cropping or badges on top: the rules do not allow changing it
         AsyncImage(
             model = video.thumbnailUrl,
             contentDescription = null,
@@ -352,7 +352,7 @@ internal fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
     }
 }
 
-/** Официальный логотип YouTube на сплошном белом фоне, без изменений. Ведёт на YouTube. */
+/** Official YouTube logo on a solid white background, unmodified. Leads to YouTube. */
 @Composable
 fun YouTubeLogo(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(

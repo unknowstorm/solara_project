@@ -1,13 +1,13 @@
 package com.unknowstorm.musicapp.ui
 
 /**
- * Мост между нашими кнопками и единственным встроенным плеером YouTube.
- * Платформа (Android) подставляет send и вызывает onState на изменения состояния плеера.
- * Команды: "play" и "pause" (методы официального IFrame Player API).
+ * Bridge between our buttons and the single embedded YouTube player.
+ * The platform (Android) provides send and calls onState when the player state changes.
+ * Commands: "play" and "pause" (methods of the official IFrame Player API).
  */
 object YouTubeControl {
     var send: ((String) -> Unit)? = null
     var onState: ((Int) -> Unit)? = null
-    /** Позиция и длительность в секундах: плеер сообщает их несколько раз в секунду. */
+    /** Position and duration in seconds: the player reports them several times per second. */
     var onTime: ((Double, Double) -> Unit)? = null
 }

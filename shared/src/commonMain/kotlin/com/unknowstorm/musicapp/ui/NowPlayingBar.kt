@@ -15,14 +15,14 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import com.unknowstorm.musicapp.player.AudioBackend
 
 /**
- * Теперь это НЕ мини-плеер, а невидимая «метка места».
+ * Now this is NOT the mini player but an invisible “placeholder marker”.
  *
- * Настоящий мини-плеер рисует [ExpandablePlayer] в корне приложения (App.kt), чтобы он мог плавно
- * превращаться в полный экран. Эта метка нужна только затем, чтобы:
- *  1) зарезервировать в MainScreen место под мини-плеер (как раньше, высота 64dp);
- *  2) сообщить [ExpandablePlayer], где именно это место находится.
+ * The real mini player is drawn by [ExpandablePlayer] at the app root (App.kt), so that it can smoothly
+ * turn into the full screen. This marker is only needed to:
+ *  1) reserve space for the mini player in MainScreen (as before, height 64dp);
+ *  2) tell [ExpandablePlayer] where exactly this place is.
  *
- * Сигнатура осталась прежней, поэтому MainScreen менять не нужно.
+ * The signature stayed the same, so MainScreen does not need to change.
  */
 @Composable
 fun NowPlayingBar(

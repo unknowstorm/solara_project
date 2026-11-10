@@ -28,8 +28,8 @@ import com.unknowstorm.musicapp.provider.youtube.YouTubeVideo
 import kotlinx.coroutines.CancellationException
 
 /**
- * Выдача YouTube на вкладке «Поиск». Отдельно от других источников (правила YouTube запрещают
- * смешивать результаты). Запрос уходит только когда пользователь нажал Enter: [submitted].
+ * YouTube results on the “Search” tab. Separate from other sources (the YouTube rules forbid
+ * mixing results). The request is sent only when the user presses Enter: [submitted].
  */
 @Composable
 fun YouTubeSearchPane(
@@ -93,7 +93,7 @@ fun YouTubeSearchPane(
             LazyColumn(Modifier.weight(1f)) {
                 items(videos) { video ->
                     VideoRow(video) {
-                        // Звук нашего плеера и YouTube не должны играть одновременно
+                        // The sound of our player and YouTube must not play at the same time
                         audio.stop()
                         session.open(video, videos)
                     }

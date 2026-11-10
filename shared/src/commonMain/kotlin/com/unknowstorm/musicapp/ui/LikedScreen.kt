@@ -35,9 +35,9 @@ import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
 /**
- * Содержимое вкладки «Любимые» на главной (под верхней панелью выбора источников).
- * Показывает лайки только текущего аккаунта: сервер чужие строки не отдаёт (RLS),
- * а при выходе или смене аккаунта список очищается.
+ * Contents of the “Liked” tab on Home (under the top source selection bar).
+ * Shows likes of the current account only: the server does not return other users' rows (RLS),
+ * and on sign-out or account switch the list is cleared.
  */
 @Composable
 fun LikedContent(
@@ -115,7 +115,7 @@ fun LikedContent(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        // Нажатие снимает лайк, трек сразу пропадает из списка
+                        // Tapping removes the like, the track immediately disappears from the list
                         IconButton(onClick = { likes.toggle(track) }) {
                             HeartIcon(true, tint = primary)
                         }

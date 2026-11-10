@@ -67,13 +67,13 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         startConnect()
     }
 
-    /** Тихое подключение при запуске: только если пользователь уже подключал Spotify и не отключал. */
+    /** Silent connection at launch: only if the user has connected Spotify before and has not disconnected it. */
     fun autoConnect() {
         if (!prefs.getBoolean("auto", false)) return
         if (remote?.isConnected == true || _state.value.connecting) return
         silent = true
         ignoreIdle = true
-        // Разрешение уже выдано при ручном подключении: окно входа пропускаем, подключаемся напрямую
+        // The permission was already granted during the manual connection: skip the sign-in window and connect directly
         connectRemote()
     }
 
@@ -89,8 +89,8 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         }
         _state.update { it.copy(appInstalled = true, connecting = true, error = null) }
         handler.removeCallbacks(connectTimeout)
-        // Окно разрешения открываем из Solara, пока она на экране: из фона Android его блокирует
-        // Implicit grant (Type.TOKEN) Spotify снял: используем код авторизации с PKCE
+        // We open the permission window from Solara while it is on screen: Android blocks it from the background
+        // Spotify removed the implicit grant (Type.TOKEN): we use the authorization code flow with PKCE
         val request = AuthorizationRequest.Builder(
             SpotifyConfig.CLIENT_ID, AuthorizationResponse.Type.CODE, SpotifyConfig.REDIRECT_URI,
         )
@@ -102,8 +102,8 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     }
 
     /**
-     * PKCE challenge для запроса согласия. Код из ответа мы не обмениваем на токен (App Remote нужно только
-     * согласие пользователя), поэтому проверочная строка после запроса не нужна и нигде не хранится.
+     * PKCE challenge for the consent request. We do not exchange the code from the response for a token (App Remote only needs
+     * the user's consent), so the verifier string is not needed after the request and is not stored anywhere.
      */
     private fun newPkceChallenge(): String {
         val flags = android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP
@@ -113,7 +113,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         return android.util.Base64.encodeToString(digest, flags)
     }
 
-    /** Вызывается из MainActivity. Код из ответа не используется и не сохраняется. */
+    /** Called from MainActivity. The code from the response is not used or stored. */
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode != AUTH_REQUEST) return
         val response = AuthorizationClient.getResponse(resultCode, data)
@@ -178,7 +178,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         sub?.cancel()
         val subscription = r.playerApi.subscribeToPlayerState()
         subscription.setEventCallback { ps ->
-            // После тихого автоподключения не показываем то, что Spotify играл раньше: ждём, пока что-то реально заиграет
+            // After a silent auto-connect we do not show what Spotify was playing earlier: we wait until something actually starts playing
             if (ignoreIdle) {
                 if (ps.isPaused) return@setEventCallback
                 ignoreIdle = false
@@ -233,11 +233,11 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         remote = null
         lastTrackUri = null
         handler.removeCallbacks(ticker)
-        // Всё, что пришло из Spotify, стираем из памяти
+        // Everything that came from Spotify is erased from memory
         _state.value = SpotifyState(appInstalled = SpotifyAppRemote.isSpotifyInstalled(activity))
     }
 
-    /** Вызывается при закрытии активности. Если приложение закрыли совсем (не поворот экрана), ставим Spotify на паузу. */
+    /** Called when the activity is closed. If the app was closed completely (not a screen rotation), we pause Spotify. */
     fun release() {
         val r = remote
         android.util.Log.d("SpotifyRelease", "release finishing=${activity.isFinishing} config=${activity.isChangingConfigurations} connected=${r?.isConnected}")
@@ -252,7 +252,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun playUri(uri: String) {
         val r = remote ?: return
         ignoreIdle = false
-        // Сразу показываем выбранное в мини-плеере: пока Spotify отвечает, плеер не пропадает
+        // Show the selection in the mini player right away: while Spotify responds, the player does not disappear
         val known = listItems[uri]
         val hist = _state.value.history.firstOrNull { it.uri == uri }
         val name = known?.title ?: hist?.title
@@ -268,7 +268,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                     positionMs = 0L,
                     durationMs = 0L,
                     cover = key?.let { st.covers[it] },
-                    // Трек сразу встаёт первым в «Недавно играло», чтобы список не менялся второй раз при ответе Spotify
+                    // The track immediately becomes first in “Recently played”, so the list does not change a second time when Spotify responds
                     history = if (uri.startsWith("spotify:track:")) {
                         (listOf(SpotifyItem(uri, name, known?.subtitle ?: hist?.subtitle, imageKey = key)) +
                             st.history.filterNot { h -> h.uri == uri }).take(30)
@@ -293,13 +293,13 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         val uri = _state.value.uri ?: return
         val add = !_state.value.saved
         _state.update { it.copy(saved = add) }
-        // Лайк уходит в Spotify и у нас нигде не хранится
+        // The like goes to Spotify and is not stored anywhere on our side
         if (add) r.userApi.addToLibrary(uri) else r.userApi.removeFromLibrary(uri)
     }
 
     private val coverRequested = HashSet<String>()
 
-    /** Обложка элемента: берём у самого Spotify без изменений, держим только в памяти. */
+    /** Item cover: taken from Spotify itself without changes, kept only in memory. */
     private fun requestCover(uri: com.spotify.protocol.types.ImageUri?) {
         val r = remote ?: return
         val u = uri ?: run { android.util.Log.d("SpotifyCover", "no imageUri"); return }
@@ -336,7 +336,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     private fun toSpotifyItem(li: com.spotify.protocol.types.ListItem) =
         SpotifyItem(li.uri, li.title, li.subtitle, li.playable, li.hasChildren, li.imageUri?.raw)
 
-    /** Каждая верхняя полка Spotify становится отдельным рядом (не больше 12 элементов, лимит Spotify 20). */
+    /** Each top-level Spotify shelf becomes a separate row (at most 12 items, Spotify limit is 20). */
     override fun loadRecommended() {
         val r = remote ?: return
         if (shelvesLoading) return
@@ -385,7 +385,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             .setErrorCallback { _state.update { st -> st.copy(error = S.couldNotOpenTheCollection) } }
     }
 
-    /** Эксперимент: Content API по URI без Web API и токенов. Логи: adb logcat -s SpotifyBrowse */
+    /** Experiment: Content API by URI without the Web API and tokens. Logs: adb logcat -s SpotifyBrowse */
     override fun openByUri(uri: String) {
         val r = remote ?: return
         val kind = uri.split(":").getOrNull(1)
@@ -418,7 +418,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         activity.packageManager.getLaunchIntentForPackage("com.spotify.music")?.let { activity.startActivity(it) }
     }
 
-    /** Открывает конкретный трек, альбом или плейлист в приложении Spotify (метаданные должны вести на Spotify). */
+    /** Opens a specific track, album or playlist in the Spotify app (metadata must lead to Spotify). */
     override fun openInSpotify(uri: String) {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).setPackage("com.spotify.music")
         runCatching { activity.startActivity(intent) }.onFailure { openSpotifyApp() }

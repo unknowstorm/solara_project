@@ -25,7 +25,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Строка таблицы `likes` (user_id проставляет база сама: auth.uid()). */
+/** Row of the `likes` table (user_id is set by the database itself: auth.uid()). */
 @Serializable
 private data class LikeRow(
     val provider: String,
@@ -38,13 +38,13 @@ private data class LikeRow(
 
 private fun LikeRow.toTrack(): Track? {
     val p = ProviderId.entries.firstOrNull { it.name == provider } ?: return null
-    // Ссылку на звук не храним: она протухает, свежую даёт MusicProvider.resolveStream
+    // We do not store the audio link: it expires, a fresh one comes from MusicProvider.resolveStream
     return Track(trackId, p, title, artist, artworkUrl, durationMs)
 }
 
 private fun Track.toRow() = LikeRow(provider.name, id, title, artist, artworkUrl, durationMs)
 
-/** Текущий трек плеера в виде Track (null, если неизвестен источник или id). */
+/** Current player track as a Track (null if the source or id is unknown). */
 fun PlaybackState.asTrack(): Track? {
     val id = mediaId ?: return null
     val p = provider ?: return null
@@ -56,8 +56,8 @@ fun List<Track>.containsTrack(track: Track?): Boolean =
     track != null && any { it.provider == track.provider && it.id == track.id }
 
 /**
- * Лайки пользователя в облаке (таблица `likes`, RLS: каждый видит только свои).
- * Работают одинаково для любого источника, потому что хранится пара (provider, track_id).
+ * User likes in the cloud (table `likes`, RLS: everyone sees only their own).
+ * They work the same for any source, because the pair (provider, track_id) is stored.
  */
 class LikesRepository(
     auth: AuthRepository,
@@ -68,7 +68,7 @@ class LikesRepository(
     private var userId: String? = null
 
     private val _tracks = MutableStateFlow<List<Track>>(emptyList())
-    /** Лайкнутые треки, новые сверху. */
+    /** Liked tracks, newest first. */
     val tracks: StateFlow<List<Track>> = _tracks.asStateFlow()
 
     private val _signedIn = MutableStateFlow(false)
@@ -83,7 +83,7 @@ class LikesRepository(
                 when (s) {
                     is AuthState.SignedIn -> if (userId != s.userId) {
                         userId = s.userId
-                        // Другой аккаунт: старый список не показываем ни секунды
+                        // Another account: we do not show the old list for a single second
                         _tracks.value = emptyList()
                         _signedIn.value = true
                         refresh()
@@ -93,13 +93,13 @@ class LikesRepository(
                         _signedIn.value = false
                         _tracks.value = emptyList()
                     }
-                    else -> Unit // Loading / Error: оставляем как есть (например, нет сети)
+                    else -> Unit // Loading / Error: leave as is (for example, no network)
                 }
             }
         }
     }
 
-    /** Подтягивает лайки из облака. */
+    /** Pulls likes from the cloud. */
     fun refresh() {
         val owner = userId ?: return
         scope.launch {
@@ -107,7 +107,7 @@ class LikesRepository(
                 val rows = client.from("likes")
                     .select { order("liked_at", Order.DESCENDING); limit(200) }
                     .decodeList<LikeRow>()
-                // Пока шёл запрос, мог войти другой пользователь: тогда ответ выбрасываем
+                // Another user may have signed in while the request was running: then we discard the response
                 if (userId == owner) _tracks.value = rows.mapNotNull { it.toTrack() }.filter { it.provider != ProviderId.DEEZER }
             } catch (e: CancellationException) {
                 throw e
@@ -117,10 +117,10 @@ class LikesRepository(
         }
     }
 
-    /** Ставит или снимает лайк. Интерфейс обновляется сразу, при ошибке сети откатывается. */
+    /** Sets or removes a like. The UI updates immediately and rolls back on a network error. */
     fun toggle(track: Track) {
         if (!_signedIn.value) return
-        // Deezer: только 30-секундные превью, в общие лайки не входит
+        // Deezer: only 30-second previews, not part of the shared likes
         if (track.provider == ProviderId.DEEZER) return
         val wasLiked = _tracks.value.containsTrack(track)
         _tracks.update { list ->
@@ -143,7 +143,7 @@ class LikesRepository(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            // Уже лайкнут с другого устройства: это не ошибка
+                            // Already liked from another device: this is not an error
                             if (e.message?.contains("duplicate", ignoreCase = true) != true) throw e
                         }
                     }

@@ -7,7 +7,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 
-/** Срабатывает, когда Solara смахнули из недавних: ставит Spotify на паузу, даже если у активности не было onDestroy. */
+/** Fires when Solara is swiped away from recents: pauses Spotify even if the activity did not get onDestroy. */
 class SpotifyTaskGuard : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 

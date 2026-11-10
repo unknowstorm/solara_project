@@ -52,7 +52,7 @@ import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.parseSpotifyLink
 import org.jetbrains.compose.resources.painterResource
 
-/** Полный логотип Spotify на чёрном фоне, без изменений. */
+/** Full Spotify logo on a black background, unmodified. */
 @Composable
 internal fun SpotifyLogoBar(modifier: Modifier = Modifier) {
     Row(modifier.padding(vertical = 6.dp)) {
@@ -60,7 +60,7 @@ internal fun SpotifyLogoBar(modifier: Modifier = Modifier) {
     }
 }
 
-/** Обложка Spotify: без обрезки, надписей, значков и блюра, углы 4 dp. */
+/** Spotify cover: no cropping, captions, badges or blur, 4 dp corners. */
 @Composable
 internal fun SpotifyCover(bitmap: ImageBitmap?, size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
@@ -70,7 +70,7 @@ internal fun SpotifyCover(bitmap: ImageBitmap?, size: Dp, modifier: Modifier = M
 
 @Composable
 internal fun SpotifyTile(item: SpotifyItem, covers: Map<String, ImageBitmap>, onClick: () -> Unit) {
-    // У верхнеуровневых подборок Spotify не отдаёт обложку: показываем нейтральную плитку с названием
+    // Spotify does not provide a cover for top-level shelves: we show a neutral tile with the title
     if (item.imageKey.isNullOrBlank()) {
         Box(
             Modifier.size(120.dp).clip(RoundedCornerShape(4.dp))
@@ -103,7 +103,7 @@ internal fun SpotifyTile(item: SpotifyItem, covers: Map<String, ImageBitmap>, on
     }
 }
 
-/** Ряд плиток Spotify: не больше 20 элементов, в конце ссылка на приложение Spotify. */
+/** Row of Spotify tiles: at most 20 items, with a link to the Spotify app at the end. */
 @Composable
 internal fun SpotifyTileRow(
     list: List<SpotifyItem>,
@@ -117,7 +117,7 @@ internal fun SpotifyTileRow(
         items(shown.size, key = { shown[it].uri }) { i -> SpotifyTile(shown[i], covers) { onClick(shown[i]) } }
         if (onOpenSpotify != null) {
             item {
-                // Последняя плитка ряда: тот же размер, что у обложек, углы 4 dp
+                // Last tile of the row: the same size as the covers, 4 dp corners
                 Column(
                     Modifier.size(120.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onOpenSpotify).padding(8.dp),
@@ -139,10 +139,10 @@ internal fun SpotifyTileRow(
     }
 }
 
-// Макет должен вмещать: плейлист/альбом 25 символов, исполнитель 18, трек 23.
-// Усечение (многоточие) допустимо только если не хватает места; метаданные не меняем.
+// The layout must fit: playlist/album 25 characters, artist 18, track 23.
+// Truncation (ellipsis) is allowed only when there is not enough room; we do not alter metadata.
 
-/** Режим Spotify на вкладке «Поиск»: запуск по ссылке и недавние треки. Остальных источников здесь нет. */
+/** Spotify mode on the “Search” tab: launch by link and recent tracks. No other sources here. */
 @Composable
 fun SpotifySearchPane(
     remote: SpotifyRemote?,
@@ -195,7 +195,7 @@ fun SpotifySearchPane(
                 link = ""
             }
         }) { Text(S.playFromLink) }
-        // Эксперимент: список треков альбома или плейлиста через Content API App Remote
+        // Experiment: the track list of an album or playlist via the App Remote Content API
         val browseUri = parseSpotifyLink(link)
             ?.takeIf { it.startsWith("spotify:album:") || it.startsWith("spotify:playlist:") }
         if (browseUri != null) {
@@ -213,12 +213,12 @@ fun SpotifySearchPane(
 }
 
 
-/** Монохромная иконка Spotify: белая на тёмном фоне, чёрная на светлом. Зелёную можно только на чёрном или белом. */
+/** Monochrome Spotify icon: white on a dark background, black on a light one. Green only on black or white. */
 @Composable
 internal fun spotifyMonoIcon(background: Color): Painter =
     painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_icon_white else Res.drawable.spotify_icon_black)
 
-/** Кнопка «OPEN SPOTIFY» с иконкой, как в примерах гайдлайнов. */
+/** “OPEN SPOTIFY” button with an icon, as in the guideline examples. */
 @Composable
 internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(onClick = onClick, modifier = modifier) {
@@ -228,7 +228,7 @@ internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifie
     }
 }
 
-/** Монохромный полный логотип Spotify: белый на тёмном фоне, чёрный на светлом. */
+/** Monochrome full Spotify logo: white on a dark background, black on a light one. */
 @Composable
 internal fun spotifyMonoLogo(background: Color): Painter =
     painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_logo_white else Res.drawable.spotify_logo_black)

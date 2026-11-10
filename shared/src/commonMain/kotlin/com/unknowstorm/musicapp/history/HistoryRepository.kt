@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Строка таблицы `listening_history` (user_id проставляет база: auth.uid()). */
+/** Row of the `listening_history` table (user_id is set by the database: auth.uid()). */
 @Serializable
 private data class HistoryRow(
     val provider: String,
@@ -34,9 +34,9 @@ private data class HistoryRow(
 private const val LISTEN_MS = 30_000L
 
 /**
- * Пишет в облако трек, который реально прослушан: 30 секунд воспроизведения
- * (или половина, если трек короче минуты). Перемотка вперёд не засчитывается.
- * Только Jamendo и Audius: остальное база не принимает.
+ * Writes to the cloud a track that was really listened to: 30 seconds of playback
+ * (or half, if the track is shorter than a minute). Seeking forward does not count.
+ * Only Jamendo and Audius: the database does not accept anything else.
  */
 class HistoryRepository(
     auth: AuthRepository,
@@ -64,7 +64,7 @@ class HistoryRepository(
         scope.launch { audio.state.collect { onState(it) } }
     }
 
-    /** Последние прослушанные треки, новые сверху (без ссылок на звук). */
+    /** Recently listened tracks, newest first (without audio links). */
     suspend fun recent(count: Long = 200L): List<Track> = try {
         client.from("listening_history")
             .select { order("played_at", Order.DESCENDING); limit(count) }
@@ -92,7 +92,7 @@ class HistoryRepository(
         } else {
             val delta = s.positionMs - lastPos
             if (s.isPlaying && delta in 0..1_500) played += delta
-            // Трек пошёл заново (повтор одного трека): считаем новое прослушивание
+            // The track started over (repeat of a single track): we count a new listen
             if (s.positionMs < 2_000 && lastPos > 5_000) {
                 played = 0L
                 logged = false

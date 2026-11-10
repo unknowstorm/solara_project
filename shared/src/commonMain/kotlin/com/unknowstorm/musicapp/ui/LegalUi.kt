@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-/** Полноэкранный текст (условия или политика) со ссылками на документы Google и YouTube. */
+/** Fullscreen text (terms or policy) with links to the Google and YouTube documents. */
 @Composable
 fun LegalDialog(title: String, body: String, onDismiss: () -> Unit) {
     val openLink = rememberExternalLinkOpener()
@@ -63,7 +63,7 @@ fun LegalDialog(title: String, body: String, onDismiss: () -> Unit) {
     }
 }
 
-/** Блок для экрана «Настройки»: условия и политика должны быть доступны всегда. */
+/** Block for the “Settings” screen: the terms and the policy must always be accessible. */
 @Composable
 fun LegalLinks(modifier: Modifier = Modifier) {
     var showTerms by remember { mutableStateOf(false) }
@@ -77,7 +77,7 @@ fun LegalLinks(modifier: Modifier = Modifier) {
     if (showPrivacy) LegalDialog(S.privacyPolicy, LegalTexts.PRIVACY) { showPrivacy = false }
 }
 
-/** Узкая строка со ссылками внизу экрана YouTube. */
+/** Narrow line with links at the bottom of the YouTube screen. */
 @Composable
 fun LegalFooter(modifier: Modifier = Modifier) {
     var showTerms by remember { mutableStateOf(false) }
@@ -90,7 +90,7 @@ fun LegalFooter(modifier: Modifier = Modifier) {
     if (showPrivacy) LegalDialog(S.privacyPolicy, LegalTexts.PRIVACY) { showPrivacy = false }
 }
 
-/** Экран согласия перед первым открытием раздела YouTube. */
+/** Consent screen before the YouTube section is opened for the first time. */
 @Composable
 fun YouTubeConsentScreen(onAccept: () -> Unit, onBack: () -> Unit) {
     PlatformBackHandler(onBack = onBack)
@@ -123,7 +123,7 @@ fun YouTubeConsentScreen(onAccept: () -> Unit, onBack: () -> Unit) {
         }
     }
         Spacer(Modifier.height(12.dp))
-        // Кнопка закреплена внизу экрана и не уезжает при прокрутке текста
+        // The button is pinned to the bottom of the screen and does not move when the text scrolls
         Button(onClick = onAccept, enabled = agreed, modifier = Modifier.fillMaxWidth()) { Text(S.continueText) }
     }
 
