@@ -14,11 +14,30 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.pow
 
 private const val TOP_ARTISTS = 3
 private const val PER_ARTIST = 10
 private const val TOTAL = 30
-private const val LIKE_WEIGHT = 3
+private const val LIKE_WEIGHT = 3.0
+private const val EXPLORE_POOL = 3   // how many artists after the top may be picked for "something new"
+private const val DECAY = 0.985      // each older listen weighs 1.5% less than the next newer one
+
+private val ArtistSuffix = Regex("""\s+(music|official|records|topic|beats)$""")
+private val TitleExtras = Regex("""\s*[\(\[].*?[\)\]]""")
+
+/** "@HasenChat Music" and "hasenchat" are the same artist. */
+private fun artistKey(name: String): String {
+    var k = name.trim().removePrefix("@").lowercase()
+    repeat(2) {
+        val stripped = k.replace(ArtistSuffix, "")
+        if (stripped.length >= 3) k = stripped
+    }
+    return k
+}
+
+/** Same song on different services or under different ids. */
+private fun trackKey(t: Track): String = artistKey(t.artist) + "|" + t.title.lowercase().replace(TitleExtras, "").trim()
 
 private fun ProviderId.isOurs() = this == ProviderId.JAMENDO || this == ProviderId.AUDIUS
 
@@ -74,19 +93,22 @@ class RecommendationsFeed(
             val played = history.recent()
             val liked = likes.tracks.value.filter { it.provider.isOurs() }
 
-            // key (nickname without @ in lowercase) -> (how to display it, weight)
-            val weights = LinkedHashMap<String, Pair<String, Int>>()
-            fun add(artist: String, w: Int) {
+            // normalized artist -> (how to display it, weight). History is newest first: older listens weigh less.
+            val weights = LinkedHashMap<String, Pair<String, Double>>()
+            fun add(artist: String, w: Double) {
                 val shown = artist.trim()
-                val key = shown.removePrefix("@").lowercase()
+                val key = artistKey(shown)
                 if (key.isBlank()) return
                 val old = weights[key]
-                weights[key] = (old?.first ?: shown) to ((old?.second ?: 0) + w)
+                weights[key] = (old?.first ?: shown) to ((old?.second ?: 0.0) + w)
             }
-            played.filter { it.provider.isOurs() }.forEach { add(it.artist, 1) }
+            var rank = 0
+            for (t in played) if (t.provider.isOurs()) add(t.artist, DECAY.pow(rank++))
             liked.forEach { add(it.artist, LIKE_WEIGHT) }
 
-            val top = weights.values.sortedByDescending { it.second }.take(TOP_ARTISTS).map { it.first }
+            val ranked = weights.values.sortedByDescending { it.second }.map { it.first }
+            // the top artists plus one "discovery": a random one from the next few
+            val top = ranked.take(TOP_ARTISTS) + ranked.drop(TOP_ARTISTS).take(EXPLORE_POOL).shuffled().take(1)
             artists = top
             if (top.isEmpty()) {
                 tracks = emptyList()
@@ -95,8 +117,12 @@ class RecommendationsFeed(
 
             val seen = (played + liked).map { "${it.provider}:${it.id}" }.toSet()
             val perArtist = coroutineScope { top.map { name -> async { fetch(name, seen) } }.awaitAll() }
+            val seenKeys = (played + liked).map(::trackKey).toSet()
             tracks = roundRobin(perArtist)
                 .distinctBy { "${it.provider}:${it.id}" }
+                // the same song on Jamendo and Audius, or one you already know under another id
+                .distinctBy { trackKey(it) }
+                .filter { trackKey(it) !in seenKeys }
                 .take(TOTAL)
         } finally {
             loading = false
@@ -121,7 +147,7 @@ class RecommendationsFeed(
         return roundRobin(found)
             .filter { it.provider.isOurs() && "${it.provider}:${it.id}" !in seen && !DeadTracks.isDead(it) }
             // first the artist's own tracks, then what was found nearby
-            .sortedByDescending { it.artist.contains(query, ignoreCase = true) }
+            .sortedByDescending { artistKey(it.artist).contains(artistKey(artist)) }
             .take(PER_ARTIST)
     }
 }
