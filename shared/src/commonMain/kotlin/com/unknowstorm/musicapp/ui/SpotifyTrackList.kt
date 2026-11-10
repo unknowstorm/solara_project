@@ -118,7 +118,7 @@ internal fun SpotifyTrackList(
         Column(Modifier.padding(horizontal = 16.dp)) {
             Text(s.browseTitle ?: kind, style = MaterialTheme.typography.titleLarge)
             Text(
-                S.spotifyTracksCount(if (s.browseMore) "${list.size}+" else list.size),
+                S.spotifyTracksCount(s.browseTotal ?: if (s.browseMore) "${list.size}+" else list.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

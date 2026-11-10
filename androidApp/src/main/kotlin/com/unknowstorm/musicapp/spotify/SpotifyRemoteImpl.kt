@@ -418,7 +418,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         r.contentApi.getChildrenOfItem(li, 20, 0)
             .setResultCallback {
                 showItems(item.title, it.items)
-                startPaging(li, 20, it.items?.size ?: 0)
+                startPaging(li, 20, it.items?.size ?: 0, it.total)
             }
             .setErrorCallback { _state.update { st -> st.copy(error = S.couldNotOpenTheCollection) } }
     }
@@ -429,12 +429,12 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     private var browseNext = 0
     private var browseLoadingMore = false
 
-    private fun startPaging(parent: com.spotify.protocol.types.ListItem, page: Int, loaded: Int) {
+    private fun startPaging(parent: com.spotify.protocol.types.ListItem, page: Int, loaded: Int, total: Int = -1) {
         browseParent = parent
         browsePage = page
         browseNext = loaded
         browseLoadingMore = false
-        _state.update { it.copy(browseMore = loaded >= page) }
+        _state.update { it.copy(browseMore = if (total >= 0) loaded < total else loaded >= page, browseTotal = total.takeIf { t -> t >= 0 }) }
     }
 
     private fun appendItems(items: Array<com.spotify.protocol.types.ListItem>) {
@@ -459,7 +459,8 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 browseNext += raw.size
                 appendItems(raw)
                 browseLoadingMore = false
-                _state.update { it.copy(browseMore = raw.size >= browsePage) }
+                val knownTotal = _state.value.browseTotal
+                _state.update { it.copy(browseMore = if (knownTotal != null) browseNext < knownTotal else raw.size >= browsePage) }
             }
             .setErrorCallback { e ->
                 android.util.Log.d("SpotifyBrowse", "load more error: ${e.message}")
@@ -487,7 +488,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 android.util.Log.d("SpotifyBrowse", "${uri} -> items: ${res.items?.size}")
                 android.util.Log.d("SpotifyBrowse", "page0 total=${res.total} offset=${res.offset} limit=${res.limit}")
                 showItems(if (kind == "album") S.album else S.playlist, res.items)
-                startPaging(li, 50, res.items?.size ?: 0)
+                startPaging(li, 50, res.items?.size ?: 0, res.total)
             }
             .setErrorCallback { e ->
                 android.util.Log.d("SpotifyBrowse", "error ${uri}: ${e.message}")
@@ -497,7 +498,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
 
     override fun closeBrowse() {
         browseParent = null
-        _state.update { it.copy(browse = null, browseTitle = null, browseMore = false) }
+        _state.update { it.copy(browse = null, browseTitle = null, browseMore = false, browseTotal = null) }
     }
 
     override fun openSpotifyApp() {

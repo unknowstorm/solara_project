@@ -53,7 +53,7 @@ fun SpotifyScreen(
     val s = remote?.state?.collectAsState()?.value
     PlatformBackHandler(
         enabled = !ui.expanded,
-        onBack = { if (s?.browse != null) remote?.closeBrowse() else onBack() },
+        onBack = { if (s?.browse != null) remote.closeBrowse() else onBack() },
     )
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Spotify rules: its brand does not stand next to the brands of other services, so there is no bar with their logos here

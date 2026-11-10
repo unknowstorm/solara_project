@@ -36,6 +36,8 @@ data class SpotifyState(
     val browseTitle: String? = null,
     /** More tracks can be loaded for the open album or playlist. */
     val browseMore: Boolean = false,
+    /** Exact number of tracks in the open album or playlist, as reported by Spotify. */
+    val browseTotal: Int? = null,
     val covers: Map<String, ImageBitmap> = emptyMap(),
     val shelves: List<SpotifyShelf>? = null,
 )
