@@ -42,9 +42,10 @@ object LegalTexts {
         3. The YouTube section uses YouTube API Services. By using it, you agree to be bound by the YouTube Terms of Service: $YOUTUBE_TERMS_URL. Videos play only in the embedded YouTube player while the video is visible on screen (full-size or in the floating window). Solara does not download or store videos and does not make copies of them.
 
         4. The Spotify section controls the Spotify app on your device: the Spotify app itself plays the music, and Spotify Premium is required. Solara does not play, download or store Spotify music or artwork. By using this section, you agree to Spotify's terms: $SPOTIFY_TERMS_URL.
-        • Spotify gives no warranties regarding Solara and is not liable for it or for any damage from its use. The developer of Solara is responsible for Solara.
+        • Spotify gives no warranties regarding Solara, including implied warranties of merchantability, fitness for a particular purpose and non-infringement, and is not liable for it or for any damage from its use. The developer of Solara is responsible for Solara.
+        • You may not modify, or create derivative works based on, the Spotify platform, service or content.
         • You may not decompile, disassemble or reverse engineer Solara, including the Spotify section, except where the law does not allow this to be prohibited.
-        • Spotify is a third-party beneficiary of these terms with respect to the Spotify section and may enforce them.
+        • Spotify is a third-party beneficiary of these terms and of the Privacy Policy with respect to the Spotify section and may enforce them directly.
 
         5. Solara is not affiliated with Google, YouTube, Spotify, Deezer, Jamendo or Audius. Their names and logos belong to their owners.
 
@@ -71,6 +72,7 @@ object LegalTexts {
         • This data is kept only in the memory of the running app and is erased when you disconnect Spotify and when you close the app. Solara does not store it on a server or on the device, and does not add it to likes, playlists, history or recommendations.
         • The “+” button sends the track to “Liked Songs” in your Spotify account. Solara stores nothing about this itself.
         • You can disconnect Spotify with the “Disconnect Spotify” button in the Spotify section. You can revoke the app's access to your Spotify account at: $SPOTIFY_APPS_URL.
+        • Spotify is a third-party beneficiary of this Privacy Policy with respect to the Spotify section and may enforce it directly.
 
         5. Who receives data: Supabase (accounts and library), Google (sign-in and YouTube), Spotify (controlling the Spotify app on your device), Jamendo, Audius, Deezer (catalog requests).
 
@@ -99,9 +101,10 @@ object LegalTexts {
         3. Розділ YouTube використовує YouTube API Services. Користуючись ним, ви погоджуєтеся дотримуватися Умов використання YouTube: $YOUTUBE_TERMS_URL. Відео відтворюється лише у вбудованому плеєрі YouTube, доки відео видно на екрані (у повному вигляді або в плаваючому вікні). Solara не завантажує й не зберігає відео та не створює їхніх копій.
 
         4. Розділ Spotify керує застосунком Spotify на вашому пристрої: музику відтворює сам застосунок Spotify, потрібен Spotify Premium. Solara не відтворює, не завантажує й не зберігає музику та обкладинки Spotify. Користуючись цим розділом, ви погоджуєтеся з умовами Spotify: $SPOTIFY_TERMS_URL.
-        • Spotify не надає жодних гарантій щодо Solara і не відповідає за неї та за шкоду від її використання. За Solara відповідає її розробник.
+        • Spotify не надає жодних гарантій щодо Solara, зокрема неявних гарантій товарної придатності, придатності для певної мети та непорушення прав, і не відповідає за неї та за шкоду від її використання. За Solara відповідає її розробник.
+        • Заборонено змінювати платформу, сервіс чи контент Spotify та створювати похідні роботи на їхній основі.
         • Заборонено декомпілювати, розбирати та піддавати зворотному проєктуванню Solara, зокрема розділ Spotify, крім випадків, коли закон не дозволяє це забороняти.
-        • Spotify є третьою стороною-бенефіціаром цих умов у частині, що стосується розділу Spotify, і має право вимагати їх дотримання.
+        • Spotify є третьою стороною-бенефіціаром цих умов і Політики конфіденційності в частині, що стосується розділу Spotify, і має право безпосередньо вимагати їх дотримання.
 
         5. Solara не пов’язана з Google, YouTube, Spotify, Deezer, Jamendo і Audius. Їхні назви та логотипи належать їхнім власникам.
 
@@ -128,6 +131,7 @@ object LegalTexts {
         • Ці дані зберігаються лише в пам’яті запущеного застосунку та стираються під час відключення Spotify і закриття застосунку. Solara не зберігає їх на сервері й на пристрої, не додає до вподобань, плейлистів, історії та рекомендацій.
         • Кнопка «+» надсилає трек до «Улюблених треків» вашого акаунта Spotify. Solara у себе про це нічого не зберігає.
         • Відключити Spotify можна кнопкою «Відключити Spotify» в розділі Spotify. Доступ застосунку до вашого акаунта Spotify можна відкликати на сторінці: $SPOTIFY_APPS_URL.
+        • Spotify є третьою стороною-бенефіціаром цієї Політики конфіденційності в частині, що стосується розділу Spotify, і має право безпосередньо вимагати її дотримання.
 
         5. Кому передаються дані: Supabase (акаунти та бібліотека), Google (вхід і YouTube), Spotify (керування застосунком Spotify на вашому пристрої), Jamendo, Audius, Deezer (запити до каталогів).
 
