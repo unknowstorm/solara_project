@@ -151,7 +151,7 @@ fun MainScreen(
                                 .onGloballyPositioned { session.screenBounds = it.boundsInWindow() },
                         ) { page, active ->
                             when (page) {
-                                null -> LikedContent(likes, providers, audio, onOpenAuth)
+                                null -> LibraryContent(likes, playlists, history, providers, audio, onOpenAuth, onOpenPlaylist = { openPlaylist = it })
                                 Service.YOUTUBE -> YouTubeScreen(
                                     audio = audio,
                                     session = session,
@@ -162,6 +162,7 @@ fun MainScreen(
                                     feedsFor(page), page, { service = it; showLikes = false }, audio, likes, providers,
                                     false, { showLikes = true }, onOpenAuth, playlists, recs, { openPlaylist = it },
                                     showBar = false,
+                                    history = history,
                                 )
                             }
                         }

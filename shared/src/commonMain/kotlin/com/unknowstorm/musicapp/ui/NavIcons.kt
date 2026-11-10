@@ -84,3 +84,18 @@ fun SettingsIcon(modifier: Modifier = Modifier.size(24.dp), tint: Color = LocalC
         }
     }
 }
+
+/** «Моя библиотека»: три книги на полке. */
+@Composable
+fun LibraryIcon(modifier: Modifier = Modifier.size(24.dp), tint: Color = LocalContentColor.current) {
+    Canvas(modifier) {
+        scale(size.width / 24f, pivot = Offset.Zero) {
+            val books = Path().apply {
+                moveTo(3.5f, 5f); lineTo(8f, 5f); lineTo(8f, 19f); lineTo(3.5f, 19f); close()
+                moveTo(10f, 5f); lineTo(14.5f, 5f); lineTo(14.5f, 19f); lineTo(10f, 19f); close()
+                moveTo(16f, 6.5f); lineTo(19.8f, 5.5f); lineTo(22.4f, 18f); lineTo(18.6f, 19f); close()
+            }
+            drawPath(books, tint, style = navStroke())
+        }
+    }
+}
