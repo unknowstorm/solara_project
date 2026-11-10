@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.provider.youtube
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.Secrets
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -169,8 +170,8 @@ class YouTubeApi(
             val text = runCatching { response.bodyAsText() }.getOrDefault("")
             val quota = text.contains("quotaExceeded") || text.contains("dailyLimitExceeded")
             throw YouTubeException(
-                if (quota) "Дневной лимит запросов YouTube исчерпан. Попробуйте завтра."
-                else "Ошибка YouTube API (${response.status.value})"
+                if (quota) S.theDailyYoutubeRequestLimit
+                else S.youtubeApiError(response.status.value)
             )
         }
         return response

@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.CancellationException
@@ -28,7 +29,7 @@ suspend fun searchAll(providers: List<MusicProvider>, query: String): List<Track
         }.awaitAll()
     }
     if (providers.isNotEmpty() && failures == providers.size) {
-        throw firstError ?: IllegalStateException("Источники недоступны")
+        throw firstError ?: IllegalStateException(S.sourcesUnavailable)
     }
     return interleave(lists)
 }

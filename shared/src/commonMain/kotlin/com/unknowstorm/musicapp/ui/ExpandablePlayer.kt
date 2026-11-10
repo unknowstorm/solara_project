@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
@@ -817,9 +818,9 @@ private fun FullContent(
     if (showDetails) {
         AlertDialog(
             onDismissRequest = { showDetails = false },
-            confirmButton = { TextButton(onClick = { showDetails = false }) { Text("Закрыть") } },
+            confirmButton = { TextButton(onClick = { showDetails = false }) { Text(S.close) } },
             title = { Text(state.title ?: "") },
-            text = { Text("Исполнитель: ${state.artist ?: "—"}\nИсточник: ${state.provider?.toService()?.title ?: "—"}") },
+            text = { Text(S.artistSource(state.artist ?: "—", state.provider?.toService()?.title ?: "—")) },
         )
     }
 }

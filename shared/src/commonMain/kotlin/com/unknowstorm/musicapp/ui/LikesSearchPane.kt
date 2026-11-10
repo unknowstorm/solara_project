@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -43,12 +44,12 @@ internal fun LikesSearchPane(
 
     when {
         !signedIn -> Text(
-            "Войдите в аккаунт, чтобы искать по своим лайкам.",
+            S.signInToSearchYour,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp),
         )
         shown.isEmpty() -> Text(
-            if (q.isEmpty()) "Лайков пока нет. Нажмите ♡ в плеере." else "В лайках ничего не найдено",
+            if (q.isEmpty()) S.noLikesYetTapIn else S.nothingFoundInYourLikes,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp),
         )

@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.player
 
+import com.unknowstorm.musicapp.i18n.S
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
@@ -80,12 +81,12 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             // При повторе одного трека «следующий» это он же, поэтому повтор выключаем
             if (c.repeatMode == Player.REPEAT_MODE_ONE) c.repeatMode = Player.REPEAT_MODE_OFF
             if (errorStreak < c.mediaItemCount && c.hasNextMediaItem()) {
-                showError("Трек недоступен, включаю следующий")
+                showError(S.trackUnavailablePlayingTheNext)
                 c.seekToNextMediaItem()
                 c.prepare()
                 c.play()
             } else {
-                showError("Трек недоступен")
+                showError(S.trackUnavailable)
             }
             publish()
         }
@@ -249,7 +250,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         val slow = RangeSupport.isNoRange("AUDIUS:$id") &&
             c.playbackState == Player.STATE_BUFFERING &&
             c.currentPosition > 15_000
-        return if (slow) "Audius отдаёт этот трек только целиком, перемотка займёт до минуты" else null
+        return if (slow) S.audiusServesThisTrackOnly else null
     }
 
     private fun publish() {

@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
+import com.unknowstorm.musicapp.i18n.I18n
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
@@ -48,11 +50,14 @@ import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
 
-enum class Tab(val label: String) {
-    HOME("Главная"),
-    SEARCH("Поиск"),
-    QUEUE("Очередь"),
-    SETTINGS("Настройки"),
+enum class Tab(private val labelFn: () -> String) {
+    HOME({ S.home }),
+    SEARCH({ S.search }),
+    QUEUE({ S.queue }),
+    SETTINGS({ S.settings });
+
+    /** Подпись берётся при каждом чтении, поэтому меняется вместе с языком. */
+    val label: String get() = labelFn()
 }
 
 @Composable
@@ -75,7 +80,7 @@ fun MainScreen(
         mutableFloatStateOf(pagerOrder(true).indexOf(if (showLikes) null else service).coerceAtLeast(0).toFloat())
     }
 
-    val feeds = remember(providers) {
+    val feeds = remember(providers, I18n.language) {
         providers.mapNotNull { provider ->
             val s = Service.entries.firstOrNull { it.name == provider.id.toString() }
             s?.let { HomeFeed(it, provider, defaultMixes(it)) }
@@ -243,7 +248,7 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
-        Text("Настройки", style = MaterialTheme.typography.headlineMedium)
+        Text(S.settings, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(16.dp))
 
         var editingProfile by remember { mutableStateOf(false) }
@@ -253,7 +258,7 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         val authState by authRepo.state.collectAsState()
         var showChangePassword by remember { mutableStateOf(false) }
         if (authState is AuthState.SignedIn) {
-            TextButton(onClick = { showChangePassword = true }) { Text("Сменить пароль") }
+            TextButton(onClick = { showChangePassword = true }) { Text(S.changePassword) }
         }
         val editProfile = (authState as? AuthState.SignedIn)?.profile
         if (editingProfile && editProfile != null) {
@@ -270,15 +275,18 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
 
+        LanguageSetting()
+        Spacer(Modifier.height(24.dp))
+
         LegalLinks()
         Spacer(Modifier.height(24.dp))
-        Text("Источники музыки", style = MaterialTheme.typography.titleMedium)
+        Text(S.musicSources, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Service.entries.filter { it != Service.ALL }.forEach { service ->
             ListItem(
                 headlineContent = { Text(service.title) },
                 supportingContent = {
-                    Text(if (service.ready) "Работает. ${service.note}" else "Скоро. ${service.note}")
+                    Text(if (service.ready) S.available(service.note) else S.comingSoon(service.note))
                 },
             )
         }

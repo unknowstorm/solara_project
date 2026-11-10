@@ -12,19 +12,19 @@ class StubAudioBackend : AudioBackend {
     private val _state = MutableStateFlow(PlaybackState())
     override val state: StateFlow<PlaybackState> = _state.asStateFlow()
 
-    private var queue: List<Track> = emptyList()
+    private var trackList: List<Track> = emptyList()
     private var index = 0
     private var repeat = RepeatMode.OFF
     private var shuffle = false
 
     override fun playQueue(tracks: List<Track>, startIndex: Int) {
-        queue = tracks
+        trackList = tracks
         index = startIndex.coerceIn(0, (tracks.size - 1).coerceAtLeast(0))
         publishCurrent(playing = true)
     }
 
     private fun publishCurrent(playing: Boolean) {
-        val track = queue.getOrNull(index) ?: return
+        val track = trackList.getOrNull(index) ?: return
         _state.value = PlaybackState(
             mediaId = track.id,
             title = track.title,
@@ -32,7 +32,7 @@ class StubAudioBackend : AudioBackend {
             artworkUrl = track.artworkUrl,
             isPlaying = playing,
             durationMs = track.durationMs,
-            hasNext = index < queue.lastIndex,
+            hasNext = index < trackList.lastIndex,
             hasPrevious = index > 0,
             repeatMode = repeat,
             shuffle = shuffle,
@@ -49,7 +49,7 @@ class StubAudioBackend : AudioBackend {
     }
 
     override fun next() {
-        if (index < queue.lastIndex) {
+        if (index < trackList.lastIndex) {
             index++
             publishCurrent(playing = true)
         }
@@ -67,7 +67,7 @@ class StubAudioBackend : AudioBackend {
     }
 
     override fun stop() {
-        queue = emptyList()
+        trackList = emptyList()
         index = 0
         _state.value = PlaybackState(repeatMode = repeat, shuffle = shuffle)
     }

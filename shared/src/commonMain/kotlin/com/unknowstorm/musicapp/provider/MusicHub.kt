@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.provider
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import kotlinx.coroutines.CancellationException
@@ -32,14 +33,14 @@ class MusicHub(
                         val result = try {
                             val tracks = withTimeoutOrNull(timeoutMs) { provider.search(query) }
                             if (tracks == null) {
-                                SourceResult(provider.id, error = "нет ответа")
+                                SourceResult(provider.id, error = S.noResponse)
                             } else {
                                 SourceResult(provider.id, tracks)
                             }
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            SourceResult(provider.id, error = e.message ?: "ошибка")
+                            SourceResult(provider.id, error = e.message ?: S.error)
                         }
                         send(result)
                     }

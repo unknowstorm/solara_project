@@ -1,9 +1,11 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.tr
+
 /**
- * Тексты условий и политики конфиденциальности.
- * ПЕРЕД ПУБЛИКАЦИЕЙ: заполните CONTACT_EMAIL и проверьте, что каждый пункт соответствует
- * тому, как приложение работает на самом деле. Это шаблон, а не юридическая консультация.
+ * Terms of use and privacy policy texts (English and Ukrainian).
+ * BEFORE PUBLISHING: fill in CONTACT_EMAIL and check that every item matches how the app really works.
+ * This is a template, not legal advice.
  */
 object LegalTexts {
     const val CONTACT_EMAIL = "musics.solara@gmail.com"
@@ -14,62 +16,127 @@ object LegalTexts {
     const val SPOTIFY_PRIVACY_URL = "https://www.spotify.com/legal/privacy-policy/"
     const val SPOTIFY_APPS_URL = "https://www.spotify.com/account/apps/"
 
-    val CONSENT_LINE =
-        "Я принимаю Условия использования Solara, включая Условия использования YouTube, " +
-            "и Политику конфиденциальности."
+    val CONSENT_LINE: String
+        get() = tr(
+            "I accept the Solara Terms of Use, including the YouTube Terms of Service, and the Privacy Policy.",
+            "Я приймаю Умови використання Solara, зокрема Умови використання YouTube, і Політику конфіденційності.",
+        )
 
-    val YOUTUBE_INTRO = """
-        Раздел YouTube использует службы YouTube API Services. Видео играет во встроенном плеере YouTube, пока видео видно на экране (в полном виде или в плавающем окне). Фоновое воспроизведение для YouTube не поддерживается, это требование YouTube.
+    val YOUTUBE_INTRO: String get() = tr(YOUTUBE_INTRO_EN, YOUTUBE_INTRO_UK)
+    val TERMS: String get() = tr(TERMS_EN, TERMS_UK)
+    val PRIVACY: String get() = tr(PRIVACY_EN, PRIVACY_UK)
 
-        Чтобы продолжить, прочитайте условия ниже и подтвердите согласие.
+    // ---------- English ----------
+
+    private val YOUTUBE_INTRO_EN = """
+        The YouTube section uses YouTube API Services. Videos play in the embedded YouTube player while the video is visible on screen (full-size or in the floating window). Background playback is not supported for YouTube; this is a YouTube requirement.
+
+        To continue, read the terms below and confirm your agreement.
     """.trimIndent()
 
-    val TERMS = """
-        1. Solara — учебный проект. Приложение предоставляется «как есть».
+    private val TERMS_EN = """
+        1. Solara is a student project. The app is provided “as is”.
 
-        2. Музыка из Jamendo, Audius и Deezer воспроизводится по условиям этих сервисов и лицензий авторов. Права на треки и обложки принадлежат их авторам.
+        2. Music from Jamendo, Audius and Deezer is played under the terms of those services and the authors' licenses. Rights to tracks and artwork belong to their authors.
 
-        3. Раздел YouTube использует службы YouTube API Services. Используя его, вы соглашаетесь соблюдать Условия использования YouTube: $YOUTUBE_TERMS_URL. Видео воспроизводится только во встроенном плеере YouTube, пока видео видно на экране (в полном виде или в плавающем окне). Solara не скачивает и не сохраняет видео и не создаёт их копий.
+        3. The YouTube section uses YouTube API Services. By using it, you agree to be bound by the YouTube Terms of Service: $YOUTUBE_TERMS_URL. Videos play only in the embedded YouTube player while the video is visible on screen (full-size or in the floating window). Solara does not download or store videos and does not make copies of them.
 
-        4. Раздел Spotify управляет приложением Spotify на вашем устройстве: музыку играет само приложение Spotify, нужен Spotify Premium. Solara не воспроизводит, не скачивает и не сохраняет музыку и обложки Spotify. Используя этот раздел, вы соглашаетесь с условиями Spotify: $SPOTIFY_TERMS_URL.
-        • Spotify не даёт никаких гарантий в отношении Solara и не несёт ответственности за неё и за ущерб от её использования. За Solara отвечает её разработчик.
-        • Запрещено декомпилировать, разбирать и подвергать реверс-инжинирингу Solara, включая раздел Spotify, кроме случаев, когда закон этого не позволяет запретить.
-        • Spotify является третьей стороной-бенефициаром этих условий в части, касающейся раздела Spotify, и вправе требовать их соблюдения.
+        4. The Spotify section controls the Spotify app on your device: the Spotify app itself plays the music, and Spotify Premium is required. Solara does not play, download or store Spotify music or artwork. By using this section, you agree to Spotify's terms: $SPOTIFY_TERMS_URL.
+        • Spotify gives no warranties regarding Solara and is not liable for it or for any damage from its use. The developer of Solara is responsible for Solara.
+        • You may not decompile, disassemble or reverse engineer Solara, including the Spotify section, except where the law does not allow this to be prohibited.
+        • Spotify is a third-party beneficiary of these terms with respect to the Spotify section and may enforce them.
 
-        5. Solara не связана с Google, YouTube, Spotify, Deezer, Jamendo и Audius. Их названия и логотипы принадлежат их владельцам.
+        5. Solara is not affiliated with Google, YouTube, Spotify, Deezer, Jamendo or Audius. Their names and logos belong to their owners.
 
-        6. Вопросы: $CONTACT_EMAIL.
+        6. Questions: $CONTACT_EMAIL.
     """.trimIndent()
 
-    val PRIVACY = """
-        1. Кто отвечает за данные. Проект Solara (учебный проект). Контакт: $CONTACT_EMAIL.
+    private val PRIVACY_EN = """
+        1. Who is responsible for the data. The Solara project (a student project). Contact: $CONTACT_EMAIL.
 
-        2. Какие данные мы обрабатываем.
-        • Аккаунт: адрес электронной почты, никнейм, аватар и настройки. При входе через Google мы получаем имя, адрес почты и фото вашего профиля Google. Мы не запрашиваем доступ к данным вашего аккаунта YouTube.
-        • Библиотека: лайки, плейлисты и история прослушивания музыки из Jamendo, Audius, Deezer и локальных файлов. Они используются для рекомендаций. Данные Spotify и YouTube в библиотеку не попадают.
-        • Технические данные: IP-адрес и сведения об устройстве передаются сервисам, к которым обращается приложение (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
+        2. What data we process.
+        • Account: email address, nickname, avatar and settings. When you sign in with Google, we receive your Google profile name, email address and photo. We do not request access to your YouTube account data.
+        • Library: likes, playlists and listening history for music from Jamendo, Audius, Deezer and local files. They are used for recommendations. Spotify and YouTube data does not enter the library.
+        • Technical data: your IP address and device information are passed to the services the app contacts (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
 
-        3. YouTube API Services. Раздел YouTube использует службы YouTube API Services. Используя его, вы соглашаетесь с Условиями использования YouTube ($YOUTUBE_TERMS_URL). Политика конфиденциальности Google: $GOOGLE_PRIVACY_URL.
-        • Ваш поисковый запрос отправляется в YouTube Data API.
-        • Видео воспроизводится встроенным плеером YouTube. При его загрузке YouTube получает данные об устройстве и приложении, а плеер может использовать cookies и локальное хранилище и показывать рекламу. Solara этим не управляет.
-        • Видео, которое вы выбрали в списке, запускается автоматически. Поэтому плеер YouTube собирает и передаёт данные об устройстве и приложении уже при загрузке и при воспроизведении, а не после отдельного нажатия «Play». Видео никогда не запускается само без вашего выбора.
-        • Результаты поиска YouTube хранятся только в памяти запущенного приложения. Solara не сохраняет видео и не добавляет данные YouTube в лайки, плейлисты, историю и рекомендации.
-        • Видео, помеченные YouTube как «для детей», в Solara не показываются.
+        3. YouTube API Services. The YouTube section uses YouTube API Services. By using it, you agree to be bound by the YouTube Terms of Service ($YOUTUBE_TERMS_URL). Google Privacy Policy: $GOOGLE_PRIVACY_URL.
+        • Your search query is sent to the YouTube Data API.
+        • Videos play in the embedded YouTube player. When it loads, YouTube receives data about your device and the app, and the player may use cookies and local storage and show ads. Solara does not control this.
+        • The video you pick from the list starts automatically. Therefore the YouTube player collects and transmits device and app data already when it loads and while it plays, not after a separate “Play” tap. A video never starts on its own without your selection.
+        • YouTube search results are kept only in the memory of the running app. Solara does not save videos and does not add YouTube data to likes, playlists, history or recommendations.
+        • Videos marked by YouTube as “made for kids” are not shown in Solara.
 
-        4. Spotify. Раздел Spotify управляет приложением Spotify на вашем устройстве, музыку играет само приложение Spotify (нужен Spotify Premium). Условия Spotify: $SPOTIFY_TERMS_URL. Политика конфиденциальности Spotify: $SPOTIFY_PRIVACY_URL.
-        • После подключения Solara получает от приложения Spotify название и исполнителя текущего трека, обложку, состояние и позицию воспроизведения, а также подборки рекомендаций Spotify, чтобы показать их в мини-плеере, плеере и разделе Spotify.
-        • Эти данные хранятся только в памяти запущенного приложения и стираются при отключении Spotify и закрытии приложения. Solara не сохраняет их на сервере и на устройстве, не добавляет в лайки, плейлисты, историю и рекомендации.
-        • Кнопка «+» отправляет трек в «Любимые треки» вашего аккаунта Spotify. Solara у себя об этом ничего не сохраняет.
-        • Отключить Spotify можно кнопкой «Отключить Spotify» в разделе Spotify. Доступ приложения к вашему аккаунту Spotify можно отозвать на странице: $SPOTIFY_APPS_URL.
+        4. Spotify. The Spotify section controls the Spotify app on your device; the Spotify app itself plays the music (Spotify Premium is required). Spotify terms: $SPOTIFY_TERMS_URL. Spotify Privacy Policy: $SPOTIFY_PRIVACY_URL.
+        • After connecting, Solara receives from the Spotify app the title and artist of the current track, the artwork, the playback state and position, and Spotify's recommendation collections, in order to show them in the mini-player, the player and the Spotify section.
+        • This data is kept only in the memory of the running app and is erased when you disconnect Spotify and when you close the app. Solara does not store it on a server or on the device, and does not add it to likes, playlists, history or recommendations.
+        • The “+” button sends the track to “Liked Songs” in your Spotify account. Solara stores nothing about this itself.
+        • You can disconnect Spotify with the “Disconnect Spotify” button in the Spotify section. You can revoke the app's access to your Spotify account at: $SPOTIFY_APPS_URL.
 
-        5. Кому передаются данные: Supabase (аккаунты и библиотека), Google (вход и YouTube), Spotify (управление приложением Spotify на вашем устройстве), Jamendo, Audius, Deezer (запросы к каталогам).
+        5. Who receives data: Supabase (accounts and library), Google (sign-in and YouTube), Spotify (controlling the Spotify app on your device), Jamendo, Audius, Deezer (catalog requests).
 
-        6. Cookies и данные на устройстве. Встроенный плеер YouTube может сохранять cookies. Приложение хранит локальные настройки, например ваше согласие с условиями.
+        6. Cookies and on-device data. The embedded YouTube player may store cookies. The app stores local settings, for example your agreement to the terms.
 
-        7. Ваши права. Вы можете запросить удаление своих данных и аккаунта, написав на $CONTACT_EMAIL.
+        7. Your rights. You can request deletion of your data and account by writing to $CONTACT_EMAIL.
 
-        8. Доступ Google. Если вы входили через Google, вы можете отозвать доступ на странице: $GOOGLE_PERMISSIONS_URL.
+        8. Google access. If you signed in with Google, you can revoke access at: $GOOGLE_PERMISSIONS_URL.
 
-        9. Контакты. Вопросы и жалобы по поводу конфиденциальности: $CONTACT_EMAIL.
+        9. Contact. Questions and complaints about privacy: $CONTACT_EMAIL.
+    """.trimIndent()
+
+    // ---------- Українська ----------
+
+    private val YOUTUBE_INTRO_UK = """
+        Розділ YouTube використовує YouTube API Services. Відео відтворюється у вбудованому плеєрі YouTube, доки відео видно на екрані (у повному вигляді або в плаваючому вікні). Фонове відтворення для YouTube не підтримується, це вимога YouTube.
+
+        Щоб продовжити, прочитайте умови нижче й підтвердьте згоду.
+    """.trimIndent()
+
+    private val TERMS_UK = """
+        1. Solara — навчальний проєкт. Застосунок надається «як є».
+
+        2. Музика з Jamendo, Audius і Deezer відтворюється на умовах цих сервісів і ліцензій авторів. Права на треки та обкладинки належать їхнім авторам.
+
+        3. Розділ YouTube використовує YouTube API Services. Користуючись ним, ви погоджуєтеся дотримуватися Умов використання YouTube: $YOUTUBE_TERMS_URL. Відео відтворюється лише у вбудованому плеєрі YouTube, доки відео видно на екрані (у повному вигляді або в плаваючому вікні). Solara не завантажує й не зберігає відео та не створює їхніх копій.
+
+        4. Розділ Spotify керує застосунком Spotify на вашому пристрої: музику відтворює сам застосунок Spotify, потрібен Spotify Premium. Solara не відтворює, не завантажує й не зберігає музику та обкладинки Spotify. Користуючись цим розділом, ви погоджуєтеся з умовами Spotify: $SPOTIFY_TERMS_URL.
+        • Spotify не надає жодних гарантій щодо Solara і не відповідає за неї та за шкоду від її використання. За Solara відповідає її розробник.
+        • Заборонено декомпілювати, розбирати та піддавати зворотному проєктуванню Solara, зокрема розділ Spotify, крім випадків, коли закон не дозволяє це забороняти.
+        • Spotify є третьою стороною-бенефіціаром цих умов у частині, що стосується розділу Spotify, і має право вимагати їх дотримання.
+
+        5. Solara не пов’язана з Google, YouTube, Spotify, Deezer, Jamendo і Audius. Їхні назви та логотипи належать їхнім власникам.
+
+        6. Запитання: $CONTACT_EMAIL.
+    """.trimIndent()
+
+    private val PRIVACY_UK = """
+        1. Хто відповідає за дані. Проєкт Solara (навчальний проєкт). Контакт: $CONTACT_EMAIL.
+
+        2. Які дані ми обробляємо.
+        • Акаунт: адреса електронної пошти, нікнейм, аватар і налаштування. Під час входу через Google ми отримуємо ім’я, адресу пошти та фото вашого профілю Google. Ми не запитуємо доступ до даних вашого акаунта YouTube.
+        • Бібліотека: вподобання, плейлисти та історія прослуховування музики з Jamendo, Audius, Deezer і локальних файлів. Вони використовуються для рекомендацій. Дані Spotify і YouTube до бібліотеки не потрапляють.
+        • Технічні дані: IP-адреса та відомості про пристрій передаються сервісам, до яких звертається застосунок (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
+
+        3. YouTube API Services. Розділ YouTube використовує YouTube API Services. Користуючись ним, ви погоджуєтеся дотримуватися Умов використання YouTube ($YOUTUBE_TERMS_URL). Політика конфіденційності Google: $GOOGLE_PRIVACY_URL.
+        • Ваш пошуковий запит надсилається до YouTube Data API.
+        • Відео відтворюється вбудованим плеєром YouTube. Під час його завантаження YouTube отримує дані про пристрій і застосунок, а плеєр може використовувати cookies і локальне сховище та показувати рекламу. Solara цим не керує.
+        • Відео, яке ви вибрали у списку, запускається автоматично. Тому плеєр YouTube збирає й передає дані про пристрій і застосунок уже під час завантаження та відтворення, а не після окремого натискання «Play». Відео ніколи не запускається саме без вашого вибору.
+        • Результати пошуку YouTube зберігаються лише в пам’яті запущеного застосунку. Solara не зберігає відео й не додає дані YouTube до вподобань, плейлистів, історії та рекомендацій.
+        • Відео, позначені YouTube як «для дітей», у Solara не показуються.
+
+        4. Spotify. Розділ Spotify керує застосунком Spotify на вашому пристрої, музику відтворює сам застосунок Spotify (потрібен Spotify Premium). Умови Spotify: $SPOTIFY_TERMS_URL. Політика конфіденційності Spotify: $SPOTIFY_PRIVACY_URL.
+        • Після підключення Solara отримує від застосунку Spotify назву та виконавця поточного треку, обкладинку, стан і позицію відтворення, а також добірки рекомендацій Spotify, щоб показати їх у міні-плеєрі, плеєрі та розділі Spotify.
+        • Ці дані зберігаються лише в пам’яті запущеного застосунку та стираються під час відключення Spotify і закриття застосунку. Solara не зберігає їх на сервері й на пристрої, не додає до вподобань, плейлистів, історії та рекомендацій.
+        • Кнопка «+» надсилає трек до «Улюблених треків» вашого акаунта Spotify. Solara у себе про це нічого не зберігає.
+        • Відключити Spotify можна кнопкою «Відключити Spotify» в розділі Spotify. Доступ застосунку до вашого акаунта Spotify можна відкликати на сторінці: $SPOTIFY_APPS_URL.
+
+        5. Кому передаються дані: Supabase (акаунти та бібліотека), Google (вхід і YouTube), Spotify (керування застосунком Spotify на вашому пристрої), Jamendo, Audius, Deezer (запити до каталогів).
+
+        6. Cookies і дані на пристрої. Вбудований плеєр YouTube може зберігати cookies. Застосунок зберігає локальні налаштування, наприклад вашу згоду з умовами.
+
+        7. Ваші права. Ви можете запросити видалення своїх даних і акаунта, написавши на $CONTACT_EMAIL.
+
+        8. Доступ Google. Якщо ви входили через Google, ви можете відкликати доступ на сторінці: $GOOGLE_PERMISSIONS_URL.
+
+        9. Контакти. Запитання та скарги щодо конфіденційності: $CONTACT_EMAIL.
     """.trimIndent()
 }

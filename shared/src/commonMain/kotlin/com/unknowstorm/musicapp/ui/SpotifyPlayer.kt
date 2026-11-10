@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
@@ -697,9 +698,9 @@ private fun SpFullContent(
     if (showDetails) {
         AlertDialog(
             onDismissRequest = { showDetails = false },
-            confirmButton = { TextButton(onClick = { showDetails = false }) { Text("Закрыть") } },
+            confirmButton = { TextButton(onClick = { showDetails = false }) { Text(S.close) } },
             title = { Text(s.title ?: "") },
-            text = { Text("Исполнитель: ${s.artist ?: "—"}\nИсточник: Spotify") },
+            text = { Text(S.artistSourceSpotify(s.artist ?: "—")) },
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -41,7 +42,7 @@ private val Extensions = setOf("jpg", "jpeg", "png", "bmp", "gif")
 
 /** Открывает окно выбора файла, обрезает фото по центру до квадрата и сжимает в JPEG. */
 private fun pickAndPrepare(): ByteArray? {
-    val dialog = FileDialog(null as Frame?, "Выбери фото", FileDialog.LOAD).apply {
+    val dialog = FileDialog(null as Frame?, S.chooseAPhoto, FileDialog.LOAD).apply {
         setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in Extensions }
         isVisible = true // блокирует поток, пока окно открыто
     }

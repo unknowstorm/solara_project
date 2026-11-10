@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import kotlin.math.sin
 import kotlin.math.floor
 import kotlin.math.PI
@@ -101,25 +102,25 @@ private suspend fun searchWithRetry(provider: MusicProvider, query: String): Lis
 /** Подборки источника: заголовок и поисковый запрос (пустой запрос = популярное). */
 fun defaultMixes(service: Service): List<Pair<String, String>> = when (service) {
     Service.JAMENDO -> listOf(
-        "Популярное" to "",
-        "Для расслабления" to "chillout",
-        "Электроника" to "electronic",
-        "Рок" to "rock",
-        "Поп" to "pop",
+        S.popular to "",
+        S.relaxing to "chillout",
+        S.electronic to "electronic",
+        S.rock to "rock",
+        S.pop to "pop",
     )
     Service.AUDIUS -> listOf(
-        "Популярное" to "",
-        "Электроника" to "electronic",
-        "Рок" to "rock",
-        "Хип-хоп" to "hip hop",
-        "Лоу-фай" to "lofi",
+        S.popular to "",
+        S.electronic to "electronic",
+        S.rock to "rock",
+        S.hipHop to "hip hop",
+        S.loFi to "lofi",
     )
     Service.DEEZER -> listOf(
-        "Чарт" to "",
-        "Электроника" to "electronic",
-        "Рок" to "rock",
-        "Поп" to "pop",
-        "Хип-хоп" to "hip hop",
+        S.chart to "",
+        S.electronic to "electronic",
+        S.rock to "rock",
+        S.pop to "pop",
+        S.hipHop to "hip hop",
     )
     else -> emptyList()
 }
@@ -171,7 +172,7 @@ class HomeFeed(
                 }.awaitAll()
             }.filterNotNull().filter { it.tracks.isNotEmpty() }
             sections = loaded
-            if (loaded.isEmpty() && lastError != null) error = "Ошибка загрузки: $lastError"
+            if (loaded.isEmpty() && lastError != null) error = S.loadingError(lastError)
         } finally {
             loading = false
         }
@@ -199,7 +200,7 @@ private fun buildRows(feeds: List<HomeFeed>, mixed: Boolean): List<FeedRow> {
     val firstRows = perFeed.mapNotNull { it.firstOrNull() }
     if (firstRows.size < 2) return rows
     val mix = roundRobin(firstRows.map { it.tracks }).take(16)
-    return listOf(FeedRow("mix", "Микс из всех источников", Service.ALL, mix)) + rows
+    return listOf(FeedRow("mix", S.mixFromAllSources, Service.ALL, mix)) + rows
 }
 
 // --- ОБНОВЛЕННЫЙ HOME SCREEN ---
@@ -232,12 +233,12 @@ fun HomeScreen(
     deleting?.let { target ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Удалить плейлист?") },
-            text = { Text("«${target.name}» будет удалён без возможности восстановления.") },
+            title = { Text(S.deletePlaylist) },
+            text = { Text(S.willBeDeletedPermanently(target.name)) },
             confirmButton = {
-                TextButton(onClick = { playlists?.delete(target.id); deleting = null }) { Text("Удалить") }
+                TextButton(onClick = { playlists?.delete(target.id); deleting = null }) { Text(S.delete) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(S.cancel) } },
         )
     }
     val rows = buildRows(feeds, mixed)
@@ -274,11 +275,11 @@ fun HomeScreen(
         }
 
         if (service == Service.DEEZER) {
-            HintCard("Deezer: только 30-секундные превью. Они живут на своём чипе и не попадают в общий поиск и очередь.")
+            HintCard(S.deezer30SecondPreviewsOnly)
         }
 
         if (!service.ready) {
-            HintCard("${service.title} скоро появится. ${service.note}.")
+            HintCard(S.isComingSoon(service.title, service.note))
             return@Column
         }
 
@@ -290,7 +291,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
+                    Text(S.youLiked, style = MaterialTheme.typography.titleLarge)
                 }
             }
             if (!isDeezer) item(key = "likes") {
@@ -300,10 +301,10 @@ fun HomeScreen(
                     .filterNot { DeadTracks.isDead(it) }
                     .filter { recProvider == null || it.provider == recProvider }
                 when {
-                    !signedIn -> HintCard("Войдите в аккаунт, и треки, которые вы лайкнете (♡ в плеере), будут храниться здесь.")
+                    !signedIn -> HintCard(S.signInAndTheTracks)
                     shown.isEmpty() -> HintCard(
-                        if (recProvider != null && liked.isNotEmpty()) "На этом сервисе лайков пока нет."
-                        else "Нажмите ♡ в плеере, и трек появится здесь."
+                        if (recProvider != null && liked.isNotEmpty()) S.thereAreNoLikesOn
+                        else S.tapInThePlayerAnd
                     )
                     else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -319,11 +320,11 @@ fun HomeScreen(
             }
 
             // Подборки
-            item { SectionTitle("Подборки для вас") }
+            item { SectionTitle(S.picksForYou) }
             if (!isDeezer && shownRecs.isNotEmpty()) {
                 item(key = "recs-label") {
                     Text(
-                        "Ещё от тех, кого вы слушаете: " + recArtists.joinToString(", "),
+                        S.moreFromArtistsYouListen + recArtists.joinToString(", "),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -353,7 +354,7 @@ fun HomeScreen(
                     item(key = "error:${feed.service.name}") {
                         Column(Modifier.padding(horizontal = 16.dp)) {
                             Text("${feed.service.title}: $message", color = MaterialTheme.colorScheme.error)
-                            TextButton(onClick = { scope.launch { feed.load() } }) { Text("Повторить") }
+                            TextButton(onClick = { scope.launch { feed.load() } }) { Text(S.retry) }
                         }
                     }
                 }
@@ -376,9 +377,9 @@ fun HomeScreen(
             }
 
             // Плейлисты
-            item { SectionTitle("Ваши плейлисты") }
+            item { SectionTitle(S.yourPlaylists) }
             if (myPlaylists.isEmpty()) item(key = "no-playlists") {
-                HintCard("Плейлистов пока нет. На вкладке «Очередь» можно сохранить очередь как плейлист.")
+                HintCard(S.noPlaylistsYetOnThe)
             }
             item {
                 LazyRow(
@@ -567,7 +568,7 @@ fun TopBar(
                     )
                     soon.forEach { service ->
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(service.title + " · скоро") },
+                            text = { Text(service.title + S.soon) },
                             leadingIcon = { ServiceLogo(service, Modifier.size(20.dp)) },
                             onClick = {
                                 menuOpen.value = false

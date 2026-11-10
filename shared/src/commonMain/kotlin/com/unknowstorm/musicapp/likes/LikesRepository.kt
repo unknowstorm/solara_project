@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.likes
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.auth.supabase
@@ -111,7 +112,7 @@ class LikesRepository(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                showError("Не удалось загрузить лайки")
+                showError(S.couldNotLoadLikes)
             }
         }
     }
@@ -153,7 +154,7 @@ class LikesRepository(
                         if (wasLiked) listOf(track) + list
                         else list.filterNot { it.provider == track.provider && it.id == track.id }
                     }
-                    showError(if (wasLiked) "Не удалось убрать лайк" else "Не удалось поставить лайк")
+                    showError(if (wasLiked) S.couldNotRemoveTheLike else S.couldNotAddTheLike)
                 }
             }
         }

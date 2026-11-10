@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -116,13 +117,13 @@ fun AwaitEmailScreen(
                 }
 
                 Text(
-                    "Введи код из письма",
+                    S.enterTheCodeFromThe,
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    "Мы отправили $CODE_LENGTH-значный код на ${pending.email}. " +
-                            "Введи его ниже, чтобы подтвердить почту.",
+                    S.weSentADigitCode(CODE_LENGTH, pending.email) +
+                            S.enterItBelowToConfirm,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -174,11 +175,11 @@ fun AwaitEmailScreen(
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
                 ) {
-                    Text("Подтвердить")
+                    Text(S.confirm)
                 }
 
                 Text(
-                    "Письма нет? Проверь папку «Спам».",
+                    S.noEmailCheckYourSpam,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -190,7 +191,7 @@ fun AwaitEmailScreen(
                             busy = true; error = null; info = null
                             repo.resendConfirmation(pending.email)
                                 .onSuccess {
-                                    info = "Новый код отправлен"
+                                    info = S.newCodeSent
                                     code = ""
                                     cooldown = RESEND_COOLDOWN_SEC
                                 }
@@ -202,10 +203,10 @@ fun AwaitEmailScreen(
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
                 ) {
-                    Text(if (cooldown > 0) "Отправить ещё раз через $cooldown с" else "Отправить код ещё раз")
+                    Text(if (cooldown > 0) S.sendAgainInS(cooldown) else S.sendTheCodeAgain)
                 }
 
-                TextButton(onClick = onBack, enabled = !busy) { Text("← Изменить почту") }
+                TextButton(onClick = onBack, enabled = !busy) { Text(S.changeEmail) }
             }
         }
     }

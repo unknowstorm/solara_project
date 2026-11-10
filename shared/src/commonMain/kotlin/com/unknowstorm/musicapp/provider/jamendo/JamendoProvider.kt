@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.provider.jamendo
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -44,7 +45,7 @@ class JamendoProvider(
             if (!url.isNullOrBlank()) return url.secure()
             if (attempt < MAX_ATTEMPTS - 1) delay(RETRY_DELAY_MS)
         }
-        error("Jamendo: нет ссылки на аудио для трека ${track.id}")
+        error(S.jamendoNoAudioLinkFor(track.id))
     }
 
     private suspend fun fetchTracks(block: HttpRequestBuilder.() -> Unit): List<JamendoTrackDto> {

@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.provider.deezer
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -26,14 +27,14 @@ class DeezerProvider(
             }.bodyAsText()
         }
         val response = json.decodeFromString<DeezerResponse>(text)
-        response.error?.let { error("Deezer: ${it.message.ifBlank { "ошибка ${it.code}" }}") }
+        response.error?.let { error(S.deezer(it.message.ifBlank { S.error2(it.code) })) }
         return response.data.filter { !it.preview.isNullOrBlank() }.map { it.toTrack() }
     }
 
     /** Свежая ссылка на превью: старая живёт около 15 минут. */
     override suspend fun resolveStream(track: Track): String {
         val dto = json.decodeFromString<DeezerTrackDto>(client.get("$BASE_URL/track/${track.id}").bodyAsText())
-        return dto.preview?.takeIf { it.isNotBlank() } ?: error("Deezer: нет превью для трека ${track.id}")
+        return dto.preview?.takeIf { it.isNotBlank() } ?: error(S.deezerNoPreviewForTrack(track.id))
     }
 
     private fun DeezerTrackDto.toTrack() = Track(

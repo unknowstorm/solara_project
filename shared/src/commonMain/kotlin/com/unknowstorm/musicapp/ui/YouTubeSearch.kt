@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,13 +55,13 @@ fun YouTubeSearchPane(
             error = null
             try {
                 videos = api.search(submitted)
-                heading = "Результаты: $submitted"
+                heading = S.results(submitted)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: YouTubeException) {
                 error = e.message
             } catch (e: Exception) {
-                error = "Не удалось загрузить: ${e.message}"
+                error = S.couldNotLoad(e.message)
             } finally {
                 loading = false
             }
@@ -74,7 +75,7 @@ fun YouTubeSearchPane(
                 YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "Поиск запускается по Enter: у YouTube дневной лимит запросов на всё приложение.",
+                    S.searchRunsOnEnterYoutube,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -87,7 +88,7 @@ fun YouTubeSearchPane(
             if (heading.isNotEmpty()) {
                 Text(heading, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             } else if (!loading && error == null) {
-                Text("Введите запрос и нажмите Enter на клавиатуре.", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                Text(S.typeAQueryAndPress, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             LazyColumn(Modifier.weight(1f)) {
                 items(videos) { video ->
