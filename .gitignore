@@ -22,3 +22,11 @@ shared/src/commonMain/kotlin/Secrets.kt
 
 context*.txt
 context.txt~
+
+# Секреты: любой Secrets.kt и локальные файлы ключей в любой папке
+**/Secrets.kt
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+.env
