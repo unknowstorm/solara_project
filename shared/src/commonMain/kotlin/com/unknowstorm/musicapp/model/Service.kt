@@ -1,5 +1,7 @@
 package com.unknowstorm.musicapp.model
 
+import com.unknowstorm.musicapp.i18n.S
+
 /** Как источник играет музыку. */
 enum class PlaybackKind {
     IN_APP,     // звук идёт в наш плеер
@@ -9,17 +11,21 @@ enum class PlaybackKind {
 }
 
 enum class Service(
-    val title: String,
+    private val titleFn: () -> String,
     val kind: PlaybackKind?,
     val ready: Boolean,
-    val note: String,
+    private val noteFn: () -> String,
 ) {
-    ALL("Все", null, true, "Все доступные источники"),
-    JAMENDO("Jamendo", PlaybackKind.IN_APP, true, "Полные треки внутри приложения"),
-    AUDIUS("Audius", PlaybackKind.IN_APP, true, "Полные треки внутри приложения"),
-    SPOTIFY("Spotify", PlaybackKind.REMOTE, true, "Пульт к приложению Spotify, нужен Premium"),
-    YOUTUBE("YouTube", PlaybackKind.EMBEDDED, true, "Видео во встроенном плеере: Главная → YouTube. Без фонового воспроизведения"),
-    DEEZER("Deezer", PlaybackKind.PREVIEW, true, "Каталог и 30-секундные превью"),
+    ALL({ S.all }, null, true, { S.allAvailableSources }),
+    JAMENDO({ "Jamendo" }, PlaybackKind.IN_APP, true, { S.fullTracksInsideTheApp }),
+    AUDIUS({ "Audius" }, PlaybackKind.IN_APP, true, { S.fullTracksInsideTheApp }),
+    SPOTIFY({ "Spotify" }, PlaybackKind.REMOTE, true, { S.remoteControlForTheSpotify }),
+    YOUTUBE({ "YouTube" }, PlaybackKind.EMBEDDED, true, { S.videoInTheBuiltIn }),
+    DEEZER({ "Deezer" }, PlaybackKind.PREVIEW, true, { S.catalogAnd30SecondPreviews });
+
+    /** Название и описание берутся при каждом чтении, поэтому меняются вместе с языком. */
+    val title: String get() = titleFn()
+    val note: String get() = noteFn()
 }
 
 /** Источник трека как значок/чип интерфейса. */

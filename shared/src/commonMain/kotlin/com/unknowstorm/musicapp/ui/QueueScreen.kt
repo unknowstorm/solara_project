@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -148,7 +149,7 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Очередь", style = MaterialTheme.typography.headlineMedium)
+            Text(S.queue, style = MaterialTheme.typography.headlineMedium)
             if (queue.isNotEmpty()) {
                 Row {
                     TextButton(onClick = { if (signedIn) showSave = true else onOpenAuth() }) { Text("Сохранить") }

@@ -41,7 +41,11 @@ import com.unknowstorm.musicapp.ui.MiniPlayerAnchor
 import com.unknowstorm.musicapp.ui.OnboardingScreen
 import com.unknowstorm.musicapp.ui.PendingSignUp
 import com.unknowstorm.musicapp.ui.PlatformBackHandler
+import com.unknowstorm.musicapp.i18n.AppLanguage
+import com.unknowstorm.musicapp.i18n.I18n
+import com.unknowstorm.musicapp.i18n.LANGUAGE_KEY
 import com.unknowstorm.musicapp.ui.SplashScreen
+import com.unknowstorm.musicapp.ui.rememberTextStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -63,6 +67,14 @@ private class AppBoot(
 fun App() {
     SolaraTheme {
         Surface(Modifier.fillMaxSize()) {
+            // Язык интерфейса: сохранённый выбор, иначе язык системы (по умолчанию английский)
+            val languageStore = rememberTextStore()
+            // Язык выставляем синхронно, до первой композиции экранов: иначе значения,
+            // вычисляемые один раз, запомнят английский
+            remember(languageStore) {
+                I18n.language = AppLanguage.fromCode(languageStore.get(LANGUAGE_KEY)) ?: AppLanguage.system()
+                Unit
+            }
             // HTTP-клиенты, Supabase и провайдеры создаём в фоновом потоке: главный в это время свободен для анимации
             val boot by produceState<AppBoot?>(initialValue = null) {
                 value = withContext(Dispatchers.Default) {
