@@ -30,9 +30,9 @@ private fun <T> roundRobin(lists: List<List<T>>): List<T> {
 }
 
 /**
- * Ряд «Похоже на то, что вы слушаете».
- * Берёт самых частых исполнителей из истории (прослушивание = 1, лайк = 3),
- * ищет их треки у Jamendo и Audius и убирает уже знакомое.
+ * “Similar to what you listen to” row.
+ * Takes the most frequent artists from the history (a listen = 1, a like = 3),
+ * searches their tracks on Jamendo and Audius and removes what is already familiar.
  */
 class RecommendationsFeed(
     private val history: HistoryRepository,
@@ -48,7 +48,7 @@ class RecommendationsFeed(
 
     private var loadedFor: Boolean? = null
 
-    /** Грузит один раз на состояние «вошёл / гость»; после входа или выхода пересчитывается. */
+    /** Loads once per “signed in / guest” state; recalculated after signing in or out. */
     suspend fun ensureLoaded(signedIn: Boolean) {
         if (loading || loadedFor == signedIn) return
         loadedFor = signedIn
@@ -64,7 +64,7 @@ class RecommendationsFeed(
             throw e
         } catch (e: Exception) {
             println("Solara: recommendations failed: ${e.message}")
-            loadedFor = null // в следующий раз попробуем снова
+            loadedFor = null // we will try again next time
         }
     }
 
@@ -74,7 +74,7 @@ class RecommendationsFeed(
             val played = history.recent()
             val liked = likes.tracks.value.filter { it.provider.isOurs() }
 
-            // ключ (ник без @ в нижнем регистре) -> (как показать, вес)
+            // key (nickname without @ in lowercase) -> (how to display it, weight)
             val weights = LinkedHashMap<String, Pair<String, Int>>()
             fun add(artist: String, w: Int) {
                 val shown = artist.trim()
@@ -120,7 +120,7 @@ class RecommendationsFeed(
         }
         return roundRobin(found)
             .filter { it.provider.isOurs() && "${it.provider}:${it.id}" !in seen && !DeadTracks.isDead(it) }
-            // сначала треки самого исполнителя, потом то, что нашлось рядом
+            // first the artist's own tracks, then what was found nearby
             .sortedByDescending { it.artist.contains(query, ignoreCase = true) }
             .take(PER_ARTIST)
     }

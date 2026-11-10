@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -24,7 +25,7 @@ import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
 
-/** Играет плейлист с первого трека (ссылки на звук берутся заново, как у лайков). */
+/** Plays a playlist from the first track (audio links are fetched again, as with likes). */
 internal suspend fun playPlaylist(
     repo: PlaylistsRepository,
     playlist: Playlist,
@@ -42,9 +43,9 @@ internal fun SavePlaylistDialog(
     error: String?,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
-    initialName: String = "Моя очередь",
-    title: String = "Сохранить как плейлист",
-    confirmLabel: String = "Сохранить",
+    initialName: String = S.myQueue,
+    title: String = S.saveAsPlaylist,
+    confirmLabel: String = S.save,
 ) {
     var name by remember { mutableStateOf(initialName) }
     AlertDialog(
@@ -55,7 +56,7 @@ internal fun SavePlaylistDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it.take(100) },
-                    label = { Text("Название") },
+                    label = { Text(S.name) },
                     singleLine = true,
                 )
                 error?.let {
@@ -70,16 +71,16 @@ internal fun SavePlaylistDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(name) }, enabled = !saving && name.isNotBlank()) {
-                Text(if (saving) "Сохраняю…" else confirmLabel)
+                Text(if (saving) S.saving else confirmLabel)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !saving) { Text("Отмена") }
+            TextButton(onClick = onDismiss, enabled = !saving) { Text(S.cancel) }
         },
     )
 }
 
-/** Выбор плейлиста, в который добавить трек, или создание нового. */
+/** Choice of a playlist to add the track to, or creating a new one. */
 @Composable
 internal fun AddToPlaylistDialog(
     playlists: List<Playlist>,
@@ -91,14 +92,14 @@ internal fun AddToPlaylistDialog(
 ) {
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Добавить в плейлист") },
+        title = { Text(S.addToPlaylist) },
         text = {
             Column(
                 Modifier
                     .heightIn(max = 320.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                TextButton(onClick = onNew, enabled = !busy) { Text("+ Новый плейлист") }
+                TextButton(onClick = onNew, enabled = !busy) { Text(S.newPlaylist) }
                 playlists.forEach { pl ->
                     TextButton(
                         onClick = { onPick(pl) },
@@ -119,6 +120,6 @@ internal fun AddToPlaylistDialog(
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(S.cancel) } },
     )
 }

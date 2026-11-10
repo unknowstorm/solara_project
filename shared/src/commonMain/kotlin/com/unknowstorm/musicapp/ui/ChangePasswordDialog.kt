@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -24,7 +25,7 @@ import kotlinx.coroutines.launch
 
 private const val MIN_PASSWORD = 6
 
-/** Диалог смены пароля для вошедшего пользователя. Закрывается сам после успешного сохранения. */
+/** Password change dialog for a signed-in user. Closes by itself after a successful save. */
 @Composable
 fun ChangePasswordDialog(repo: AuthRepository, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
@@ -36,8 +37,8 @@ fun ChangePasswordDialog(repo: AuthRepository, onDismiss: () -> Unit) {
     fun save() {
         if (busy) return
         when {
-            password.length < MIN_PASSWORD -> error = "Пароль слишком простой (минимум $MIN_PASSWORD символов)"
-            password != repeat -> error = "Пароли не совпадают"
+            password.length < MIN_PASSWORD -> error = S.passwordIsTooSimpleAt2(MIN_PASSWORD)
+            password != repeat -> error = S.passwordsDoNotMatch
             else -> scope.launch {
                 busy = true; error = null
                 repo.changePassword(password)
@@ -50,13 +51,13 @@ fun ChangePasswordDialog(repo: AuthRepository, onDismiss: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text("Смена пароля") },
+        title = { Text(S.changePassword2) },
         text = {
             Column {
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it; error = null },
-                    label = { Text("Новый пароль") },
+                    label = { Text(S.newPassword) },
                     singleLine = true,
                     enabled = !busy,
                     visualTransformation = PasswordVisualTransformation(),
@@ -66,7 +67,7 @@ fun ChangePasswordDialog(repo: AuthRepository, onDismiss: () -> Unit) {
                 OutlinedTextField(
                     value = repeat,
                     onValueChange = { repeat = it; error = null },
-                    label = { Text("Повтори пароль") },
+                    label = { Text(S.repeatPassword) },
                     singleLine = true,
                     enabled = !busy,
                     visualTransformation = PasswordVisualTransformation(),
@@ -79,10 +80,10 @@ fun ChangePasswordDialog(repo: AuthRepository, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = { save() }, enabled = !busy) { Text("Сохранить") }
+            TextButton(onClick = { save() }, enabled = !busy) { Text(S.save) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text(S.cancel) }
         },
     )
 }

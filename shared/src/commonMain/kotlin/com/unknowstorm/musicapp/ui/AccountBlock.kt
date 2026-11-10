@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,11 +43,11 @@ fun AccountBlock(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Аккаунт", style = MaterialTheme.typography.titleMedium)
+            Text(S.account, style = MaterialTheme.typography.titleMedium)
             when (val s = state) {
                 AuthState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
                 is AuthState.SignedIn -> {
-                    // Аватарка слева (крупная), ник и почта справа
+                    // Avatar on the left (large), nickname and email on the right
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -59,7 +60,7 @@ fun AccountBlock(
                         )
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                s.username ?: "Пользователь",
+                                s.username ?: S.user,
                                 style = MaterialTheme.typography.headlineSmall,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -74,19 +75,19 @@ fun AccountBlock(
                             }
                         }
                     }
-                    Button(onClick = onEditProfile, enabled = s.profile != null) { Text("Изменить профиль") }
-                    FilledTonalButton(onClick = { scope.launch { repo.signOut() } }) { Text("Выйти") }
+                    Button(onClick = onEditProfile, enabled = s.profile != null) { Text(S.editProfile) }
+                    FilledTonalButton(onClick = { scope.launch { repo.signOut() } }) { Text(S.signOut) }
                 }
                 is AuthState.Error -> {
                     Text(s.message, color = MaterialTheme.colorScheme.error)
-                    Button(onClick = onOpenAuth) { Text("Войти") }
+                    Button(onClick = onOpenAuth) { Text(S.signIn) }
                 }
                 AuthState.Guest -> {
                     Text(
-                        "Вы не вошли. Войдите, чтобы синхронизировать избранное.",
+                        S.youAreNotSignedIn,
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Button(onClick = onOpenAuth) { Text("Войти или зарегистрироваться") }
+                    Button(onClick = onOpenAuth) { Text(S.signInOrSignUp) }
                 }
             }
         }

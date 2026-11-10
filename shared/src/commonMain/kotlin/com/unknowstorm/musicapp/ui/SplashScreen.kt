@@ -33,8 +33,8 @@ import com.unknowstorm.musicapp.resources.logo
 import org.jetbrains.compose.resources.painterResource
 
 private val LogoSize = 160.dp
-// Инверсия для светлой темы: светлое становится чёрным (диск), тёмное или бледное усиливается до белого (буква S).
-// Прозрачность не трогаем. 6375 = 25 * 255.
+// Inversion for the light theme: light becomes black (the disc), dark or pale is boosted to white (the letter S).
+// Transparency is untouched. 6375 = 25 * 255.
 private val InvertedLogo = ColorFilter.colorMatrix(
     ColorMatrix(
         floatArrayOf(
@@ -45,20 +45,20 @@ private val InvertedLogo = ColorFilter.colorMatrix(
         )
     )
 )
-private const val ENTER_MS = 380 // логотип «въезжает»: проявляется, растёт и доворачивается до остановки
-private const val EXIT_MS = 280 // заставка растворяется, логотип чуть увеличивается
-private const val SPIN_UP_SEC = 0.45f // разгон пластинки от покоя до рабочей скорости
-private const val SPIN_DEG_PER_SEC = 400f // рабочая скорость вращения
-private const val MAX_FRAME_SEC = 0.05f // подвисший кадр не должен «перепрыгивать» пол-оборота
+private const val ENTER_MS = 380 // the logo "slides in": it fades in, grows and finishes rotating to a stop
+private const val EXIT_MS = 280 // the splash dissolves, the logo grows a little
+private const val SPIN_UP_SEC = 0.45f // the record accelerates from rest to working speed
+private const val SPIN_DEG_PER_SEC = 400f // working rotation speed
+private const val MAX_FRAME_SEC = 0.05f // a stalled frame must not "jump" half a turn
 
 /**
- * Заставка: лого-пластинка.
+ * Splash: the logo record.
  *
- * Фазы:
- *  1. вход: логотип проявляется и доворачивается до покоя (по завершении вызывается [onEntered]);
- *  2. [spinning]: пластинка плавно разгоняется от покоя, без рывка;
- *  3. [leaving]: заставка растворяется (по завершении вызывается [onFinished]).
- * Угол и масштаб читаются только в фазе рисования (graphicsLayer): вращение не вызывает рекомпозицию.
+ * Phases:
+ *  1. enter: the logo fades in and finishes rotating to rest ([onEntered] is called when done);
+ *  2. [spinning]: the record accelerates smoothly from rest, without a jerk;
+ *  3. [leaving]: the splash dissolves ([onFinished] is called when done).
+ * Angle and scale are read only in the draw phase (graphicsLayer): rotation does not cause recomposition.
  */
 @Composable
 fun SplashScreen(
@@ -88,7 +88,7 @@ fun SplashScreen(
             last = now
             t += dt
             val k = (t / SPIN_UP_SEC).coerceIn(0f, 1f)
-            val speed = SPIN_DEG_PER_SEC * k * k * (3f - 2f * k) // smoothstep: скорость нарастает плавно
+            val speed = SPIN_DEG_PER_SEC * k * k * (3f - 2f * k) // smoothstep: the speed grows smoothly
             angle = (angle + speed * dt) % 360f
         }
     }

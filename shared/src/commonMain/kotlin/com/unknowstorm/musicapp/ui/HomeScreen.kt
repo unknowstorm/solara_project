@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import kotlin.math.sin
 import kotlin.math.floor
 import kotlin.math.PI
@@ -79,11 +80,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-// --- ВАШИ СУЩЕСТВУЮЩИЕ КЛАССЫ И ФУНКЦИИ (БЕЗ ИЗМЕНЕНИЙ) ---
+// --- EXISTING CLASSES AND FUNCTIONS (UNCHANGED) ---
 
 data class FeedSection(val title: String, val tracks: List<Track>)
 
-/** Запрос подборки с повторами: на холодном старте сеть часто ещё не готова (DNS, таймаут). */
+/** A selection request with retries: on a cold start the network is often not ready yet (DNS, timeout). */
 private suspend fun searchWithRetry(provider: MusicProvider, query: String): List<Track> {
     var last: Exception? = null
     repeat(3) { attempt ->
@@ -99,33 +100,33 @@ private suspend fun searchWithRetry(provider: MusicProvider, query: String): Lis
     throw last ?: IllegalStateException("search failed")
 }
 
-/** Подборки источника: заголовок и поисковый запрос (пустой запрос = популярное). */
+/** Source selections: title and search query (an empty query = popular). */
 fun defaultMixes(service: Service): List<Pair<String, String>> = when (service) {
     Service.JAMENDO -> listOf(
-        "Популярное" to "",
-        "Для расслабления" to "chillout",
-        "Электроника" to "electronic",
-        "Рок" to "rock",
-        "Поп" to "pop",
+        S.popular to "",
+        S.relaxing to "chillout",
+        S.electronic to "electronic",
+        S.rock to "rock",
+        S.pop to "pop",
     )
     Service.AUDIUS -> listOf(
-        "Популярное" to "",
-        "Электроника" to "electronic",
-        "Рок" to "rock",
-        "Хип-хоп" to "hip hop",
-        "Лоу-фай" to "lofi",
+        S.popular to "",
+        S.electronic to "electronic",
+        S.rock to "rock",
+        S.hipHop to "hip hop",
+        S.loFi to "lofi",
     )
     Service.DEEZER -> listOf(
-        "Чарт" to "",
-        "Электроника" to "electronic",
-        "Рок" to "rock",
-        "Поп" to "pop",
-        "Хип-хоп" to "hip hop",
+        S.chart to "",
+        S.electronic to "electronic",
+        S.rock to "rock",
+        S.pop to "pop",
+        S.hipHop to "hip hop",
     )
     else -> emptyList()
 }
 
-/** Лента одного источника. Живёт на уровне MainScreen, чтобы не грузиться заново при смене вкладок. */
+/** One source's feed. Lives at the MainScreen level so it is not reloaded when tabs change. */
 class HomeFeed(
     val service: Service,
     private val provider: MusicProvider,
@@ -141,7 +142,7 @@ class HomeFeed(
     suspend fun loadIfNeeded() {
         if (sections.isEmpty() && !loading) {
             load()
-            // Если сеть так и не ответила, пробуем ещё пару раз сами, без нажатия «Повторить»
+            // If the network never answered, we retry a couple more times ourselves, without pressing "Retry"
             var tries = 0
             while (sections.isEmpty() && error != null && tries < 2) {
                 tries++
@@ -172,7 +173,7 @@ class HomeFeed(
                 }.awaitAll()
             }.filterNotNull().filter { it.tracks.isNotEmpty() }
             sections = loaded
-            if (loaded.isEmpty() && lastError != null) error = "Ошибка загрузки: $lastError"
+            if (loaded.isEmpty() && lastError != null) error = S.loadingError(lastError)
         } finally {
             loading = false
         }
@@ -190,7 +191,7 @@ private fun <T> roundRobin(lists: List<List<T>>): List<T> {
     return result
 }
 
-/** Собирает ряды главной. На вкладке «Все» источники чередуются, а сверху идёт общий микс. */
+/** Builds the home rows. On the "All" tab the sources alternate and a shared mix goes on top. */
 private fun buildRows(feeds: List<HomeFeed>, mixed: Boolean): List<FeedRow> {
     val perFeed = feeds.map { feed ->
         feed.sections.map { FeedRow("${feed.service.name}:${it.title}", it.title, feed.service, it.tracks.filterNot { t -> DeadTracks.isDead(t) }) }
@@ -200,10 +201,10 @@ private fun buildRows(feeds: List<HomeFeed>, mixed: Boolean): List<FeedRow> {
     val firstRows = perFeed.mapNotNull { it.firstOrNull() }
     if (firstRows.size < 2) return rows
     val mix = roundRobin(firstRows.map { it.tracks }).take(16)
-    return listOf(FeedRow("mix", "Микс из всех источников", Service.ALL, mix)) + rows
+    return listOf(FeedRow("mix", S.mixFromAllSources, Service.ALL, mix)) + rows
 }
 
-// --- ОБНОВЛЕННЫЙ HOME SCREEN ---
+// --- UPDATED HOME SCREEN ---
 
 @Composable
 fun HomeScreen(
@@ -219,9 +220,9 @@ fun HomeScreen(
     playlists: PlaylistsRepository? = null,
     recs: RecommendationsFeed? = null,
     onOpenPlaylist: (Playlist) -> Unit = {},
-    // Горизонтальный свайп между чипами: двигает только содержимое под панелью, сама панель стоит на месте
+    // Horizontal swipe between chips: moves only the content under the bar, the bar itself stays in place
     swipe: Modifier = Modifier,
-    // false: верхнюю панель рисует родитель (пейджер), здесь только содержимое
+    // false: the top bar is drawn by the parent (the pager), here only the content
     showBar: Boolean = true,
     history: HistoryRepository? = null,
 ) {
@@ -234,19 +235,19 @@ fun HomeScreen(
     deleting?.let { target ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Удалить плейлист?") },
-            text = { Text("«${target.name}» будет удалён без возможности восстановления.") },
+            title = { Text(S.deletePlaylist) },
+            text = { Text(S.willBeDeletedPermanently(target.name)) },
             confirmButton = {
-                TextButton(onClick = { playlists?.delete(target.id); deleting = null }) { Text("Удалить") }
+                TextButton(onClick = { playlists?.delete(target.id); deleting = null }) { Text(S.delete) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(S.cancel) } },
         )
     }
     val rows = buildRows(feeds, mixed)
     val signedInForRecs by likes.signedIn.collectAsState()
     LaunchedEffect(recs, signedInForRecs) { recs?.ensureLoaded(signedInForRecs) }
-    // На чипе источника рекомендации только его, на «Все» смешанные
-    // Deezer: только превью, общие лайки и рекомендации на его чипе не показываем
+    // On a source's chip only its recommendations, on "All" mixed ones
+    // Deezer: previews only, shared likes and recommendations are not shown on its chip
     val isDeezer = service == Service.DEEZER
     val recProvider = when (service) {
         Service.JAMENDO -> com.unknowstorm.musicapp.model.ProviderId.JAMENDO
@@ -276,23 +277,23 @@ fun HomeScreen(
         }
 
         if (service == Service.DEEZER) {
-            HintCard("Deezer: только 30-секундные превью. Они живут на своём чипе и не попадают в общий поиск и очередь.")
+            HintCard(S.deezer30SecondPreviewsOnly)
         }
 
         if (!service.ready) {
-            HintCard("${service.title} скоро появится. ${service.note}.")
+            HintCard(S.isComingSoon(service.title, service.note))
             return@Column
         }
 
         LazyColumn(swipe.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-            // Секция "Вы лайкнули" с кнопкой фильтра
+            // The "You liked" section with a filter button
             if (!isDeezer) item {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Вы лайкнули", style = MaterialTheme.typography.titleLarge)
+                    Text(S.youLiked, style = MaterialTheme.typography.titleLarge)
                 }
             }
             if (!isDeezer) item(key = "likes") {
@@ -302,10 +303,10 @@ fun HomeScreen(
                     .filterNot { DeadTracks.isDead(it) }
                     .filter { recProvider == null || it.provider == recProvider }
                 when {
-                    !signedIn -> HintCard("Войдите в аккаунт, и треки, которые вы лайкнете (♡ в плеере), будут храниться здесь.")
+                    !signedIn -> HintCard(S.signInAndTheTracks)
                     shown.isEmpty() -> HintCard(
-                        if (recProvider != null && liked.isNotEmpty()) "На этом сервисе лайков пока нет."
-                        else "Нажмите ♡ в плеере, и трек появится здесь."
+                        if (recProvider != null && liked.isNotEmpty()) S.thereAreNoLikesOn
+                        else S.tapInThePlayerAnd
                     )
                     else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -320,12 +321,12 @@ fun HomeScreen(
                 }
             }
 
-            // Подборки
-            item { SectionTitle("Подборки для вас") }
+            // Selections
+            item { SectionTitle(S.picksForYou) }
             if (!isDeezer && shownRecs.isNotEmpty()) {
                 item(key = "recs-label") {
                     Text(
-                        "Ещё от тех, кого вы слушаете: " + recArtists.joinToString(", "),
+                        S.moreFromArtistsYouListen + recArtists.joinToString(", "),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -355,7 +356,7 @@ fun HomeScreen(
                     item(key = "error:${feed.service.name}") {
                         Column(Modifier.padding(horizontal = 16.dp)) {
                             Text("${feed.service.title}: $message", color = MaterialTheme.colorScheme.error)
-                            TextButton(onClick = { scope.launch { feed.load() } }) { Text("Повторить") }
+                            TextButton(onClick = { scope.launch { feed.load() } }) { Text(S.retry) }
                         }
                     }
                 }
@@ -377,10 +378,10 @@ fun HomeScreen(
                 }
             }
 
-            // Плейлисты
-            item { SectionTitle("Ваши плейлисты") }
+            // Playlists
+            item { SectionTitle(S.yourPlaylists) }
             if (myPlaylists.isEmpty()) item(key = "no-playlists") {
-                HintCard("Плейлистов пока нет. На вкладке «Очередь» можно сохранить очередь как плейлист.")
+                HintCard(S.noPlaylistsYetOnThe)
             }
             item {
                 LazyRow(
@@ -410,8 +411,8 @@ fun HomeScreen(
 }
 
 /**
- * Лайки хранят только метаданные, поэтому ссылку на звук берём заново у источника:
- * у Deezer она протухает. Что не удалось получить, пропускаем.
+ * Likes store only metadata, so we fetch the audio link again from the source:
+ * for Deezer it expires. What could not be fetched is skipped.
  */
 internal suspend fun playLiked(
     tracks: List<Track>,
@@ -419,7 +420,7 @@ internal suspend fun playLiked(
     providers: List<MusicProvider>,
     audio: AudioBackend,
 ) {
-    // Окно вокруг выбранного трека: так работает и выбор из хвоста длинного списка
+    // A window around the selected track: this also works for picking from the tail of a long list
     val from = tracks.indexOfFirst { it.provider == start.provider && it.id == start.id }.coerceAtLeast(0)
     val window = tracks.drop((from - 5).coerceAtLeast(0)).take(30)
     val resolved = coroutineScope {
@@ -441,18 +442,18 @@ internal suspend fun playLiked(
     if (index >= 0) audio.playQueue(resolved, index)
 }
 
-// --- НОВЫЕ КОМПОНЕНТЫ ---
+// --- NEW COMPONENTS ---
 
 @Composable
 fun TopBar(
     selected: Service,
     onSelect: (Service) -> Unit,
     modifier: Modifier = Modifier,
-    // Кнопка «Любимые» показывается, только если передан onLikes
+    // The "Favorites" button is shown only if onLikes is passed
     likesSelected: Boolean = false,
     onLikes: (() -> Unit)? = null,
-    // Непрерывная позиция пейджера: подсветка-капля едет за пальцем.
-    // null: старое поведение (подсветка по выбранному чипу)
+    // Continuous pager position: the highlight "drop" follows the finger.
+    // null: the old behavior (highlight by the selected chip)
     position: (() -> Float)? = null,
 ) {
     val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -465,7 +466,7 @@ fun TopBar(
     val onPrimary = cs.onPrimary
     val idle = cs.onSurfaceVariant
 
-    // Индекс чипа = индекс страницы пейджера: ♡ = 0 (если есть), дальше сервисы
+    // The chip index = the pager page index: ♡ = 0 (if present), then the services
     val order = pagerOrder(onLikes != null)
     val chipRects = remember { mutableStateMapOf<Int, Rect>() }
     var rowWindow by remember { mutableStateOf(Offset.Zero) }
@@ -477,7 +478,7 @@ fun TopBar(
         }
 
     val pos = position?.invoke()
-    // 1 когда капля ровно на чипе, 0 когда дальше соседнего
+    // 1 when the drop is exactly on a chip, 0 when farther than the neighbor
     fun weight(idx: Int): Float = if (pos == null) 0f else (1f - abs(pos - idx)).coerceIn(0f, 1f)
     fun pill(picked: Boolean): Color = if (pos == null && picked) primary else Color.Transparent
     fun tint(idx: Int, picked: Boolean): Color =
@@ -498,7 +499,7 @@ fun TopBar(
                 val f = (p - i).coerceIn(0f, 1f)
                 val a = chipRects[i] ?: return@drawBehind
                 val b = chipRects[j] ?: return@drawBehind
-                // Капля: центр идёт точно за позицией, в середине пути тело вытягивается и сплющивается
+                // The drop: the center follows the position exactly, mid-way the body stretches and squashes
                 val stretch = sin(PI.toFloat() * f)
                 val cx = androidx.compose.ui.util.lerp(a.center.x, b.center.x, f) - rowWindow.x
                 val cy = androidx.compose.ui.util.lerp(a.center.y, b.center.y, f) - rowWindow.y
@@ -559,14 +560,14 @@ fun TopBar(
                     expanded = menuOpen.value,
                     onDismissRequest = { menuOpen.value = false },
                 ) {
-                    // Spotify: вход только через «+», текстом и без логотипа (правила бренда)
+                    // Spotify: entry only via "+", as text and without a logo (brand rules)
                     if (Service.SPOTIFY.ready) androidx.compose.material3.DropdownMenuItem(
                         text = { Text("Spotify") },
                         onClick = { menuOpen.value = false; onSelect(Service.SPOTIFY) },
                     )
                     soon.forEach { service ->
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(service.title + " · скоро") },
+                            text = { Text(service.title + S.soon) },
                             leadingIcon = { ServiceLogo(service, Modifier.size(20.dp)) },
                             onClick = {
                                 menuOpen.value = false
@@ -622,7 +623,7 @@ fun AddIcon(modifier: Modifier = Modifier, tint: Color) {
     }
 }
 
-// --- ВАШИ СУЩЕСТВУЮЩИЕ КОМПОНЕНТЫ (БЕЗ ИЗМЕНЕНИЙ) ---
+// --- EXISTING COMPONENTS (UNCHANGED) ---
 
 @Composable
 private fun RowLabel(row: FeedRow, withService: Boolean) {
@@ -664,7 +665,7 @@ fun ServiceTray(selected: Service, onSelect: (Service) -> Unit, modifier: Modifi
                 modifier = Modifier.semantics { contentDescription = service.title },
             )
         }
-        // Spotify вне ряда логотипов: вход через «+», только текстом
+        // Spotify is outside the row of logos: entry via "+", as text only
         item(key = "more") {
             val open = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             Box {

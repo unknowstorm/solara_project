@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 
-/** true, только если буферизация длится дольше delayMs. Короткие загрузки не мигают крутилкой. */
+/** true only if buffering lasts longer than delayMs. Short loads do not flash the spinner. */
 @Composable
 fun rememberDelayedBuffering(isBuffering: Boolean, delayMs: Long = 1500): Boolean {
     var show by remember { mutableStateOf(false) }

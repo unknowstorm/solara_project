@@ -3,7 +3,7 @@ package com.unknowstorm.musicapp.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
-/** Простое хранилище флагов (например, «принял условия YouTube»). */
+/** Simple flag storage (e.g. "accepted the YouTube terms"). */
 interface FlagStore {
     fun get(key: String): Boolean
     fun set(key: String, value: Boolean)
@@ -12,21 +12,21 @@ interface FlagStore {
 @Composable
 expect fun rememberFlagStore(): FlagStore
 
-/** Открывает ссылку во внешнем приложении или браузере. */
+/** Opens a link in an external app or browser. */
 @Composable
 expect fun rememberExternalLinkOpener(): (String) -> Unit
 
 /**
- * Встроенный плеер YouTube. Видео играет только пока этот компонент на экране
- * (правила YouTube запрещают фоновое воспроизведение).
- * onError получает код ошибки IFrame API: 100, 101, 150, 153 и т. д.
+ * Embedded YouTube player. The video plays only while this component is on screen
+ * (YouTube rules forbid background playback).
+ * onError receives an IFrame API error code: 100, 101, 150, 153, etc.
  */
 @Composable
 expect fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int) -> Unit)
 
 /**
- * Постоянное хранилище строк (переживает перезапуск, обновление и пересборку).
- * quotaDay: номер календарного дня в Pacific Time, когда у YouTube сбрасывается квота.
+ * Persistent string storage (survives restart, update and rebuild).
+ * quotaDay: the number of the calendar day in Pacific Time when the YouTube quota resets.
  */
 interface TextStore {
     fun get(key: String): String?

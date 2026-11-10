@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -23,7 +24,7 @@ import com.unknowstorm.musicapp.player.DeadTracks
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
-/** Поиск по своим лайкам: локальный фильтр, без запросов в сеть. */
+/** Search within your own likes: a local filter, no network requests. */
 @Composable
 internal fun LikesSearchPane(
     likes: LikesRepository,
@@ -43,12 +44,12 @@ internal fun LikesSearchPane(
 
     when {
         !signedIn -> Text(
-            "Войдите в аккаунт, чтобы искать по своим лайкам.",
+            S.signInToSearchYour,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp),
         )
         shown.isEmpty() -> Text(
-            if (q.isEmpty()) "Лайков пока нет. Нажмите ♡ в плеере." else "В лайках ничего не найдено",
+            if (q.isEmpty()) S.noLikesYetTapIn else S.nothingFoundInYourLikes,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp),
         )

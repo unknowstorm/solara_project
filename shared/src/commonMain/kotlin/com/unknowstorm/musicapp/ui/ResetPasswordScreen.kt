@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,9 +41,9 @@ private const val CODE_LENGTH = 8
 private const val MIN_PASSWORD = 6
 
 /**
- * Сброс пароля по коду из письма: сначала почта, затем код + новый пароль.
- * Когда пароль сохранён, пользователь автоматически оказывается вошедшим,
- * App видит это и закрывает экран входа, поэтому [onClose] после успеха вызывать не нужно.
+ * Password reset with a code from the email: first the email, then the code + new password.
+ * When the password is saved the user automatically ends up signed in,
+ * App sees this and closes the sign-in screen, so [onClose] does not need to be called after success.
  */
 @Composable
 fun ResetPasswordScreen(
@@ -67,7 +68,7 @@ fun ResetPasswordScreen(
         scope.launch {
             busy = true; error = null; info = null
             repo.sendResetCode(email)
-                .onSuccess { codeSent = true; info = "Код отправлен на ${email.trim()}" }
+                .onSuccess { codeSent = true; info = S.codeSentTo(email.trim()) }
                 .onFailure { error = it.message }
             busy = false
         }
@@ -75,8 +76,8 @@ fun ResetPasswordScreen(
 
     fun confirm() {
         if (busy) return
-        if (code.length != CODE_LENGTH) { error = "Введи $CODE_LENGTH-значный код"; return }
-        if (password.length < MIN_PASSWORD) { error = "Пароль слишком простой (минимум $MIN_PASSWORD символов)"; return }
+        if (code.length != CODE_LENGTH) { error = S.enterTheDigitCode(CODE_LENGTH); return }
+        if (password.length < MIN_PASSWORD) { error = S.passwordIsTooSimpleAt2(MIN_PASSWORD); return }
         scope.launch {
             busy = true; error = null; info = null
             repo.resetPasswordWithCode(email, code, password)
@@ -100,14 +101,14 @@ fun ResetPasswordScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    "Сброс пароля",
+                    S.resetPassword,
                     modifier = Modifier.padding(top = 48.dp),
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    if (codeSent) "Введи код из письма и придумай новый пароль."
-                    else "Укажи почту аккаунта, мы отправим на неё код.",
+                    if (codeSent) S.enterTheCodeFromThe2
+                    else S.enterYourAccountEmailAnd,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -116,7 +117,7 @@ fun ResetPasswordScreen(
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it; error = null },
-                    label = { Text("Почта") },
+                    label = { Text(S.email) },
                     singleLine = true,
                     enabled = !busy && !codeSent,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -128,7 +129,7 @@ fun ResetPasswordScreen(
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it.filter(Char::isDigit).take(CODE_LENGTH); error = null },
-                        label = { Text("Код из письма") },
+                        label = { Text(S.codeFromTheEmail) },
                         singleLine = true,
                         enabled = !busy,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -138,7 +139,7 @@ fun ResetPasswordScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it; error = null },
-                        label = { Text("Новый пароль") },
+                        label = { Text(S.newPassword) },
                         singleLine = true,
                         enabled = !busy,
                         visualTransformation = PasswordVisualTransformation(),
@@ -157,13 +158,13 @@ fun ResetPasswordScreen(
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
                 ) {
-                    Text(if (codeSent) "Сохранить пароль" else "Отправить код")
+                    Text(if (codeSent) S.savePassword else S.sendCode)
                 }
 
                 if (codeSent) {
-                    TextButton(onClick = { sendCode() }, enabled = !busy) { Text("Отправить код ещё раз") }
+                    TextButton(onClick = { sendCode() }, enabled = !busy) { Text(S.sendTheCodeAgain) }
                 }
-                TextButton(onClick = onClose, enabled = !busy) { Text("← Назад") }
+                TextButton(onClick = onClose, enabled = !busy) { Text(S.back) }
             }
         }
     }

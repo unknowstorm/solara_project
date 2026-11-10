@@ -32,7 +32,7 @@ import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.model.toService
 
-/** Логотип сервиса цветом темы. Если контура нет, показываем букву. */
+/** Service logo in the theme color. If there is no outline, we show a letter. */
 @Composable
 fun ServiceLogo(
     service: Service?,
@@ -88,7 +88,7 @@ fun GlobeIcon(
     }
 }
 
-/** Кружок с логотипом источника для угла обложки. */
+/** Circle with the source logo for the cover corner. */
 @Composable
 fun ServiceBadge(service: Service?, modifier: Modifier = Modifier, size: Dp = 22.dp) {
     if (service == null) return
@@ -103,7 +103,7 @@ fun ServiceBadge(service: Service?, modifier: Modifier = Modifier, size: Dp = 22
     }
 }
 
-/** Обложка трека, при необходимости со значком источника. */
+/** Track cover, with a source badge when needed. */
 @Composable
 fun TrackCover(
     track: Track,

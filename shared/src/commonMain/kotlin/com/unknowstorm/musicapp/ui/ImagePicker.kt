@@ -3,15 +3,15 @@ package com.unknowstorm.musicapp.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 
-/** Сторона квадратной аватарки в пикселях: фото обрезается по центру и ужимается до этого размера. */
+/** Side of the square avatar in pixels: the photo is cropped to the center and shrunk to this size. */
 const val AvatarSizePx = 512
 
 /**
- * Возвращает функцию, которая открывает выбор фото (галерея на Android, окно выбора файла на ПК).
- * Выбранное фото приходит в [onPicked] уже готовым: квадрат [AvatarSizePx]×[AvatarSizePx], JPEG.
+ * Returns a function that opens the photo picker (gallery on Android, a file chooser window on desktop).
+ * The picked photo arrives in [onPicked] already ready: a square [AvatarSizePx]×[AvatarSizePx], JPEG.
  */
 @Composable
 expect fun rememberAvatarPicker(onPicked: (ByteArray) -> Unit): () -> Unit
 
-/** Превращает байты картинки (JPEG/PNG) в картинку для Compose; null, если не удалось. */
+/** Turns image bytes (JPEG/PNG) into an image for Compose; null if it failed. */
 expect fun decodeImageBitmap(bytes: ByteArray): ImageBitmap?

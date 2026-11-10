@@ -4,5 +4,5 @@ import androidx.compose.runtime.Composable
 
 @Composable
 actual fun FullscreenWindowEffect(active: Boolean) {
-    // На ПК ничего не поворачиваем: видео растягивается на всё окно приложения
+    // On desktop nothing is rotated: the video is stretched to the whole app window
 }

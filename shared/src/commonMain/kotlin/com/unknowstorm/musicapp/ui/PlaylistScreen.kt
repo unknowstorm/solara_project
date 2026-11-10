@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,7 +44,7 @@ import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
-/** Экран плейлиста поверх Главной: состав, «Слушать всё», удаление треков, переименование и удаление. */
+/** A playlist screen above Home: contents, "Play all", deleting tracks, renaming and deleting. */
 @Composable
 fun PlaylistScreen(
     playlist: Playlist,
@@ -88,27 +89,27 @@ fun PlaylistScreen(
             },
             onDismiss = { showRename = false; renameError = null },
             initialName = name,
-            title = "Переименовать плейлист",
+            title = S.renamePlaylist,
         )
     }
 
     if (showDelete) {
         AlertDialog(
             onDismissRequest = { showDelete = false },
-            title = { Text("Удалить плейлист?") },
-            text = { Text("«$name» будет удалён без возможности восстановления.") },
+            title = { Text(S.deletePlaylist) },
+            text = { Text(S.willBeDeletedPermanently(name)) },
             confirmButton = {
                 TextButton(onClick = {
                     repo.delete(playlist.id)
                     showDelete = false
                     onBack()
-                }) { Text("Удалить") }
+                }) { Text(S.delete) }
             },
-            dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Отмена") } },
+            dismissButton = { TextButton(onClick = { showDelete = false }) { Text(S.cancel) } },
         )
     }
 
-    // Фон и перехват касаний: Главная под экраном не должна быть видна и нажиматься
+    // Background and touch interception: Home under the screen must not be visible or clickable
     Box(
         Modifier
             .fillMaxSize()
@@ -129,7 +130,7 @@ fun PlaylistScreen(
                     modifier = Modifier.weight(1f),
                 )
                 TextButton(onClick = { showDelete = true }) {
-                    Text("Удалить", color = MaterialTheme.colorScheme.error)
+                    Text(S.delete, color = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -147,8 +148,8 @@ fun PlaylistScreen(
                         if (tracks.isNotEmpty()) scope.launch { playLiked(tracks, tracks.first(), providers, audio) }
                     },
                     enabled = !list.isNullOrEmpty(),
-                ) { Text("Слушать всё") }
-                TextButton(onClick = { showRename = true }) { Text("Переименовать") }
+                ) { Text(S.playAll) }
+                TextButton(onClick = { showRename = true }) { Text(S.rename) }
             }
 
             message?.let {
@@ -162,12 +163,12 @@ fun PlaylistScreen(
 
             when {
                 failed -> Text(
-                    "Не удалось загрузить плейлист",
+                    S.couldNotLoadThePlaylist,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(16.dp),
                 )
                 list != null && list.isEmpty() -> Text(
-                    "В плейлисте нет треков.",
+                    S.thereAreNoTracksIn,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp),
                 )
@@ -208,7 +209,7 @@ fun PlaylistScreen(
                                             message = null
                                             entries = entries?.filterNot { it.position == entry.position }
                                         } else {
-                                            message = "Не удалось убрать трек"
+                                            message = S.couldNotRemoveTheTrack
                                         }
                                     }
                                 }) {

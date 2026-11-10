@@ -27,7 +27,7 @@ class AudiusProvider(
         } else {
             fetch("/tracks/search") { parameter("query", query) }
         }
-        // Закрытые и недоступные для стрима треки не показываем
+        // Private tracks and tracks unavailable for streaming are not shown
         return tracks
             .filter { it.isStreamable != false && it.access?.stream != false }
             .map { it.toTrack() }
@@ -46,7 +46,7 @@ class AudiusProvider(
         return response.data
     }
 
-    // Этот адрес перенаправляет на mp3 на узле Audius, Media3 идёт по редиректу сам
+    // This address redirects to an mp3 on an Audius node; Media3 follows the redirect itself
     private fun streamUrl(id: String) = "$BASE_URL/tracks/$id/stream?app_name=$APP_NAME"
 
     private fun AudiusTrackDto.toTrack() = Track(

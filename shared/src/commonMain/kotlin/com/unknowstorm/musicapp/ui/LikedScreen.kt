@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -252,10 +253,10 @@ fun LikedContent(
             )
         }
         when {
-            !signedIn -> Message("Войдите в аккаунт, чтобы сохранять любимое. У каждого аккаунта свой список.") {
-                Button(onClick = onOpenAuth) { Text("Войти") }
+            !signedIn -> Message(S.signInToSaveYour) {
+                Button(onClick = onOpenAuth) { Text(S.signIn) }
             }
-            shown.isEmpty() -> Message("Здесь будет ваше Любимое. Нажмите ♡ в плеере, и трек появится тут.")
+            shown.isEmpty() -> Message(S.yourFavoritesWillAppearHere)
             else -> LazyColumn(
                 Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 16.dp),
@@ -268,12 +269,12 @@ fun LikedContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "Треков: ${shown.size}",
+                            S.tracks(shown.size),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(onClick = { scope.launch { playLiked(shown, shown.first(), providers, audio) } }) {
-                            Text("Слушать всё")
+                            Text(S.playAll)
                         }
                     }
                 }
@@ -302,7 +303,7 @@ fun LikedContent(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        // Нажатие снимает лайк, трек сразу пропадает из списка
+                        // Tapping removes the like, the track immediately disappears from the list
                         IconButton(onClick = { likes.toggle(track) }) {
                             HeartIcon(true, tint = primary)
                         }

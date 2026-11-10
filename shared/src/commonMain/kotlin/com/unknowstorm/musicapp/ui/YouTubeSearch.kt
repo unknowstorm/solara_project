@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -27,8 +28,8 @@ import com.unknowstorm.musicapp.provider.youtube.YouTubeVideo
 import kotlinx.coroutines.CancellationException
 
 /**
- * Выдача YouTube на вкладке «Поиск». Отдельно от других источников (правила YouTube запрещают
- * смешивать результаты). Запрос уходит только когда пользователь нажал Enter: [submitted].
+ * YouTube results on the “Search” tab. Separate from other sources (the YouTube rules forbid
+ * mixing results). The request is sent only when the user presses Enter: [submitted].
  */
 @Composable
 fun YouTubeSearchPane(
@@ -54,13 +55,13 @@ fun YouTubeSearchPane(
             error = null
             try {
                 videos = api.search(submitted)
-                heading = "Результаты: $submitted"
+                heading = S.results(submitted)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: YouTubeException) {
                 error = e.message
             } catch (e: Exception) {
-                error = "Не удалось загрузить: ${e.message}"
+                error = S.couldNotLoad(e.message)
             } finally {
                 loading = false
             }
@@ -74,7 +75,7 @@ fun YouTubeSearchPane(
                 YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "Поиск запускается по Enter: у YouTube дневной лимит запросов на всё приложение.",
+                    S.searchRunsOnEnterYoutube,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -87,12 +88,12 @@ fun YouTubeSearchPane(
             if (heading.isNotEmpty()) {
                 Text(heading, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             } else if (!loading && error == null) {
-                Text("Введите запрос и нажмите Enter на клавиатуре.", modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                Text(S.typeAQueryAndPress, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             LazyColumn(Modifier.weight(1f)) {
                 items(videos) { video ->
                     VideoRow(video) {
-                        // Звук нашего плеера и YouTube не должны играть одновременно
+                        // The sound of our player and YouTube must not play at the same time
                         audio.stop()
                         session.open(video, videos)
                     }

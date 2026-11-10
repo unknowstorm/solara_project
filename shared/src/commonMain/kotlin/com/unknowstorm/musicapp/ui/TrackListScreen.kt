@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,7 +64,7 @@ fun TrackListScreen(
     var pagerPos by remember {
         mutableFloatStateOf(pagerOrder(likes != null).indexOf(if (likesSelected) null else selected).coerceAtLeast(0).toFloat())
     }
-    // Результаты по страницам пейджера: соседние источники грузятся заранее
+    // Results by pager pages: neighboring sources are loaded in advance
     val cache = remember(providers) { mutableStateMapOf<Service, Map<ProviderId, SourceResult>>() }
     val loadingFor = remember(providers) { mutableStateMapOf<Service, Boolean>() }
     val loadedFor = remember(providers) { mutableMapOf<Service, Pair<String, Int>>() }
@@ -92,7 +93,7 @@ fun TrackListScreen(
                     val fresh = mutableMapOf<ProviderId, SourceResult>()
                     try {
                         val sourceId = ProviderId.entries.firstOrNull { it.name == svc.name }
-                        // «Все» ищет только там, где играют полные треки; превью Deezer живут на своём чипе
+                        // "All" searches only where full tracks are played; Deezer previews live on their own chip
                         val sources = sourceId?.let { setOf(it) }
                             ?: providers.filter { p ->
                                 Service.entries.firstOrNull { it.name == p.id.name }?.kind == PlaybackKind.IN_APP
@@ -112,12 +113,12 @@ fun TrackListScreen(
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         if (selected == Service.SPOTIFY) {
-            // Правила Spotify: его бренд не соседствует с брендами других сервисов
+            // Spotify rules: its brand does not stand next to the brands of other services
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { selected = Service.ALL }) { Text("← Назад") }
+                TextButton(onClick = { selected = Service.ALL }) { Text(S.back) }
             }
         } else {
             TopBar(
@@ -131,7 +132,7 @@ fun TrackListScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Поиск") },
+                label = { Text(S.search) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
@@ -150,7 +151,7 @@ fun TrackListScreen(
         }
 
         if (selected == Service.SPOTIFY) {
-            // Выдача Spotify отдельная: с другими источниками не смешивается
+            // Spotify results are separate: they are not mixed with other sources
             SpotifySearchPane(
                 remote = com.unknowstorm.musicapp.spotify.LocalSpotifyRemote.current,
                 onBeforePlay = { audio.stop(); session?.close() },
@@ -173,7 +174,7 @@ fun TrackListScreen(
                         LikesSearchPane(likes, providers, audio, query, Modifier.fillMaxSize())
                     }
                     svc == Service.YOUTUBE && session != null -> {
-                        // Выдача YouTube отдельная: правила запрещают смешивать её с другими источниками
+                        // YouTube results are separate: the rules forbid mixing them with other sources
                         YouTubeSearchPane(
                             submitted = ytQuery,
                             audio = audio,
@@ -191,8 +192,8 @@ fun TrackListScreen(
                         onRetry = { retry++ },
                     )
                     else -> Text(
-                        text = if (svc == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube."
-                        else "${svc.title} скоро появится. ${svc.note}.",
+                        text = if (svc == Service.YOUTUBE) S.youtubeIsSearchedOnIts
+                        else S.isComingSoon(svc.title, svc.note),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp)
                     )
@@ -218,7 +219,7 @@ private fun SearchResultsPage(
     Column(Modifier.fillMaxSize()) {
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 
-        // Ошибка одного источника не мешает остальным
+        // An error of one source does not disturb the others
         failed.forEach { result ->
             Row(
                 Modifier.padding(horizontal = 16.dp),
@@ -230,13 +231,13 @@ private fun SearchResultsPage(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onRetry) { Text("Повторить") }
+                TextButton(onClick = onRetry) { Text(S.retry) }
             }
         }
 
         if (!loading && results != null && results.isNotEmpty() && visible.isEmpty() && failed.isEmpty()) {
             Text(
-                text = "Ничего не найдено",
+                text = S.nothingFound,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }

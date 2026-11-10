@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +53,7 @@ import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.parseSpotifyLink
 import org.jetbrains.compose.resources.painterResource
 
-/** Полный логотип Spotify на чёрном фоне, без изменений. */
+/** Full Spotify logo on a black background, unmodified. */
 @Composable
 internal fun SpotifyLogoBar(modifier: Modifier = Modifier) {
     Row(modifier.padding(vertical = 6.dp)) {
@@ -59,7 +61,7 @@ internal fun SpotifyLogoBar(modifier: Modifier = Modifier) {
     }
 }
 
-/** Обложка Spotify: без обрезки, надписей, значков и блюра, углы 4 dp. */
+/** Spotify cover: no cropping, captions, badges or blur, 4 dp corners. */
 @Composable
 internal fun SpotifyCover(bitmap: ImageBitmap?, size: Dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
@@ -69,7 +71,7 @@ internal fun SpotifyCover(bitmap: ImageBitmap?, size: Dp, modifier: Modifier = M
 
 @Composable
 internal fun SpotifyTile(item: SpotifyItem, covers: Map<String, ImageBitmap>, onClick: () -> Unit) {
-    // У верхнеуровневых подборок Spotify не отдаёт обложку: показываем нейтральную плитку с названием
+    // Spotify does not provide a cover for top-level shelves: we show a neutral tile with the title
     if (item.imageKey.isNullOrBlank()) {
         Box(
             Modifier.size(120.dp).clip(RoundedCornerShape(4.dp))
@@ -102,7 +104,7 @@ internal fun SpotifyTile(item: SpotifyItem, covers: Map<String, ImageBitmap>, on
     }
 }
 
-/** Ряд плиток Spotify: не больше 20 элементов, в конце ссылка на приложение Spotify. */
+/** Row of Spotify tiles: at most 20 items, with a link to the Spotify app at the end. */
 @Composable
 internal fun SpotifyTileRow(
     list: List<SpotifyItem>,
@@ -116,7 +118,7 @@ internal fun SpotifyTileRow(
         items(shown.size, key = { shown[it].uri }) { i -> SpotifyTile(shown[i], covers) { onClick(shown[i]) } }
         if (onOpenSpotify != null) {
             item {
-                // Последняя плитка ряда: тот же размер, что у обложек, углы 4 dp
+                // Last tile of the row: the same size as the covers, 4 dp corners
                 Column(
                     Modifier.size(120.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onOpenSpotify).padding(8.dp),
@@ -138,10 +140,10 @@ internal fun SpotifyTileRow(
     }
 }
 
-// Макет должен вмещать: плейлист/альбом 25 символов, исполнитель 18, трек 23.
-// Усечение (многоточие) допустимо только если не хватает места; метаданные не меняем.
+// The layout must fit: playlist/album 25 characters, artist 18, track 23.
+// Truncation (ellipsis) is allowed only when there is not enough room; we do not alter metadata.
 
-/** Режим Spotify на вкладке «Поиск»: запуск по ссылке и недавние треки. Остальных источников здесь нет. */
+/** Spotify mode on the “Search” tab: launch by link and recent tracks. No other sources here. */
 @Composable
 fun SpotifySearchPane(
     remote: SpotifyRemote?,
@@ -150,74 +152,98 @@ fun SpotifySearchPane(
     modifier: Modifier = Modifier,
 ) {
     val ui = LocalSpotifyMini.current
+    // The album or playlist whose track list is open on this tab
+    var linkContext by remember { mutableStateOf<String?>(null) }
+    val live = remote?.state?.collectAsState()?.value
+    if (remote != null && live != null && linkContext != null) {
+        SpotifyLinkBrowse(
+            remote = remote,
+            s = live,
+            contextUri = linkContext!!,
+            onBeforePlay = onBeforePlay,
+            onClose = { remote.closeBrowse(); linkContext = null },
+            modifier = modifier,
+        )
+        return
+    }
+    // Leaving the tab with an open list: the list must not appear on the Home page
+    DisposableEffect(Unit) { onDispose { if (linkContext != null) remote?.closeBrowse() } }
     Column(
         modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { SpotifyLogoBar() }
         if (remote == null) {
-            Text("Spotify доступен только в Android-версии.")
+            Text(S.spotifyIsAvailableOnlyIn)
             return@Column
         }
         val s by remote.state.collectAsState()
         if (!s.connected || s.premium == false) {
             Text(
-                if (s.premium == false) "Управление Spotify доступно только с подпиской Premium."
-                else "Spotify не подключён. Подключите его один раз в разделе Spotify, дальше подключение будет автоматическим.",
+                if (s.premium == false) S.spotifyControlIsAvailableOnly
+                else S.spotifyIsNotConnectedConnect,
             )
-            Button(onClick = onOpenSection) { Text("Открыть раздел Spotify") }
+            Button(onClick = onOpenSection) { Text(S.openTheSpotifySection) }
             return@Column
         }
         var link by remember { mutableStateOf("") }
         var linkError by remember { mutableStateOf(false) }
         Text(
-            "Поиск по названию для Spotify недоступен. Вставьте ссылку на трек, альбом или плейлист " +
-                "(в приложении Spotify: Поделиться → Копировать ссылку).",
+            S.searchByNameIsNot +
+                S.inTheSpotifyAppShare,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = link,
             onValueChange = { link = it; linkError = false },
-            label = { Text("Ссылка Spotify") },
+            label = { Text(S.spotifyLink) },
             isError = linkError,
-            supportingText = { if (linkError) Text("Не похоже на ссылку Spotify") },
+            supportingText = { if (linkError) Text(S.doesnTLookLikeA) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        // What kind of link this is: worked out locally from the link itself, no Spotify request
+        parseSpotifyLink(link)?.let {
+            Text(spotifyKindLabel(it), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
         Button(onClick = {
             val uri = parseSpotifyLink(link)
-            if (uri == null) linkError = true else {
-                onBeforePlay()
-                ui.dismissedUri = null
-                remote.playUri(uri)
-                link = ""
+            when {
+                uri == null -> linkError = true
+                // One track: play it right away, the mini player shows it
+                uri.startsWith("spotify:track:") -> {
+                    onBeforePlay()
+                    ui.dismissedUri = null
+                    remote.playUri(uri)
+                    link = ""
+                }
+                // Album or playlist: show the track list here, playback starts from the list
+                else -> {
+                    remote.openByUri(uri)
+                    linkContext = uri
+                    link = ""
+                }
             }
-        }) { Text("Играть по ссылке") }
-        // Эксперимент: список треков альбома или плейлиста через Content API App Remote
-        val browseUri = parseSpotifyLink(link)
-            ?.takeIf { it.startsWith("spotify:album:") || it.startsWith("spotify:playlist:") }
-        if (browseUri != null) {
-            OutlinedButton(onClick = { remote.openByUri(browseUri); link = ""; onOpenSection() }) { Text("Показать треки") }
-        }
+        }) { Text(S.spotifyOpenLink) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (s.history.isNotEmpty()) {
-            Text("Недавно играло", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(S.recentlyPlayed, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             SpotifyTileRow(s.history, s.covers) { item ->
                 onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
             }
         }
-        TextButton(onClick = onOpenSection) { Text("Открыть раздел Spotify") }
+        TextButton(onClick = onOpenSection) { Text(S.openTheSpotifySection) }
     }
 }
 
 
-/** Монохромная иконка Spotify: белая на тёмном фоне, чёрная на светлом. Зелёную можно только на чёрном или белом. */
+/** Monochrome Spotify icon: white on a dark background, black on a light one. Green only on black or white. */
 @Composable
 internal fun spotifyMonoIcon(background: Color): Painter =
     painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_icon_white else Res.drawable.spotify_icon_black)
 
-/** Кнопка «OPEN SPOTIFY» с иконкой, как в примерах гайдлайнов. */
+/** “OPEN SPOTIFY” button with an icon, as in the guideline examples. */
 @Composable
 internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedButton(onClick = onClick, modifier = modifier) {
@@ -227,7 +253,7 @@ internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifie
     }
 }
 
-/** Монохромный полный логотип Spotify: белый на тёмном фоне, чёрный на светлом. */
+/** Monochrome full Spotify logo: white on a dark background, black on a light one. */
 @Composable
 internal fun spotifyMonoLogo(background: Color): Painter =
     painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_logo_white else Res.drawable.spotify_logo_black)

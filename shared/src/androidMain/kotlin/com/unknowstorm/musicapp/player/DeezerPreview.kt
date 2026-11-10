@@ -6,7 +6,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
-/** Ссылки на превью Deezer живут около 15 минут. Если ссылка протухла, берём новую по id трека. */
+/** Deezer preview links live about 15 minutes. If a link has expired, we fetch a new one by track id. */
 object DeezerPreview {
     private const val MARGIN_S = 60L
     private val cache = ConcurrentHashMap<String, Uri>()
@@ -15,7 +15,7 @@ object DeezerPreview {
     private fun expiry(uri: Uri): Long =
         exp.find(uri.getQueryParameter("hdnea").orEmpty())?.groupValues?.get(1)?.toLongOrNull() ?: 0L
 
-    /** null означает «оставить исходную ссылку». Вызывается на потоке загрузки, блокировать можно. */
+    /** null means "keep the original link". Called on the loading thread, so blocking is fine. */
     fun fresh(uri: Uri): Uri? {
         val id = uri.fragment?.removePrefix("deezer=")?.takeIf { it.isNotBlank() } ?: return null
         val now = System.currentTimeMillis() / 1000

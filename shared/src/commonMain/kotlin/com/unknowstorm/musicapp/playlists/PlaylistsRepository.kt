@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.playlists
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.auth.supabase
@@ -22,7 +23,7 @@ import kotlinx.serialization.Serializable
 
 data class Playlist(val id: String, val name: String)
 
-/** Трек в плейлисте вместе с позицией (по ней его можно удалить). */
+/** A track in a playlist together with its position (it can be removed by it). */
 data class PlaylistEntry(val position: Int, val track: Track)
 
 @Serializable
@@ -45,7 +46,7 @@ private data class ItemRow(
 
 private fun ProviderId.canBeSaved() = this == ProviderId.JAMENDO || this == ProviderId.AUDIUS
 
-/** Плейлисты пользователя в облаке (таблицы `playlists` и `playlist_items`, RLS: только свои). */
+/** User playlists in the cloud (tables `playlists` and `playlist_items`, RLS: own rows only). */
 class PlaylistsRepository(
     auth: AuthRepository,
     private val client: SupabaseClient = supabase,
@@ -54,7 +55,7 @@ class PlaylistsRepository(
     private var userId: String? = null
 
     private val _playlists = MutableStateFlow<List<Playlist>>(emptyList())
-    /** Плейлисты, новые сверху. */
+    /** Playlists, newest first. */
     val playlists: StateFlow<List<Playlist>> = _playlists.asStateFlow()
 
     private val _signedIn = MutableStateFlow(false)
@@ -97,12 +98,12 @@ class PlaylistsRepository(
         }
     }
 
-    /** Создаёт плейлист из треков. Deezer и прочее, что база не принимает, пропускается. */
+    /** Creates a playlist from tracks. Deezer and anything else the database does not accept is skipped. */
     suspend fun create(name: String, tracks: List<Track>): Result<Unit> {
         val clean = name.trim().take(100)
-        if (clean.isEmpty()) return Result.failure(Exception("Введите название"))
+        if (clean.isEmpty()) return Result.failure(Exception(S.enterAName))
         val items = tracks.filter { it.provider.canBeSaved() }
-        if (items.isEmpty()) return Result.failure(Exception("В очереди нет треков Jamendo или Audius"))
+        if (items.isEmpty()) return Result.failure(Exception(S.theQueueHasNoJamendo))
         var createdId: String? = null
         return try {
             val row = client.from("playlists")
@@ -120,15 +121,15 @@ class PlaylistsRepository(
             throw e
         } catch (e: Exception) {
             println("Solara: playlist create failed: ${e.message}")
-            // Не оставляем пустой плейлист, если не записались треки
+            // We do not leave an empty playlist if the tracks were not written
             createdId?.let { id ->
                 runCatching { client.from("playlists").delete { filter { eq("id", id) } } }
             }
-            Result.failure(Exception("Не удалось сохранить плейлист"))
+            Result.failure(Exception(S.couldNotSaveThePlaylist))
         }
     }
 
-    /** Треки плейлиста по порядку (без ссылок на звук: их берёт playLiked). */
+    /** Playlist tracks in order (without audio links: playLiked fetches them). */
     suspend fun loadTracks(playlistId: String): List<Track> = try {
         client.from("playlist_items")
             .select {
@@ -148,7 +149,7 @@ class PlaylistsRepository(
         emptyList()
     }
 
-    /** Состав плейлиста по порядку; null, если загрузить не удалось. */
+    /** Playlist contents in order; null if loading failed. */
     suspend fun loadEntries(playlistId: String): List<PlaylistEntry>? = try {
         client.from("playlist_items")
             .select {
@@ -185,7 +186,7 @@ class PlaylistsRepository(
 
     suspend fun rename(playlistId: String, name: String): Result<Unit> {
         val clean = name.trim().take(100)
-        if (clean.isEmpty()) return Result.failure(Exception("Введите название"))
+        if (clean.isEmpty()) return Result.failure(Exception(S.enterAName))
         return try {
             client.from("playlists").update(PlaylistInsert(clean)) { filter { eq("id", playlistId) } }
             _playlists.update { list -> list.map { if (it.id == playlistId) it.copy(name = clean) else it } }
@@ -194,14 +195,14 @@ class PlaylistsRepository(
             throw e
         } catch (e: Exception) {
             println("Solara: playlist rename failed: ${e.message}")
-            Result.failure(Exception("Не удалось переименовать"))
+            Result.failure(Exception(S.couldNotRename))
         }
     }
 
-    /** Добавляет треки в конец плейлиста, уже лежащие в нём пропускает. Возвращает, сколько добавлено. */
+    /** Appends tracks to the end of the playlist, skipping those already in it. Returns how many were added. */
     suspend fun addTracks(playlistId: String, tracks: List<Track>): Result<Int> {
         val existing = loadEntries(playlistId)
-            ?: return Result.failure(Exception("Не удалось загрузить плейлист"))
+            ?: return Result.failure(Exception(S.couldNotLoadThePlaylist))
         val have = existing.map { "${it.track.provider}:${it.track.id}" }.toSet()
         val fresh = tracks
             .filter { it.provider.canBeSaved() && "${it.provider}:${it.id}" !in have }
@@ -219,7 +220,7 @@ class PlaylistsRepository(
             throw e
         } catch (e: Exception) {
             println("Solara: playlist add failed: ${e.message}")
-            Result.failure(Exception("Не удалось добавить в плейлист"))
+            Result.failure(Exception(S.couldNotAddToThe))
         }
     }
 

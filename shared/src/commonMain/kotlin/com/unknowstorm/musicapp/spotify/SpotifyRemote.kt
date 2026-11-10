@@ -13,10 +13,10 @@ data class SpotifyItem(
     val imageKey: String? = null,
 )
 
-/** Ряд (полка) рекомендаций Spotify: заголовок и элементы. */
+/** A row (shelf) of Spotify recommendations: title and items. */
 data class SpotifyShelf(val title: String, val items: List<SpotifyItem>)
 
-/** Состояние Spotify живёт только в памяти. Ничего из него не сохраняется. */
+/** Spotify state lives only in memory. Nothing from it is saved. */
 data class SpotifyState(
     val appInstalled: Boolean = true,
     val connecting: Boolean = false,
@@ -34,6 +34,10 @@ data class SpotifyState(
     val history: List<SpotifyItem> = emptyList(),
     val browse: List<SpotifyItem>? = null,
     val browseTitle: String? = null,
+    /** More tracks can be loaded for the open album or playlist. */
+    val browseMore: Boolean = false,
+    /** Exact number of tracks in the open album or playlist, as reported by Spotify. */
+    val browseTotal: Int? = null,
     val covers: Map<String, ImageBitmap> = emptyMap(),
     val shelves: List<SpotifyShelf>? = null,
 )
@@ -50,14 +54,18 @@ interface SpotifyRemote {
     fun seekTo(ms: Long)
     fun toggleSaved()
     fun openSpotifyApp()
-    /** Открывает конкретный контент (spotify:track:…, spotify:album:…, spotify:playlist:…) в приложении Spotify. */
+    /** Opens specific content (spotify:track:…, spotify:album:…, spotify:playlist:…) in the Spotify app. */
     fun openInSpotify(uri: String)
     fun getSpotifyApp()
     fun loadRecommended()
     fun openItem(item: SpotifyItem)
     fun closeBrowse()
-    /** Список треков альбома или плейлиста по URI (spotify:album:… / spotify:playlist:…). Результат приходит в state.browse. */
+    /** Loads the next page of the open album or playlist (called when the list is scrolled to its end). */
+    fun loadMoreBrowse() {}
+    /** Track list of an album or playlist by URI (spotify:album:… / spotify:playlist:…). The result arrives in state.browse. */
     fun openByUri(uri: String) {}
+    /** Plays an album or playlist from the given track index, so "next" follows the list. */
+    fun playInContext(contextUri: String, index: Int, item: SpotifyItem? = null) {}
 }
 
 val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }
@@ -65,7 +73,7 @@ val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }
 private val LINK = Regex("""open\.spotify\.com/(?:intl-[a-z-]+/)?(track|playlist|album)/([A-Za-z0-9]+)""")
 private val URI = Regex("""^spotify:(track|playlist|album):([A-Za-z0-9]+)$""")
 
-/** Ссылка open.spotify.com или spotify:... в URI для App Remote. Иначе null. */
+/** An open.spotify.com or spotify:... link turned into a URI for App Remote. Otherwise null. */
 fun parseSpotifyLink(text: String): String? {
     val s = text.trim()
     URI.find(s)?.let { return s }

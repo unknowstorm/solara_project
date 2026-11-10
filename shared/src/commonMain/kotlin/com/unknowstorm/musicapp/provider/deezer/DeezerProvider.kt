@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.provider.deezer
 
+import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.provider.MusicProvider
@@ -9,7 +10,7 @@ import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 
-/** Deezer отдаёт через открытый API только 30-секундные превью, полный звук доступен лишь через их SDK. */
+/** Deezer's open API gives only 30-second previews; full audio is available only through their SDK. */
 class DeezerProvider(
     private val client: HttpClient = HttpClient(),
 ) : MusicProvider {
@@ -26,14 +27,14 @@ class DeezerProvider(
             }.bodyAsText()
         }
         val response = json.decodeFromString<DeezerResponse>(text)
-        response.error?.let { error("Deezer: ${it.message.ifBlank { "ошибка ${it.code}" }}") }
+        response.error?.let { error(S.deezer(it.message.ifBlank { S.error2(it.code) })) }
         return response.data.filter { !it.preview.isNullOrBlank() }.map { it.toTrack() }
     }
 
-    /** Свежая ссылка на превью: старая живёт около 15 минут. */
+    /** A fresh preview link: the old one lives about 15 minutes. */
     override suspend fun resolveStream(track: Track): String {
         val dto = json.decodeFromString<DeezerTrackDto>(client.get("$BASE_URL/track/${track.id}").bodyAsText())
-        return dto.preview?.takeIf { it.isNotBlank() } ?: error("Deezer: нет превью для трека ${track.id}")
+        return dto.preview?.takeIf { it.isNotBlank() } ?: error(S.deezerNoPreviewForTrack(track.id))
     }
 
     private fun DeezerTrackDto.toTrack() = Track(
@@ -43,7 +44,7 @@ class DeezerProvider(
         artist = artist?.name.orEmpty(),
         artworkUrl = album?.coverBig ?: album?.coverMedium,
         durationMs = PREVIEW_MS,
-        // id в конце ссылки нужен плееру, чтобы обновить протухшую ссылку (см. DeezerPreview)
+        // the id at the end of the link is needed by the player to refresh an expired link (see DeezerPreview)
         streamUrl = "$preview#deezer=$id",
     )
 

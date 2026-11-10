@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Приложение могли открыть по ссылке solara://auth (подтверждение почты, Google)
+        // The app may have been opened via a link solara://auth (email confirmation, Google)
         if (intent?.data != null) handleAuthDeepLink(intent)
 
         spotify = SpotifyRemoteImpl(this)

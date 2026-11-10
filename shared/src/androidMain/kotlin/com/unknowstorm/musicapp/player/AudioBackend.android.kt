@@ -18,7 +18,7 @@ actual fun rememberAudioBackend(): AudioBackend {
     val backend = remember { MediaControllerBackend(context) }
     DisposableEffect(backend) { onDispose { backend.release() } }
 
-    // Android 13+: без этого разрешения уведомление с кнопками не покажется
+    // Android 13+: without this permission the notification with buttons will not be shown
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }

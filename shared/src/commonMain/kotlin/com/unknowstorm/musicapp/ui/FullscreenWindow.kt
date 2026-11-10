@@ -3,9 +3,9 @@ package com.unknowstorm.musicapp.ui
 import androidx.compose.runtime.Composable
 
 /**
- * Полноэкранный режим окна, пока [active] = true.
- * Android: прячет системные панели и поворачивает экран в альбом; при выходе возвращает всё как было.
- * Desktop: ничего не делает (видео и так растягивается на всё окно приложения).
+ * Fullscreen window mode while [active] = true.
+ * Android: hides the system bars and rotates the screen to landscape; on exit restores everything as it was.
+ * Desktop: does nothing (the video already stretches over the whole app window).
  */
 @Composable
 expect fun FullscreenWindowEffect(active: Boolean)
