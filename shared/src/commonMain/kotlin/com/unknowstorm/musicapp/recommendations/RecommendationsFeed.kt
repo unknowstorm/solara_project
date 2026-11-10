@@ -66,11 +66,15 @@ class RecommendationsFeed(
         private set
 
     private var loadedFor: Boolean? = null
+    private var loadedAtRecorded = -1
 
     /** Loads once per “signed in / guest” state; recalculated after signing in or out. */
     suspend fun ensureLoaded(signedIn: Boolean) {
-        if (loading || loadedFor == signedIn) return
+        if (loading) return
+        // Reload when the sign-in state changed or new listens were written since the last calculation
+        if (loadedFor == signedIn && loadedAtRecorded == history.recorded.value) return
         loadedFor = signedIn
+        loadedAtRecorded = history.recorded.value
         if (!signedIn) {
             tracks = emptyList()
             artists = emptyList()
