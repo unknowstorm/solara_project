@@ -258,5 +258,9 @@ object S {
     val historyUnavailable: String get() = tr("History is unavailable right now.", "Історія зараз недоступна.")
     val signInToKeepHistory: String get() = tr("Sign in to keep your listening history.", "Увійдіть в акаунт, щоб зберігалася історія прослуховування.")
     val historyEmpty: String get() = tr("Tracks you listen to for at least 30 seconds will appear here. For now, history is recorded only for Jamendo and Audius.", "Тут з’являться треки, які ви послухали щонайменше 30 секунд. Поки що історія пишеться лише для Jamendo і Audius.")
+    val libLikes: String get() = tr("My likes", "Мої лайки")
+    val libPlaylists: String get() = tr("My playlists", "Мої плейлисти")
+    val libHistory: String get() = tr("History", "Історія")
+    val libCache: String get() = tr("Cache / downloads", "Кеш / завантажене")
     // <<< ENTRIES >>>
 }

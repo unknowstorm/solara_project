@@ -47,11 +47,17 @@ import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
-private enum class LibraryTab(val label: String) {
-    LIKES("Мои лайки"),
-    PLAYLISTS("Мои плейлисты"),
-    HISTORY("История"),
-    CACHE("Кеш / скачанное"),
+private enum class LibraryTab {
+    LIKES, PLAYLISTS, HISTORY, CACHE;
+
+    // Свойство, а не параметр конструктора: название берётся из текущего языка при каждой отрисовке
+    val label: String
+        @Composable get() = when (this) {
+            LIKES -> S.libLikes
+            PLAYLISTS -> S.libPlaylists
+            HISTORY -> S.libHistory
+            CACHE -> S.libCache
+        }
 }
 
 /**
