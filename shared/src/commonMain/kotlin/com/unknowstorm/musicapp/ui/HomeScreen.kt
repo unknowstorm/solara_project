@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
@@ -223,6 +224,7 @@ fun HomeScreen(
     swipe: Modifier = Modifier,
     // false: the top bar is drawn by the parent (the pager), here only the content
     showBar: Boolean = true,
+    history: HistoryRepository? = null,
 ) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(feeds) { feeds.forEach { feed -> launch { feed.loadIfNeeded() } } }
@@ -268,9 +270,9 @@ fun HomeScreen(
             onLikes = onOpenLikes,
         )
 
-        // The "Favorites" tab stands in the bar to the left of the sources and replaces the feed
+        // «Моя библиотека» стоит в панели слева от источников и заменяет ленту
         if (likesSelected) {
-            Box(swipe.weight(1f).fillMaxWidth()) { LikedContent(likes, providers, audio, onOpenAuth) }
+            Box(swipe.weight(1f).fillMaxWidth()) { LibraryContent(likes, playlists, history, providers, audio, onOpenAuth, onOpenPlaylist) }
             return@Column
         }
 
@@ -515,17 +517,14 @@ fun TopBar(
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // "Favorites": the leftmost button
+        // «Моя библиотека»: самая левая кнопка
         if (onLikes != null) {
             IconButton(
                 onClick = onLikes,
                 modifier = track(Modifier.clip(CircleShape).background(pill(likesSelected)), 0)
+                    .semantics { contentDescription = "Моя библиотека" }
             ) {
-                HeartIcon(
-                    likesSelected,
-                    Modifier.size(22.dp),
-                    tint(0, likesSelected),
-                )
+                LibraryIcon(Modifier.size(22.dp), tint(0, likesSelected))
             }
         }
 

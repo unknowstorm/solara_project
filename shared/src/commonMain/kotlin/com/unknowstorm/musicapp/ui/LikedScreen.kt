@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,21 +26,206 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
+import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.DeadTracks
+import com.unknowstorm.musicapp.playlists.Playlist
+import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
+private enum class LibraryTab(val label: String) {
+    LIKES("Мои лайки"),
+    PLAYLISTS("Мои плейлисты"),
+    HISTORY("История"),
+    CACHE("Кеш / скачанное"),
+}
+
 /**
- * Contents of the “Liked” tab on Home (under the top source selection bar).
- * Shows likes of the current account only: the server does not return other users' rows (RLS),
- * and on sign-out or account switch the list is cleared.
+ * «Моя библиотека»: первая страница верхней панели Главной. Список разделов
+ * «Мои лайки», «Мои плейлисты», «История», «Кеш / скачанное» (пока заглушка);
+ * нажатие открывает раздел, стрелка или «назад» возвращает к списку.
+ */
+@Composable
+fun LibraryContent(
+    likes: LikesRepository,
+    playlists: PlaylistsRepository?,
+    history: HistoryRepository?,
+    providers: List<MusicProvider>,
+    audio: AudioBackend,
+    onOpenAuth: () -> Unit,
+    onOpenPlaylist: (Playlist) -> Unit,
+) {
+    var selected by rememberSaveable { mutableIntStateOf(-1) }
+    val sections = LibraryTab.entries
+
+    if (selected !in sections.indices) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            sections.forEachIndexed { i, section ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { selected = i }
+                        .padding(horizontal = 8.dp, vertical = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        section.label,
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "›",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    val section = sections[selected]
+    PlatformBackHandler(onBack = { selected = -1 })
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = { selected = -1 }) { Text("←", style = MaterialTheme.typography.titleLarge) }
+            Text(
+                section.label,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (section) {
+                LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth)
+                LibraryTab.PLAYLISTS -> PlaylistsTab(playlists, onOpenAuth, onOpenPlaylist)
+                LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
+                LibraryTab.CACHE -> Message("Кеш и скачанные треки скоро появятся.")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistsTab(
+    playlists: PlaylistsRepository?,
+    onOpenAuth: () -> Unit,
+    onOpenPlaylist: (Playlist) -> Unit,
+) {
+    if (playlists == null) {
+        Message("Плейлисты сейчас недоступны.")
+        return
+    }
+    val signedIn by playlists.signedIn.collectAsState()
+    val list by playlists.playlists.collectAsState()
+    LaunchedEffect(signedIn) { if (signedIn) playlists.refresh() }
+    when {
+        !signedIn -> Message("Войдите в аккаунт, чтобы создавать плейлисты. У каждого аккаунта свои.") {
+            Button(onClick = onOpenAuth) { Text("Войти") }
+        }
+        list.isEmpty() -> Message("Плейлистов пока нет. На вкладке «Очередь» можно сохранить очередь как плейлист.")
+        else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            items(list, key = { it.id }) { pl ->
+                ListItem(
+                    headlineContent = { Text(pl.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { onOpenPlaylist(pl) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryTab(
+    likes: LikesRepository,
+    history: HistoryRepository?,
+    providers: List<MusicProvider>,
+    audio: AudioBackend,
+    onOpenAuth: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val signedIn by likes.signedIn.collectAsState()
+    var tracks by remember { mutableStateOf<List<Track>?>(null) }
+    LaunchedEffect(signedIn, history) {
+        tracks = null
+        if (signedIn && history != null) {
+            // Один и тот же трек показываем один раз: самое свежее прослушивание
+            tracks = history.recent()
+                .filterNot { DeadTracks.isDead(it) }
+                .distinctBy { "${it.provider}:${it.id}" }
+        }
+    }
+    val shown = tracks
+    when {
+        history == null -> Message("История сейчас недоступна.")
+        !signedIn -> Message("Войдите в аккаунт, чтобы сохранялась история прослушивания.") {
+            Button(onClick = onOpenAuth) { Text("Войти") }
+        }
+        shown == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        shown.isEmpty() -> Message(
+            "Здесь появятся треки, которые вы послушали хотя бы 30 секунд. Пока история пишется только для Jamendo и Audius."
+        )
+        else -> LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(shown, key = { "${it.provider}:${it.id}" }) { track ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { scope.launch { playLiked(shown, track, providers, audio) } }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TrackCover(track, Modifier.size(56.dp), badge = true, badgeSize = 18.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            track.title,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            track.artist,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Содержимое вкладки «Мои лайки» в библиотеке (под верхней панелью выбора источников).
+ * Показывает лайки только текущего аккаунта: сервер чужие строки не отдаёт (RLS),
+ * а при выходе или смене аккаунта список очищается.
  */
 @Composable
 fun LikedContent(
