@@ -118,7 +118,7 @@ fun LibraryContent(
                 LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth)
                 LibraryTab.PLAYLISTS -> PlaylistsTab(playlists, onOpenAuth, onOpenPlaylist)
                 LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
-                LibraryTab.CACHE -> Message("Кеш и скачанные треки скоро появятся.")
+                LibraryTab.CACHE -> Message(S.cacheSoon)
             }
         }
     }
@@ -131,17 +131,17 @@ private fun PlaylistsTab(
     onOpenPlaylist: (Playlist) -> Unit,
 ) {
     if (playlists == null) {
-        Message("Плейлисты сейчас недоступны.")
+        Message(S.playlistsUnavailable)
         return
     }
     val signedIn by playlists.signedIn.collectAsState()
     val list by playlists.playlists.collectAsState()
     LaunchedEffect(signedIn) { if (signedIn) playlists.refresh() }
     when {
-        !signedIn -> Message("Войдите в аккаунт, чтобы создавать плейлисты. У каждого аккаунта свои.") {
-            Button(onClick = onOpenAuth) { Text("Войти") }
+        !signedIn -> Message(S.signInToCreatePlaylists) {
+            Button(onClick = onOpenAuth) { Text(S.signIn) }
         }
-        list.isEmpty() -> Message("Плейлистов пока нет. На вкладке «Очередь» можно сохранить очередь как плейлист.")
+        list.isEmpty() -> Message(S.noPlaylistsYet)
         else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             items(list, key = { it.id }) { pl ->
                 ListItem(
@@ -176,15 +176,15 @@ private fun HistoryTab(
     }
     val shown = tracks
     when {
-        history == null -> Message("История сейчас недоступна.")
-        !signedIn -> Message("Войдите в аккаунт, чтобы сохранялась история прослушивания.") {
-            Button(onClick = onOpenAuth) { Text("Войти") }
+        history == null -> Message(S.historyUnavailable)
+        !signedIn -> Message(S.signInToKeepHistory) {
+            Button(onClick = onOpenAuth) { Text(S.signIn) }
         }
         shown == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         shown.isEmpty() -> Message(
-            "Здесь появятся треки, которые вы послушали хотя бы 30 секунд. Пока история пишется только для Jamendo и Audius."
+            S.historyEmpty
         )
         else -> LazyColumn(
             Modifier.fillMaxSize(),

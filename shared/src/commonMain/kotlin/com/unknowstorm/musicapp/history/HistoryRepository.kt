@@ -16,6 +16,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -45,6 +47,9 @@ class HistoryRepository(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val userId = MutableStateFlow<String?>(null)
+    private val _recorded = MutableStateFlow(0)
+    /** Grows with every listen written to the cloud: the recommendations use it to know the history changed. */
+    val recorded: StateFlow<Int> = _recorded
 
     private var key: String? = null
     private var played = 0L
@@ -118,6 +123,7 @@ class HistoryRepository(
                         track.artworkUrl, track.durationMs,
                     )
                 )
+                _recorded.update { it + 1 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

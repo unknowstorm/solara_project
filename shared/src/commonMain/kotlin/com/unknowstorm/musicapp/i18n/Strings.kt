@@ -250,5 +250,13 @@ object S {
     val spotifyLinkAlbum: String get() = tr("This is an album", "Це альбом")
     val spotifyLinkPlaylist: String get() = tr("This is a playlist", "Це плейлист")
     fun spotifyTracksCount(p0: Any?): String = tr("Tracks: ${p0}", "Треків: ${p0}")
+    val myLibrary: String get() = tr("My library", "Моя бібліотека")
+    val cacheSoon: String get() = tr("Cache and downloaded tracks are coming soon.", "Кеш і завантажені треки незабаром з’являться.")
+    val playlistsUnavailable: String get() = tr("Playlists are unavailable right now.", "Плейлисти зараз недоступні.")
+    val signInToCreatePlaylists: String get() = tr("Sign in to create playlists. Each account has its own.", "Увійдіть в акаунт, щоб створювати плейлисти. У кожного акаунта свої.")
+    val noPlaylistsYet: String get() = tr("No playlists yet. On the Queue tab you can save the queue as a playlist.", "Плейлистів поки немає. На вкладці «Черга» можна зберегти чергу як плейлист.")
+    val historyUnavailable: String get() = tr("History is unavailable right now.", "Історія зараз недоступна.")
+    val signInToKeepHistory: String get() = tr("Sign in to keep your listening history.", "Увійдіть в акаунт, щоб зберігалася історія прослуховування.")
+    val historyEmpty: String get() = tr("Tracks you listen to for at least 30 seconds will appear here. For now, history is recorded only for Jamendo and Audius.", "Тут з’являться треки, які ви послухали щонайменше 30 секунд. Поки що історія пишеться лише для Jamendo і Audius.")
     // <<< ENTRIES >>>
 }

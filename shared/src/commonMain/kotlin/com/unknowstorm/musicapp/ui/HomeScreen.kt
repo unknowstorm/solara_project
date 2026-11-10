@@ -522,7 +522,7 @@ fun TopBar(
             IconButton(
                 onClick = onLikes,
                 modifier = track(Modifier.clip(CircleShape).background(pill(likesSelected)), 0)
-                    .semantics { contentDescription = "Моя библиотека" }
+                    .semantics { contentDescription = S.myLibrary }
             ) {
                 LibraryIcon(Modifier.size(22.dp), tint(0, likesSelected))
             }
