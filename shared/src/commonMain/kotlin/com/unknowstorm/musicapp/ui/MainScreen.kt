@@ -38,6 +38,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
+import com.unknowstorm.musicapp.i18n.I18n
 import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
@@ -79,7 +80,7 @@ fun MainScreen(
         mutableFloatStateOf(pagerOrder(true).indexOf(if (showLikes) null else service).coerceAtLeast(0).toFloat())
     }
 
-    val feeds = remember(providers) {
+    val feeds = remember(providers, I18n.language) {
         providers.mapNotNull { provider ->
             val s = Service.entries.firstOrNull { it.name == provider.id.toString() }
             s?.let { HomeFeed(it, provider, defaultMixes(it)) }

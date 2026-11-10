@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -73,13 +74,14 @@ internal const val YOUTUBE_HOME = "https://www.youtube.com"
 
 // Подборки по жанрам: это поиск, один запрос стоит 100 единиц квоты. Обычно берём готовые с сервера,
 // а свои запросы делаем только по свайпу вниз, если на сервере чего-то не хватает
-private val GENRES = listOf(
-    "Джаз" to "jazz music",
-    "Поп" to "pop music",
-    "Рок" to "rock music",
-    "Хип-хоп" to "hip hop music",
-    "Электроника" to "electronic music",
-    "Лоу-фай" to "lofi",
+private val GENRES: List<Pair<String, String>>
+    get() = listOf(
+    S.jazz to "jazz music",
+    S.pop to "pop music",
+    S.rock to "rock music",
+    S.hipHop to "hip hop music",
+    S.electronic to "electronic music",
+    S.loFi to "lofi",
 )
 
 /** Показывает содержимое, только если пользователь принял условия YouTube. */
@@ -172,7 +174,7 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
         } catch (e: YouTubeException) {
             error = e.message
         } catch (e: Exception) {
-            error = "Не удалось загрузить: ${e.message}"
+            error = S.couldNotLoad(e.message)
         }
     }
 
@@ -215,7 +217,7 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
                     YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "Поиск по YouTube: вкладка «Поиск», чип YouTube.",
+                        S.searchYoutubeTheSearchTab,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
@@ -231,11 +233,11 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
                 }
             }
             if (popular.isNotEmpty()) {
-                item(key = "popular-label") { FeedTitle("Популярная музыка") }
+                item(key = "popular-label") { FeedTitle(S.popularMusic) }
                 item(key = "popular-strip") { VideoStrip(popular) { play(it, popular) } }
             }
             if (genres.isNotEmpty()) {
-                item(key = "genres-label") { FeedTitle("Подборки по жанрам") }
+                item(key = "genres-label") { FeedTitle(S.genrePicks) }
                 GENRES.forEach { (title, _) ->
                     val loaded = genres[title] ?: return@forEach
                     item(key = "label:$title") {
@@ -253,12 +255,12 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
                 item(key = "missing") {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp)) {
                         Text(
-                            "Не все подборки загрузились. Потяните экран вниз, чтобы обновить.",
+                            S.notAllPicksLoadedPull,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         TextButton(onClick = { refresh() }, enabled = !refreshing) {
-                            Text(if (refreshing) "Загрузка…" else "Обновить")
+                            Text(if (refreshing) S.loading else S.refresh)
                         }
                     }
                 }
@@ -368,11 +370,11 @@ fun YouTubeLogo(modifier: Modifier = Modifier, onClick: () -> Unit) {
 }
 
 internal fun playerErrorText(code: Int): String = when (code) {
-    101, 150 -> "Автор запретил встраивание этого видео. Откройте его в YouTube."
-    100 -> "Видео недоступно: удалено, закрыто или недоступно в вашем регионе."
-    153 -> "YouTube не смог проверить приложение. Откройте видео в YouTube."
-    5 -> "Ошибка плеера. Попробуйте ещё раз или откройте видео в YouTube."
-    else -> "Видео не удалось воспроизвести (код $code)."
+    101, 150 -> S.theAuthorDisabledEmbeddingFor
+    100 -> S.videoUnavailableDeletedPrivateOr
+    153 -> S.youtubeCouldNotVerifyThe
+    5 -> S.playerErrorTryAgainOr
+    else -> S.theVideoCouldNotBe(code)
 }
 
 internal fun formatYtDuration(ms: Long): String {

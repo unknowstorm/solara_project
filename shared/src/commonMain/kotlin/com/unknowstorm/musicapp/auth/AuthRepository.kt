@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.auth
 
+import com.unknowstorm.musicapp.i18n.S
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
@@ -245,7 +246,7 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         syncPalette: Boolean,
         services: Set<String>,
     ): Result<Unit> = safe {
-        val user = client.auth.currentUserOrNull() ?: error("Нет активной сессии")
+        val user = client.auth.currentUserOrNull() ?: error(S.noActiveSession)
         val current = (_state.value as? AuthState.SignedIn)?.profile?.avatar
         val path = "${user.id}/avatar.jpg"
 
@@ -331,19 +332,19 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
     private fun friendly(e: Exception): String {
         val m = e.message.orEmpty()
         return when {
-            "Invalid login credentials" in m -> "Неверный логин или пароль"
-            "login not found" in m -> "Аккаунт с таким логином не найден"
-            "already registered" in m || "already been registered" in m -> "Эта почта уже зарегистрирована"
-            "Password should be" in m -> "Пароль слишком простой (минимум 6 символов)"
-            "Email not confirmed" in m -> "Сначала подтверди почту кодом из письма"
+            "Invalid login credentials" in m -> S.wrongLoginOrPassword
+            "login not found" in m -> S.noAccountWithThisLogin
+            "already registered" in m || "already been registered" in m -> S.thisEmailIsAlreadyRegistered
+            "Password should be" in m -> S.passwordIsTooSimpleAt
+            "Email not confirmed" in m -> S.confirmYourEmailWithThe
             "Token has expired" in m || "otp_expired" in m || "invalid" in m.lowercase() && "token" in m.lowercase() ->
-                "Неверный или просроченный код"
-            "duplicate key" in m || "23505" in m -> "Этот ник уже занят"
-            "exceeded the maximum allowed size" in m || "too large" in m.lowercase() -> "Фото слишком большое"
-            "rate limit" in m.lowercase() -> "Слишком много попыток, подожди немного"
+                S.wrongOrExpiredCode
+            "duplicate key" in m || "23505" in m -> S.thisNicknameIsAlreadyTaken
+            "exceeded the maximum allowed size" in m || "too large" in m.lowercase() -> S.thePhotoIsTooLarge
+            "rate limit" in m.lowercase() -> S.tooManyAttemptsPleaseWait
             "Unable to resolve" in m || "timeout" in m.lowercase() ||
-                    "UnknownHost" in e::class.simpleName.orEmpty() -> "Нет сети"
-            else -> "Не получилось: ${m.take(120)}"
+                    "UnknownHost" in e::class.simpleName.orEmpty() -> S.noNetwork
+            else -> S.failed(m.take(120))
         }
     }
 }

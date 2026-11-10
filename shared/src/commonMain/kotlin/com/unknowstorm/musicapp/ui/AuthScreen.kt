@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -68,14 +69,14 @@ fun AuthScreen(
                 .wrapContentWidth(Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            TextButton(onClick = onClose) { Text("← Назад") }
+            TextButton(onClick = onClose) { Text(S.back) }
 
             Text(
-                if (register) "Создать аккаунт" else "С возвращением",
+                if (register) S.createAccount else S.welcomeBack,
                 style = MaterialTheme.typography.headlineLarge,
             )
             Text(
-                "Аккаунт нужен для синхронизации между телефоном и ПК. Музыка работает и без него.",
+                S.anAccountIsNeededTo,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -86,18 +87,18 @@ fun AuthScreen(
                     selected = !register,
                     onClick = { register = false; error = null; info = null },
                     shape = SegmentedButtonDefaults.itemShape(0, 2),
-                ) { Text("Вход") }
+                ) { Text(S.signIn2) }
                 SegmentedButton(
                     selected = register,
                     onClick = { register = true; error = null; info = null },
                     shape = SegmentedButtonDefaults.itemShape(1, 2),
-                ) { Text("Регистрация") }
+                ) { Text(S.signUp) }
             }
 
             OutlinedTextField(
                 value = login,
                 onValueChange = { login = it },
-                label = { Text(if (register) "Почта" else "Почта или логин") },
+                label = { Text(if (register) S.email else S.emailOrLogin) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 keyboardOptions = KeyboardOptions(
@@ -108,7 +109,7 @@ fun AuthScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Пароль") },
+                label = { Text(S.password) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
                 visualTransformation = PasswordVisualTransformation(),
@@ -119,7 +120,7 @@ fun AuthScreen(
                 OutlinedTextField(
                     value = password2,
                     onValueChange = { password2 = it },
-                    label = { Text("Повтори пароль") },
+                    label = { Text(S.repeatPassword) },
                     singleLine = true,
                     isError = password2.isNotEmpty() && password2 != password,
                     shape = RoundedCornerShape(16.dp),
@@ -146,7 +147,7 @@ fun AuthScreen(
                 shape = RoundedCornerShape(28.dp),
             ) {
                 if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                else Text(if (register) "Зарегистрироваться" else "Войти")
+                else Text(if (register) S.signUp2 else S.signIn)
             }
 
             if (!register) {
@@ -154,12 +155,12 @@ fun AuthScreen(
                     onClick = { showForgot = true },
                     enabled = !busy,
                     modifier = Modifier.align(Alignment.CenterHorizontally),
-                ) { Text("Забыл пароль?") }
+                ) { Text(S.forgotPassword) }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 HorizontalDivider(Modifier.weight(1f))
-                Text("или", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(S.or, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider(Modifier.weight(1f))
             }
 
@@ -174,7 +175,7 @@ fun AuthScreen(
                     contentAlignment = Alignment.Center,
                 ) { Text("G", style = MaterialTheme.typography.labelLarge) }
                 Spacer(Modifier.width(12.dp))
-                Text("Продолжить через Google")
+                Text(S.continueWithGoogle)
             }
         }
 
@@ -246,7 +247,7 @@ private fun ForgotPasswordSheet(
                     mail = it
                     code = ""; newPassword = ""; repeat = ""
                     step = ResetStep.Code
-                    info = "Код отправлен"
+                    info = S.codeSent
                     cooldown = RESET_RESEND_COOLDOWN_SEC
                 }
                 .onFailure { error = it.message }
@@ -260,7 +261,7 @@ private fun ForgotPasswordSheet(
             busy = true; error = null; info = null
             repo.sendResetCode(mail)
                 .onSuccess {
-                    info = "Новый код отправлен"
+                    info = S.newCodeSent
                     code = ""; newPassword = ""; repeat = ""
                     step = ResetStep.Code
                     cooldown = RESET_RESEND_COOLDOWN_SEC
@@ -274,15 +275,15 @@ private fun ForgotPasswordSheet(
         if (busy) return
         when {
             newPassword.length < RESET_MIN_PASSWORD ->
-                error = "Пароль слишком простой (минимум $RESET_MIN_PASSWORD символов)"
-            newPassword != repeat -> error = "Пароли не совпадают"
+                error = S.passwordIsTooSimpleAt2(RESET_MIN_PASSWORD)
+            newPassword != repeat -> error = S.passwordsDoNotMatch
             else -> scope.launch {
                 busy = true; error = null; info = null
                 repo.resetPasswordWithCode(mail, code, newPassword)
                     .onFailure {
                         error = it.message
                         // Код не подошёл: возвращаем на ввод кода
-                        if (it.message?.contains("код") == true) {
+                        if (it.message?.contains(S.code) == true) {
                             step = ResetStep.Code
                             code = ""
                         }
@@ -308,12 +309,12 @@ private fun ForgotPasswordSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Сброс пароля", style = MaterialTheme.typography.titleLarge)
+            Text(S.resetPassword, style = MaterialTheme.typography.titleLarge)
 
             when (step) {
                 ResetStep.Login -> {
                     Text(
-                        "Укажи почту или логин аккаунта, мы отправим на почту $RESET_CODE_LENGTH-значный код.",
+                        S.enterYourAccountEmailOr(RESET_CODE_LENGTH),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -321,7 +322,7 @@ private fun ForgotPasswordSheet(
                     OutlinedTextField(
                         value = login,
                         onValueChange = { login = it; error = null },
-                        label = { Text("Почта или логин") },
+                        label = { Text(S.emailOrLogin) },
                         singleLine = true,
                         enabled = !busy,
                         isError = error != null,
@@ -333,7 +334,7 @@ private fun ForgotPasswordSheet(
 
                 ResetStep.Code -> {
                     Text(
-                        "Письмо с кодом отправлено на ${mail.trim()}.",
+                        S.anEmailWithTheCode(mail.trim()),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -369,7 +370,7 @@ private fun ForgotPasswordSheet(
 
                 ResetStep.Password -> {
                     Text(
-                        "Код принят. Придумай новый пароль.",
+                        S.codeAcceptedCreateANew,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -377,7 +378,7 @@ private fun ForgotPasswordSheet(
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { newPassword = it; error = null },
-                        label = { Text("Новый пароль") },
+                        label = { Text(S.newPassword) },
                         singleLine = true,
                         enabled = !busy,
                         visualTransformation = PasswordVisualTransformation(),
@@ -388,7 +389,7 @@ private fun ForgotPasswordSheet(
                     OutlinedTextField(
                         value = repeat,
                         onValueChange = { repeat = it; error = null },
-                        label = { Text("Повтори пароль") },
+                        label = { Text(S.repeatPassword) },
                         singleLine = true,
                         enabled = !busy,
                         visualTransformation = PasswordVisualTransformation(),
@@ -410,7 +411,7 @@ private fun ForgotPasswordSheet(
                     shape = RoundedCornerShape(28.dp),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    else Text("Отправить код")
+                    else Text(S.sendCode)
                 }
 
                 ResetStep.Code -> Button(
@@ -418,7 +419,7 @@ private fun ForgotPasswordSheet(
                     enabled = !busy && code.length == RESET_CODE_LENGTH,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = RoundedCornerShape(28.dp),
-                ) { Text("Далее") }
+                ) { Text(S.next) }
 
                 ResetStep.Password -> Button(
                     onClick = { save() },
@@ -427,7 +428,7 @@ private fun ForgotPasswordSheet(
                     shape = RoundedCornerShape(28.dp),
                 ) {
                     if (busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                    else Text("Сохранить пароль")
+                    else Text(S.savePassword)
                 }
             }
 
@@ -436,10 +437,10 @@ private fun ForgotPasswordSheet(
                     onClick = { resend() },
                     enabled = !busy && cooldown == 0,
                 ) {
-                    Text(if (cooldown > 0) "Отправить снова через $cooldown с" else "Отправить снова")
+                    Text(if (cooldown > 0) S.resendInS(cooldown) else S.resend)
                 }
             }
-            TextButton(onClick = { close() }, enabled = !busy) { Text("Отмена") }
+            TextButton(onClick = { close() }, enabled = !busy) { Text(S.cancel) }
         }
     }
 }

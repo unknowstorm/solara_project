@@ -90,7 +90,7 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
                     playlists.addTracks(pl.id, listOf(target)).fold(
                         onSuccess = { n ->
                             addTarget = null
-                            note = if (n > 0) "Добавлено в «${pl.name}»" else "Уже в плейлисте «${pl.name}»"
+                            note = if (n > 0) S.addedTo(pl.name) else S.alreadyIn(pl.name)
                         },
                         onFailure = { addError = it.message },
                     )
@@ -110,7 +110,7 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
                     addBusy = true
                     addError = null
                     playlists.create(name, listOf(target)).fold(
-                        onSuccess = { newForTrack = null; note = "Плейлист «${name.trim()}» создан" },
+                        onSuccess = { newForTrack = null; note = S.playlistCreated(name.trim()) },
                         onFailure = { addError = it.message },
                     )
                     addBusy = false
@@ -152,15 +152,15 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
             Text(S.queue, style = MaterialTheme.typography.headlineMedium)
             if (queue.isNotEmpty()) {
                 Row {
-                    TextButton(onClick = { if (signedIn) showSave = true else onOpenAuth() }) { Text("Сохранить") }
-                    TextButton(onClick = { audio.stop() }) { Text("Очистить") }
+                    TextButton(onClick = { if (signedIn) showSave = true else onOpenAuth() }) { Text(S.save) }
+                    TextButton(onClick = { audio.stop() }) { Text(S.clear) }
                 }
             }
         }
 
         if (saved) {
             Text(
-                "Плейлист сохранён: он появится на Главной",
+                S.playlistSavedItWillAppear,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 24.dp),
@@ -178,7 +178,7 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
 
         if (queue.isEmpty()) {
             Text(
-                "Очередь пуста. Включите трек в поиске или на главной, и он появится здесь.",
+                S.theQueueIsEmptyPlay,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -193,7 +193,7 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
             FilterChip(
                 selected = state.shuffle,
                 onClick = { audio.toggleShuffle() },
-                label = { Text("Шафл") },
+                label = { Text(S.shuffle) },
             )
             FilterChip(
                 selected = state.repeatMode != RepeatMode.OFF,
@@ -201,9 +201,9 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
                 label = {
                     Text(
                         when (state.repeatMode) {
-                            RepeatMode.OFF -> "Повтор: выкл"
-                            RepeatMode.ALL -> "Повтор: список"
-                            RepeatMode.ONE -> "Повтор: трек"
+                            RepeatMode.OFF -> S.repeatOff
+                            RepeatMode.ALL -> S.repeatList
+                            RepeatMode.ONE -> S.repeatTrack
                         }
                     )
                 },
@@ -229,7 +229,7 @@ fun QueueScreen(audio: AudioBackend, playlists: PlaylistsRepository, onOpenAuth:
                     Column(Modifier.weight(1f)) {
                         Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            if (item.provider == ProviderId.DEEZER) "${item.artist} · превью 30 с" else item.artist,
+                            if (item.provider == ProviderId.DEEZER) S.s30SPreview(item.artist) else item.artist,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,

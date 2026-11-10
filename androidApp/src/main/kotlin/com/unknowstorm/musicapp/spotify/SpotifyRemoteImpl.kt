@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.spotify
 
+import com.unknowstorm.musicapp.i18n.S
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -44,7 +45,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         _state.update {
             if (it.connecting) it.copy(
                 connecting = false,
-                error = if (silent) null else "Spotify не ответил. Откройте приложение Spotify и разрешите ему всплывающие окна в фоне, затем повторите.",
+                error = if (silent) null else S.spotifyDidNotRespondOpen,
             ) else it
         }
     }
@@ -83,7 +84,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             return
         }
         if (SpotifyConfig.CLIENT_ID.isBlank()) {
-            _state.update { it.copy(error = "Не задан Client ID Spotify") }
+            _state.update { it.copy(error = S.spotifyClientIdIsNot) }
             return
         }
         _state.update { it.copy(appInstalled = true, connecting = true, error = null) }
@@ -121,7 +122,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             connectRemote()
         } else {
             _state.update {
-                it.copy(connecting = false, error = "Spotify не подтвердил доступ. Проверьте, что ваш аккаунт добавлен в User Management.")
+                it.copy(connecting = false, error = S.spotifyDidNotConfirmAccess)
             }
         }
     }
@@ -133,7 +134,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             return
         }
         if (SpotifyConfig.CLIENT_ID.isBlank()) {
-            _state.update { it.copy(error = "Не задан Client ID Spotify") }
+            _state.update { it.copy(error = S.spotifyClientIdIsNot) }
             return
         }
         _state.update { it.copy(appInstalled = true, connecting = true, error = null) }
@@ -162,11 +163,11 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             override fun onFailure(t: Throwable) {
                 handler.removeCallbacks(connectTimeout)
                 val text = when (t.javaClass.simpleName) {
-                    "CouldNotFindSpotifyApp" -> "Приложение Spotify не найдено"
-                    "NotLoggedInException" -> "Войдите в аккаунт в приложении Spotify"
-                    "UserNotAuthorizedException" -> "Разрешите доступ в окне Spotify. Аккаунт должен быть добавлен в User Management."
-                    "AuthenticationFailedException" -> "Spotify отклонил приложение: проверьте Client ID, SHA-1 и пакет в Dashboard"
-                    else -> "Не удалось подключиться к Spotify"
+                    "CouldNotFindSpotifyApp" -> S.theSpotifyAppWasNot
+                    "NotLoggedInException" -> S.signInToYourAccount
+                    "UserNotAuthorizedException" -> S.allowAccessInTheSpotify
+                    "AuthenticationFailedException" -> S.spotifyRejectedTheAppCheck
+                    else -> S.couldNotConnectToSpotify
                 }
                 _state.update { it.copy(connecting = false, connected = false, error = if (silent) null else text) }
             }
@@ -213,7 +214,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             }
         }
         subscription.setErrorCallback {
-            _state.update { it.copy(error = "Связь со Spotify потеряна") }
+            _state.update { it.copy(error = S.connectionToSpotifyWasLost) }
         }
         sub = subscription
     }
@@ -277,7 +278,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             }
         }
         r.playerApi.play(uri).setErrorCallback {
-            _state.update { it.copy(isPaused = true, error = "Не удалось запустить. Нужен Premium и открытый вход в Spotify.") }
+            _state.update { it.copy(isPaused = true, error = S.couldNotStartPlaybackPremium) }
         }
     }
 
@@ -301,10 +302,10 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     /** Обложка элемента: берём у самого Spotify без изменений, держим только в памяти. */
     private fun requestCover(uri: com.spotify.protocol.types.ImageUri?) {
         val r = remote ?: return
-        val u = uri ?: run { android.util.Log.d("SpotifyCover", "нет imageUri"); return }
+        val u = uri ?: run { android.util.Log.d("SpotifyCover", "no imageUri"); return }
         val key = u.raw
         if (key.isNullOrBlank()) {
-            android.util.Log.d("SpotifyCover", "пустой imageUri")
+            android.util.Log.d("SpotifyCover", "empty imageUri")
             return
         }
         if (!coverRequested.add(key)) return
@@ -314,7 +315,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             }
             .setErrorCallback { e ->
                 coverRequested.remove(key)
-                android.util.Log.d("SpotifyCover", "ошибка $key: ${e.message}")
+                android.util.Log.d("SpotifyCover", "error ${key}: ${e.message}")
             }
     }
 
@@ -381,7 +382,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         val li = listItems[item.uri] ?: return
         r.contentApi.getChildrenOfItem(li, 20, 0)
             .setResultCallback { showItems(item.title, it.items) }
-            .setErrorCallback { _state.update { st -> st.copy(error = "Не удалось открыть подборку") } }
+            .setErrorCallback { _state.update { st -> st.copy(error = S.couldNotOpenTheCollection) } }
     }
 
     /** Эксперимент: Content API по URI без Web API и токенов. Логи: adb logcat -s SpotifyBrowse */
@@ -395,17 +396,17 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 com.spotify.protocol.types.ListItem::class.java,
             )
         }.getOrNull() ?: run {
-            android.util.Log.d("SpotifyBrowse", "не удалось собрать ListItem для $uri")
+            android.util.Log.d("SpotifyBrowse", "could not build ListItem for ${uri}")
             return
         }
         r.contentApi.getChildrenOfItem(li, 50, 0)
             .setResultCallback { res ->
-                android.util.Log.d("SpotifyBrowse", "$uri -> элементов: ${res.items?.size}")
-                showItems(if (kind == "album") "Альбом" else "Плейлист", res.items)
+                android.util.Log.d("SpotifyBrowse", "${uri} -> items: ${res.items?.size}")
+                showItems(if (kind == "album") S.album else S.playlist, res.items)
             }
             .setErrorCallback { e ->
-                android.util.Log.d("SpotifyBrowse", "ошибка $uri: ${e.message}")
-                _state.update { st -> st.copy(error = "Spotify не отдал список треков для этой ссылки") }
+                android.util.Log.d("SpotifyBrowse", "error ${uri}: ${e.message}")
+                _state.update { st -> st.copy(error = S.spotifyReturnedNoTrackList) }
             }
     }
 

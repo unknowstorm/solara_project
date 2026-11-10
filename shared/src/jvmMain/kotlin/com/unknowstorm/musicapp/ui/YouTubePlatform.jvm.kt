@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +33,7 @@ actual fun rememberExternalLinkOpener(): (String) -> Unit = remember {
                 Desktop.getDesktop().browse(URI(url))
             }
         } catch (e: Exception) {
-            println("Solara: не удалось открыть ссылку: ${e.message}")
+            println("Solara: could not open link: ${e.message}")
         }
     }
 }
@@ -41,7 +42,7 @@ actual fun rememberExternalLinkOpener(): (String) -> Unit = remember {
 actual fun YouTubePlayerView(videoId: String, modifier: Modifier, onError: (Int) -> Unit) {
     Box(modifier, contentAlignment = Alignment.Center) {
         Text(
-            "Встроенный плеер YouTube пока доступен только на Android. Откройте видео в YouTube.",
+            S.theBuiltInYoutubePlayer,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(16.dp),
         )

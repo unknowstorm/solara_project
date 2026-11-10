@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -126,11 +127,11 @@ fun OnboardingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (onDone != null) {
-                    TextButton(onClick = onDone, enabled = !busy) { Text("← Назад") }
-                    Text("Профиль", style = MaterialTheme.typography.headlineLarge)
+                    TextButton(onClick = onDone, enabled = !busy) { Text(S.back) }
+                    Text(S.profile, style = MaterialTheme.typography.headlineLarge)
                 } else {
-                    Text("Почта подтверждена", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    Text("Расскажи о себе", style = MaterialTheme.typography.headlineLarge)
+                    Text(S.emailConfirmed, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    Text(S.tellUsAboutYourself, style = MaterialTheme.typography.headlineLarge)
                 }
 
                 // Аватарка: фото или первая буква ника на цвете палитры
@@ -147,13 +148,13 @@ fun OnboardingScreen(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         FilledTonalButton(onClick = pickPhoto, enabled = !busy) {
-                            Text(if (shownImage == null) "Загрузить фото" else "Другое фото")
+                            Text(if (shownImage == null) S.uploadPhoto else S.anotherPhoto)
                         }
                         if (shownImage != null) {
                             TextButton(
                                 onClick = { pickedBytes = null; removePhoto = true },
                                 enabled = !busy,
-                            ) { Text("Убрать") }
+                            ) { Text(S.remove) }
                         }
                     }
                 }
@@ -162,10 +163,10 @@ fun OnboardingScreen(
                 OutlinedTextField(
                     value = nick,
                     onValueChange = { nick = it.take(20); error = null },
-                    label = { Text("Ник") },
+                    label = { Text(S.nickname) },
                     singleLine = true,
                     isError = nick.isNotEmpty() && !nickValid,
-                    supportingText = { Text("3–20 символов: латинские буквы, цифры и _") },
+                    supportingText = { Text(S.s320CharactersLatinLetters) },
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -173,15 +174,15 @@ fun OnboardingScreen(
                 // Синхронизация палитры
                 Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = cardColors) {
                     ListItem(
-                        headlineContent = { Text("Синхронизировать палитру цветов") },
-                        supportingContent = { Text("Со всеми твоими устройствами через облако") },
+                        headlineContent = { Text(S.syncTheColorPalette) },
+                        supportingContent = { Text(S.acrossAllYourDevicesVia) },
                         trailingContent = { Switch(checked = syncPalette, onCheckedChange = { syncPalette = it }) },
                         colors = transparentItem,
                     )
                 }
 
                 // Сервисы: квадратные кнопки со скруглёнными углами
-                Text("Сервисы", style = MaterialTheme.typography.titleMedium)
+                Text(S.services, style = MaterialTheme.typography.titleMedium)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ServiceChoices.forEach { (key, title) ->
                         ServiceTile(
@@ -193,7 +194,7 @@ fun OnboardingScreen(
                     }
                 }
                 Text(
-                    "Вход в аккаунт сервиса появится в обновлении",
+                    S.signingInToAService,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -230,7 +231,7 @@ fun OnboardingScreen(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text("Готово")
+                        Text(S.done)
                     }
                 }
 
@@ -239,7 +240,7 @@ fun OnboardingScreen(
                         onClick = { scope.launch { repo.signOut() } },
                         enabled = !busy,
                         modifier = Modifier.align(Alignment.CenterHorizontally),
-                    ) { Text("Выйти из аккаунта") }
+                    ) { Text(S.signOutOfAccount) }
                 }
             }
         }
@@ -277,7 +278,7 @@ private fun ServiceTile(
                 textAlign = TextAlign.Center,
             )
             Text(
-                if (selected) "Выбрано" else "Подключить",
+                if (selected) S.selected else S.connect,
                 style = MaterialTheme.typography.labelSmall,
                 color = content,
                 maxLines = 1,

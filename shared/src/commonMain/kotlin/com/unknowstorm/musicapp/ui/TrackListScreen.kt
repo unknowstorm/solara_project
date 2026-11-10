@@ -118,7 +118,7 @@ fun TrackListScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { selected = Service.ALL }) { Text("← Назад") }
+                TextButton(onClick = { selected = Service.ALL }) { Text(S.back) }
             }
         } else {
             TopBar(
@@ -192,8 +192,8 @@ fun TrackListScreen(
                         onRetry = { retry++ },
                     )
                     else -> Text(
-                        text = if (svc == Service.YOUTUBE) "YouTube ищется на своём экране: Главная → YouTube."
-                        else "${svc.title} скоро появится. ${svc.note}.",
+                        text = if (svc == Service.YOUTUBE) S.youtubeIsSearchedOnIts
+                        else S.isComingSoon(svc.title, svc.note),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(16.dp)
                     )
@@ -231,13 +231,13 @@ private fun SearchResultsPage(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = onRetry) { Text("Повторить") }
+                TextButton(onClick = onRetry) { Text(S.retry) }
             }
         }
 
         if (!loading && results != null && results.isNotEmpty() && visible.isEmpty() && failed.isEmpty()) {
             Text(
-                text = "Ничего не найдено",
+                text = S.nothingFound,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }

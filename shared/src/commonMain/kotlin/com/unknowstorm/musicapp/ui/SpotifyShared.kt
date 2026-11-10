@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -156,32 +157,32 @@ fun SpotifySearchPane(
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { SpotifyLogoBar() }
         if (remote == null) {
-            Text("Spotify доступен только в Android-версии.")
+            Text(S.spotifyIsAvailableOnlyIn)
             return@Column
         }
         val s by remote.state.collectAsState()
         if (!s.connected || s.premium == false) {
             Text(
-                if (s.premium == false) "Управление Spotify доступно только с подпиской Premium."
-                else "Spotify не подключён. Подключите его один раз в разделе Spotify, дальше подключение будет автоматическим.",
+                if (s.premium == false) S.spotifyControlIsAvailableOnly
+                else S.spotifyIsNotConnectedConnect,
             )
-            Button(onClick = onOpenSection) { Text("Открыть раздел Spotify") }
+            Button(onClick = onOpenSection) { Text(S.openTheSpotifySection) }
             return@Column
         }
         var link by remember { mutableStateOf("") }
         var linkError by remember { mutableStateOf(false) }
         Text(
-            "Поиск по названию для Spotify недоступен. Вставьте ссылку на трек, альбом или плейлист " +
-                "(в приложении Spotify: Поделиться → Копировать ссылку).",
+            S.searchByNameIsNot +
+                S.inTheSpotifyAppShare,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = link,
             onValueChange = { link = it; linkError = false },
-            label = { Text("Ссылка Spotify") },
+            label = { Text(S.spotifyLink) },
             isError = linkError,
-            supportingText = { if (linkError) Text("Не похоже на ссылку Spotify") },
+            supportingText = { if (linkError) Text(S.doesnTLookLikeA) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -193,21 +194,21 @@ fun SpotifySearchPane(
                 remote.playUri(uri)
                 link = ""
             }
-        }) { Text("Играть по ссылке") }
+        }) { Text(S.playFromLink) }
         // Эксперимент: список треков альбома или плейлиста через Content API App Remote
         val browseUri = parseSpotifyLink(link)
             ?.takeIf { it.startsWith("spotify:album:") || it.startsWith("spotify:playlist:") }
         if (browseUri != null) {
-            OutlinedButton(onClick = { remote.openByUri(browseUri); link = ""; onOpenSection() }) { Text("Показать треки") }
+            OutlinedButton(onClick = { remote.openByUri(browseUri); link = ""; onOpenSection() }) { Text(S.showTracks) }
         }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (s.history.isNotEmpty()) {
-            Text("Недавно играло", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(S.recentlyPlayed, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             SpotifyTileRow(s.history, s.covers) { item ->
                 onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
             }
         }
-        TextButton(onClick = onOpenSection) { Text("Открыть раздел Spotify") }
+        TextButton(onClick = onOpenSection) { Text(S.openTheSpotifySection) }
     }
 }
 

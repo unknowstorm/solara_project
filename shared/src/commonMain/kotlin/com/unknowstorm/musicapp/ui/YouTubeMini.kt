@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
@@ -701,9 +702,9 @@ private fun YouTubeFullContent(
                         // Свободное место: пояснение. Если места мало, оно просто обрезается и ничего не сдвигает.
                         Box(Modifier.weight(1f).fillMaxWidth()) {
                             Text(
-                                "Видео играет, пока оно видно на экране. Если свернуть приложение или выключить экран, " +
-                                    "оно встаёт на паузу (правила YouTube). Фоновое воспроизведение работает в " +
-                                    "официальных приложениях YouTube и YouTube Music.",
+                                S.theVideoPlaysWhileIt +
+                                    S.itPausesYoutubeRulesBackground +
+                                    S.theOfficialYoutubeAndYoutube,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 8.dp),
