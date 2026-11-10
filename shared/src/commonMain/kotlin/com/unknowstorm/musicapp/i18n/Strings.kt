@@ -246,5 +246,11 @@ object S {
     val itPausesYoutubeRulesBackground: String get() = tr("it pauses (YouTube rules). Background playback works in ", "воно ставиться на паузу (правила YouTube). Фонове відтворення працює в ")
     val theOfficialYoutubeAndYoutube: String get() = tr("the official YouTube and YouTube Music apps.", "офіційних застосунках YouTube і YouTube Music.")
     val theBuiltInYoutubePlayer: String get() = tr("The built-in YouTube player is only available on Android for now. Open the video on YouTube.", "Вбудований плеєр YouTube поки що доступний лише на Android. Відкрийте відео в YouTube.")
+    val spotifyOpenLink: String get() = tr("Open", "Відкрити")
+    val spotifyPlayAll: String get() = tr("Play", "Грати")
+    val spotifyLinkTrack: String get() = tr("This is a track", "Це трек")
+    val spotifyLinkAlbum: String get() = tr("This is an album", "Це альбом")
+    val spotifyLinkPlaylist: String get() = tr("This is a playlist", "Це плейлист")
+    fun spotifyTracksCount(p0: Any?): String = tr("Tracks: ${p0}", "Треків: ${p0}")
     // <<< ENTRIES >>>
 }

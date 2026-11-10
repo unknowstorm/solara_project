@@ -58,6 +58,8 @@ interface SpotifyRemote {
     fun closeBrowse()
     /** Track list of an album or playlist by URI (spotify:album:… / spotify:playlist:…). The result arrives in state.browse. */
     fun openByUri(uri: String) {}
+    /** Plays an album or playlist from the given track index, so "next" follows the list. */
+    fun playInContext(contextUri: String, index: Int, item: SpotifyItem? = null) {}
 }
 
 val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }

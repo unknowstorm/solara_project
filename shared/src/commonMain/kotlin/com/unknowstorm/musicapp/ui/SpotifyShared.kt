@@ -26,6 +26,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -151,6 +152,22 @@ fun SpotifySearchPane(
     modifier: Modifier = Modifier,
 ) {
     val ui = LocalSpotifyMini.current
+    // The album or playlist whose track list is open on this tab
+    var linkContext by remember { mutableStateOf<String?>(null) }
+    val live = remote?.state?.collectAsState()?.value
+    if (remote != null && live != null && linkContext != null) {
+        SpotifyLinkBrowse(
+            remote = remote,
+            s = live,
+            contextUri = linkContext!!,
+            onBeforePlay = onBeforePlay,
+            onClose = { remote.closeBrowse(); linkContext = null },
+            modifier = modifier,
+        )
+        return
+    }
+    // Leaving the tab with an open list: the list must not appear on the Home page
+    DisposableEffect(Unit) { onDispose { if (linkContext != null) remote?.closeBrowse() } }
     Column(
         modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -186,21 +203,29 @@ fun SpotifySearchPane(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        // What kind of link this is: worked out locally from the link itself, no Spotify request
+        parseSpotifyLink(link)?.let {
+            Text(spotifyKindLabel(it), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
         Button(onClick = {
             val uri = parseSpotifyLink(link)
-            if (uri == null) linkError = true else {
-                onBeforePlay()
-                ui.dismissedUri = null
-                remote.playUri(uri)
-                link = ""
+            when {
+                uri == null -> linkError = true
+                // One track: play it right away, the mini player shows it
+                uri.startsWith("spotify:track:") -> {
+                    onBeforePlay()
+                    ui.dismissedUri = null
+                    remote.playUri(uri)
+                    link = ""
+                }
+                // Album or playlist: show the track list here, playback starts from the list
+                else -> {
+                    remote.openByUri(uri)
+                    linkContext = uri
+                    link = ""
+                }
             }
-        }) { Text(S.playFromLink) }
-        // Experiment: the track list of an album or playlist via the App Remote Content API
-        val browseUri = parseSpotifyLink(link)
-            ?.takeIf { it.startsWith("spotify:album:") || it.startsWith("spotify:playlist:") }
-        if (browseUri != null) {
-            OutlinedButton(onClick = { remote.openByUri(browseUri); link = ""; onOpenSection() }) { Text(S.showTracks) }
-        }
+        }) { Text(S.spotifyOpenLink) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (s.history.isNotEmpty()) {
             Text(S.recentlyPlayed, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))

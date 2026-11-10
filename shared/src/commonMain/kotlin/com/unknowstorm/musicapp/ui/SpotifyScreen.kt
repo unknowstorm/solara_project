@@ -23,6 +23,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -158,8 +162,21 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
     val play: (SpotifyItem) -> Unit = { item ->
         onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
     }
+    // The album or playlist opened from a shelf: tracks inside it play in its context
+    var browseContext by remember { mutableStateOf<String?>(null) }
     val tap: (SpotifyItem) -> Unit = { item ->
-        if (item.playable) play(item) else remote.openItem(item)
+        if (item.playable) {
+            val c = browseContext
+            val index = s.browse?.indexOfFirst { it.uri == item.uri } ?: -1
+            if (c != null && index >= 0 && (c.startsWith("spotify:album:") || c.startsWith("spotify:playlist:"))) {
+                onBeforePlay(); ui.dismissedUri = null; remote.playInContext(c, index, item)
+            } else {
+                play(item)
+            }
+        } else {
+            browseContext = item.uri
+            remote.openItem(item)
+        }
     }
     val pad = PaddingValues(horizontal = 16.dp)
 

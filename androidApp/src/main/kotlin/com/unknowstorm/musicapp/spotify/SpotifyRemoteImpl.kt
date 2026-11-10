@@ -331,6 +331,41 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         }
     }
 
+    /** Plays an album or playlist from the given index: "next" then follows the list instead of Spotify autoplay. */
+    override fun playInContext(contextUri: String, index: Int, item: SpotifyItem?) {
+        val r = remote ?: return
+        ignoreIdle = false
+        // Shuffle would make "next" random; the user can turn it back on in the Spotify app
+        r.playerApi.setShuffle(false)
+        r.playerApi.play(contextUri)
+            .setResultCallback {
+                if (index > 0) {
+                    r.playerApi.skipToIndex(contextUri, index)
+                        .setResultCallback { android.util.Log.d("SpotifyBrowse", "skipToIndex #$index ok") }
+                        .setErrorCallback { e ->
+                            android.util.Log.d("SpotifyBrowse", "skipToIndex error: ${e.message}")
+                            item?.let { playUri(it.uri) }
+                        }
+                }
+            }
+            .setErrorCallback { e ->
+                android.util.Log.d("SpotifyBrowse", "play context error: ${e.message}")
+                _state.update { it.copy(isPaused = true, error = S.couldNotStartPlaybackPremium) }
+            }
+        // Known SDK issue: on long playlists skipToIndex may do nothing. If Spotify is not on the chosen track, play it directly.
+        if (item != null && index > 0) {
+            handler.postDelayed({
+                r.playerApi.playerState.setResultCallback { st ->
+                    val now = st.track
+                    if (now != null && now.uri != item.uri && now.name != item.title) {
+                        android.util.Log.d("SpotifyBrowse", "not on #$index, now=${now.name}: playing the track directly")
+                        playUri(item.uri)
+                    }
+                }
+            }, 2500)
+        }
+    }
+
     private var shelvesLoading = false
 
     private fun toSpotifyItem(li: com.spotify.protocol.types.ListItem) =
