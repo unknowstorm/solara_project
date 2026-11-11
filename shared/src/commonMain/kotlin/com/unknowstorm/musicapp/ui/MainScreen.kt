@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -112,6 +113,7 @@ fun MainScreen(
     val downloadPlatform = rememberDownloadPlatform()
     val downloadScope = rememberCoroutineScope()
     val downloads = remember(queueTexts, providers) { DownloadManager(queueTexts, downloadPlatform, downloadScope, providers) }
+    SideEffect { DownloadsHolder.manager = downloads }
     val spotify = LocalSpotifyRemote.current
     // Our music or YouTube started playing: pause Spotify
     LaunchedEffect(playback.isPlaying) { if (playback.isPlaying) spotify?.pause() }
@@ -182,7 +184,7 @@ fun MainScreen(
                         }
                     }
                 }
-                Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
+                Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes, downloads = downloads)
                 Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore, downloads)
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
             }
