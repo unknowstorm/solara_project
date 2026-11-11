@@ -7,6 +7,11 @@ import androidx.compose.ui.layout.ContentScale
 import com.unknowstorm.musicapp.resources.Res
 import com.unknowstorm.musicapp.resources.youtube_icon_black
 import com.unknowstorm.musicapp.resources.youtube_icon_white
+import com.unknowstorm.musicapp.resources.audius_glyph_black
+import com.unknowstorm.musicapp.resources.audius_glyph_white
+import com.unknowstorm.musicapp.resources.deezer_icon_black
+import com.unknowstorm.musicapp.resources.deezer_icon_white
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -52,6 +57,9 @@ fun ServiceLogo(
         service == Service.ALL -> GlobeIcon(modifier, tint)
         // YouTube: official monochrome icon, never recolored; the version follows the background contrast
         service == Service.YOUTUBE -> YouTubeBrandIcon(modifier, onDarkBackground = tint.luminance() > 0.5f)
+        // Audius and Deezer: official monochrome marks (pure white or black); the version follows the background contrast
+        service == Service.AUDIUS -> OfficialMonoIcon(modifier, tint.luminance() > 0.5f, Res.drawable.audius_glyph_white, Res.drawable.audius_glyph_black)
+        service == Service.DEEZER -> OfficialMonoIcon(modifier, tint.luminance() > 0.5f, Res.drawable.deezer_icon_white, Res.drawable.deezer_icon_black)
         else -> {
             val path = remember(service) {
                 logoPathData(service.name)?.let { data ->
@@ -154,4 +162,15 @@ private fun YouTubeBrandIcon(modifier: Modifier, onDarkBackground: Boolean) {
             modifier = Modifier.requiredSize(width = h * YT_ICON_ASPECT, height = h),
         )
     }
+}
+
+/** An official monochrome brand mark: white or black file, never recolored, scaled to fit the slot without distortion. */
+@Composable
+private fun OfficialMonoIcon(modifier: Modifier, onDarkBackground: Boolean, white: DrawableResource, black: DrawableResource) {
+    Image(
+        painter = painterResource(if (onDarkBackground) white else black),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier,
+    )
 }
