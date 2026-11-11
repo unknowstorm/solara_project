@@ -40,7 +40,8 @@ data class SavedQueueEntry(
 @Serializable
 data class SavedQueue(val index: Int = 0, val items: List<SavedQueueEntry> = emptyList())
 
-private val PersistedProviders = setOf(ProviderId.JAMENDO, ProviderId.AUDIUS, ProviderId.DEEZER)
+// Deezer (30-second previews) is not part of the shared queue; local files are kept (the list stays on this phone)
+private val PersistedProviders = setOf(ProviderId.JAMENDO, ProviderId.AUDIUS, ProviderId.LOCAL)
 private const val QUEUE_KEY = "saved_queue_v1"
 private const val QUEUE_MAX = 200
 
@@ -111,6 +112,8 @@ suspend fun restoreQueue(
     val resolved = coroutineScope {
         window.map { track ->
             async {
+                // A local file needs no link lookup: its address is the id, and it also works offline
+                if (track.provider == ProviderId.LOCAL) return@async track.copy(streamUrl = track.id)
                 val provider = providers.firstOrNull { it.id == track.provider } ?: return@async null
                 val url = gate.withPermit {
                     try {

@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.model.Track
@@ -48,7 +49,7 @@ import com.unknowstorm.musicapp.provider.MusicProvider
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab {
-    LIKES, PLAYLISTS, HISTORY, CACHE;
+    LIKES, PLAYLISTS, HISTORY, LOCAL, CACHE;
 
     // Свойство, а не параметр конструктора: название берётся из текущего языка при каждой отрисовке
     val label: String
@@ -56,6 +57,7 @@ private enum class LibraryTab {
             LIKES -> S.libLikes
             PLAYLISTS -> S.libPlaylists
             HISTORY -> S.libHistory
+            LOCAL -> S.libLocal
             CACHE -> S.libCache
         }
 }
@@ -74,6 +76,8 @@ fun LibraryContent(
     audio: AudioBackend,
     onOpenAuth: () -> Unit,
     onOpenPlaylist: (Playlist) -> Unit,
+    local: LocalLibrary? = null,
+    downloads: DownloadManager? = null,
 ) {
     var selected by rememberSaveable { mutableIntStateOf(-1) }
     val sections = LibraryTab.entries
@@ -121,10 +125,11 @@ fun LibraryContent(
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (section) {
-                LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth)
+                LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth, downloads)
                 LibraryTab.PLAYLISTS -> PlaylistsTab(playlists, onOpenAuth, onOpenPlaylist)
                 LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
-                LibraryTab.CACHE -> Message(S.cacheSoon)
+                LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio) else Message(S.noLocalFiles)
+                LibraryTab.CACHE -> if (downloads != null) DownloadsContent(downloads, audio) else Message(S.cacheSoon)
             }
         }
     }
@@ -239,6 +244,7 @@ fun LikedContent(
     providers: List<MusicProvider>,
     audio: AudioBackend,
     onOpenAuth: () -> Unit,
+    downloads: DownloadManager? = null,
 ) {
     val scope = rememberCoroutineScope()
     val liked by likes.tracks.collectAsState()
@@ -309,6 +315,7 @@ fun LikedContent(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
+                        if (downloads != null) DownloadButton(track, downloads)
                         // Tapping removes the like, the track immediately disappears from the list
                         IconButton(onClick = { likes.toggle(track) }) {
                             HeartIcon(true, tint = primary)
