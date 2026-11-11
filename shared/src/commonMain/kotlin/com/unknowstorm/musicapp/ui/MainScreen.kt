@@ -103,6 +103,9 @@ fun MainScreen(
         }
     }
     val playback by audio.state.collectAsState()
+    val queueTexts = rememberTextStore()
+    val queueStore = remember(queueTexts) { QueueStore(queueTexts) }
+    QueuePersistence(audio, queueStore)
     val spotify = LocalSpotifyRemote.current
     // Our music or YouTube started playing: pause Spotify
     LaunchedEffect(playback.isPlaying) { if (playback.isPlaying) spotify?.pause() }
@@ -174,7 +177,7 @@ fun MainScreen(
                     }
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
-                Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth)
+                Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore)
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
             }
             openPlaylist?.let { pl ->

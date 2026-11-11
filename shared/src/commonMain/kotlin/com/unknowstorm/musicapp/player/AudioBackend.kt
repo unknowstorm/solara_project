@@ -34,6 +34,7 @@ data class QueueItem(
     val artist: String,
     val artworkUrl: String?,
     val provider: ProviderId?,
+    val durationMs: Long = 0L,
 )
 
 private val EmptyQueue: StateFlow<List<QueueItem>> = MutableStateFlow(emptyList<QueueItem>()).asStateFlow()
@@ -60,6 +61,8 @@ interface AudioBackend {
     val queue: StateFlow<List<QueueItem>> get() = EmptyQueue
     fun playAt(index: Int) {}
     fun removeAt(index: Int) {}
+    /** Moves a queue item (drag and drop). Platforms without queue support ignore it. */
+    fun moveItem(from: Int, to: Int) {}
 }
 
 @Composable
