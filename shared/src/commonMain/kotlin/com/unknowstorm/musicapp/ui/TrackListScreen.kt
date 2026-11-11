@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.model.PlaybackKind
 import com.unknowstorm.musicapp.model.ProviderId
@@ -55,6 +56,7 @@ fun TrackListScreen(
     session: YouTubeSession? = null,
     onOpenSpotify: () -> Unit = {},
     likes: LikesRepository? = null,
+    downloads: DownloadManager? = null,
 ) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(Service.ALL) }
@@ -190,6 +192,7 @@ fun TrackListScreen(
                         providers = providers,
                         audio = audio,
                         onRetry = { retry++ },
+                        downloads = downloads,
                     )
                     else -> Text(
                         text = if (svc == Service.YOUTUBE) S.youtubeIsSearchedOnIts
@@ -210,6 +213,7 @@ private fun SearchResultsPage(
     providers: List<MusicProvider>,
     audio: AudioBackend,
     onRetry: () -> Unit,
+    downloads: DownloadManager? = null,
 ) {
     val playback by audio.state.collectAsState()
     val visible = interleave(providers.mapNotNull { results?.get(it.id)?.tracks })
@@ -250,7 +254,12 @@ private fun SearchResultsPage(
                     },
                     headlineContent = { Text(track.title, maxLines = 1) },
                     supportingContent = { Text(track.artist, maxLines = 1) },
-                    trailingContent = { Text(formatDuration(track.durationMs)) },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (downloads != null && track.provider != ProviderId.DEEZER) DownloadButton(track, downloads)
+                            Text(formatDuration(track.durationMs))
+                        }
+                    },
                     colors = ListItemDefaults.colors(
                         containerColor = if (playback.mediaId == track.id && playback.provider == track.provider) {
                             MaterialTheme.colorScheme.secondaryContainer

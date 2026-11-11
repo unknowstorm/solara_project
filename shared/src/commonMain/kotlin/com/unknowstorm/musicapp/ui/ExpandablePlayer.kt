@@ -734,7 +734,9 @@ private fun FullContent(
                     IconButton(onClick = { showDetails = true }) {
                         MoreIcon()
                     }
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val dl = DownloadsHolder.manager
+                        if (dl != null && currentTrack != null && currentTrack.provider != com.unknowstorm.musicapp.model.ProviderId.DEEZER) DownloadButton(currentTrack, dl)
                         IconButton(enabled = currentTrack?.provider != com.unknowstorm.musicapp.model.ProviderId.DEEZER, onClick = {
                             when {
                                 currentTrack == null -> Unit
