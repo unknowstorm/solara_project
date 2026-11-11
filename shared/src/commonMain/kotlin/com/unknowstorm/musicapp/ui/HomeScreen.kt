@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.lerp
 import kotlin.math.abs
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -463,8 +464,13 @@ fun TopBar(
     val cs = MaterialTheme.colorScheme
     val base = cs.surfaceVariant.copy(alpha = 0.5f)
     val primary = cs.primary
-    val onPrimary = cs.onPrimary
-    val idle = cs.onSurfaceVariant
+    // Brand rules (YouTube, Deezer, Audius): monochrome marks are pure white or pure black, without custom tints.
+    // The same colors for all toolbar icons, so none of them looks lighter than the YouTube mark.
+    val darkTheme = cs.background.luminance() < 0.179f
+    val idle = if (darkTheme) Color.White else Color.Black
+    val onPrimary = if (primary.luminance() > 0.179f) Color.Black else Color.White
+    val idleSoft = cs.onSurface
+    val onPrimarySoft = cs.onPrimary
 
     // The chip index = the pager page index: ♡ = 0 (if present), then the services
     val order = pagerOrder(onLikes != null)
@@ -481,8 +487,11 @@ fun TopBar(
     // 1 when the drop is exactly on a chip, 0 when farther than the neighbor
     fun weight(idx: Int): Float = if (pos == null) 0f else (1f - abs(pos - idx)).coerceIn(0f, 1f)
     fun pill(picked: Boolean): Color = if (pos == null && picked) primary else Color.Transparent
-    fun tint(idx: Int, picked: Boolean): Color =
-        if (pos == null) (if (picked) onPrimary else idle) else lerp(idle, onPrimary, weight(idx))
+    fun tint(idx: Int, picked: Boolean, soft: Boolean = false): Color {
+        val i = if (soft) idleSoft else idle
+        val o = if (soft) onPrimarySoft else onPrimary
+        return if (pos == null) (if (picked) o else i) else lerp(i, o, weight(idx))
+    }
 
     Row(
         modifier = modifier
@@ -524,7 +533,7 @@ fun TopBar(
                 modifier = track(Modifier.clip(CircleShape).background(pill(likesSelected)), 0)
                     .semantics { contentDescription = S.myLibrary }
             ) {
-                LibraryIcon(Modifier.size(22.dp), tint(0, likesSelected))
+                LibraryIcon(Modifier.size(24.dp), tint(0, likesSelected))
             }
         }
 
@@ -537,8 +546,8 @@ fun TopBar(
             ) {
                 ServiceLogo(
                     service,
-                    Modifier.size(22.dp),
-                    tint(idx, isSelected),
+                    Modifier.size(24.dp),
+                    tint(idx, isSelected, soft = service == Service.JAMENDO && !JAMENDO_PURE_TINT),
                 )
             }
         }
@@ -704,3 +713,7 @@ private fun HintCard(text: String) {
         Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(16.dp))
     }
 }
+
+// Jamendo: the same pure white/black tint as the other toolbar icons. The Jamendo API terms (4.1, 6) are unclear about
+// changing their logo: set false to return the theme color for this icon.
+private const val JAMENDO_PURE_TINT = true
