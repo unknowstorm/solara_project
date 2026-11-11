@@ -1,6 +1,13 @@
 package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import com.unknowstorm.musicapp.resources.Res
+import com.unknowstorm.musicapp.resources.youtube_icon_black
+import com.unknowstorm.musicapp.resources.youtube_icon_white
+import org.jetbrains.compose.resources.painterResource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +49,8 @@ fun ServiceLogo(
     when {
         service == null -> Unit
         service == Service.ALL -> GlobeIcon(modifier, tint)
+        // YouTube: official monochrome icon, never recolored; the version follows the background contrast
+        service == Service.YOUTUBE -> YouTubeBrandIcon(modifier, onDarkBackground = tint.luminance() > 0.5f)
         else -> {
             val path = remember(service) {
                 logoPathData(service.name)?.let { data ->
@@ -121,4 +130,15 @@ fun TrackCover(
             )
         }
     }
+}
+
+/** The official YouTube icon, monochrome (white or Almost Black). [onDarkBackground] picks the contrasting version. */
+@Composable
+private fun YouTubeBrandIcon(modifier: Modifier, onDarkBackground: Boolean) {
+    Image(
+        painter = painterResource(if (onDarkBackground) Res.drawable.youtube_icon_white else Res.drawable.youtube_icon_black),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier,
+    )
 }
