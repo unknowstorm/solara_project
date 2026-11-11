@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.IntSize
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.i18n.I18n
 import com.unknowstorm.musicapp.auth.AuthState
+import com.unknowstorm.musicapp.downloads.DownloadManager
+import com.unknowstorm.musicapp.downloads.rememberDownloadPlatform
 import com.unknowstorm.musicapp.history.HistoryRepository
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
@@ -106,6 +108,10 @@ fun MainScreen(
     val queueTexts = rememberTextStore()
     val queueStore = remember(queueTexts) { QueueStore(queueTexts) }
     QueuePersistence(audio, queueStore)
+    val localLibrary = remember(queueTexts) { LocalLibrary(queueTexts) }
+    val downloadPlatform = rememberDownloadPlatform()
+    val downloadScope = rememberCoroutineScope()
+    val downloads = remember(queueTexts, providers) { DownloadManager(queueTexts, downloadPlatform, downloadScope, providers) }
     val spotify = LocalSpotifyRemote.current
     // Our music or YouTube started playing: pause Spotify
     LaunchedEffect(playback.isPlaying) { if (playback.isPlaying) spotify?.pause() }
@@ -159,7 +165,7 @@ fun MainScreen(
                                 .onGloballyPositioned { session.screenBounds = it.boundsInWindow() },
                         ) { page, active ->
                             when (page) {
-                                null -> LibraryContent(likes, playlists, history, providers, audio, onOpenAuth, onOpenPlaylist = { openPlaylist = it })
+                                null -> LibraryContent(likes, playlists, history, providers, audio, onOpenAuth, onOpenPlaylist = { openPlaylist = it }, local = localLibrary, downloads = downloads)
                                 Service.YOUTUBE -> YouTubeScreen(
                                     audio = audio,
                                     session = session,
@@ -177,7 +183,7 @@ fun MainScreen(
                     }
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes)
-                Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore)
+                Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore, downloads)
                 Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
             }
             openPlaylist?.let { pl ->

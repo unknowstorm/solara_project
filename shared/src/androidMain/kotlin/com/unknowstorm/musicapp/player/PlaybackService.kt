@@ -8,6 +8,7 @@ import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.HttpDataSource
@@ -28,8 +29,11 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
+        // DefaultDataSource opens http(s) links, content:// (files from the phone) and file:// (downloads)
+        val dataSourceFactory = DefaultDataSource.Factory(
+            this,
+            DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true),
+        )
         // Audius redirects are followed once per track, not on every seek
         val resolvingFactory = ResolvingDataSource.Factory(
             dataSourceFactory,

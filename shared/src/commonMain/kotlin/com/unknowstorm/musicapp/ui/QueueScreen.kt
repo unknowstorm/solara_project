@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import com.unknowstorm.musicapp.model.toService
@@ -86,6 +87,7 @@ fun QueueScreen(
     onOpenAuth: () -> Unit,
     providers: List<MusicProvider> = emptyList(),
     store: QueueStore? = null,
+    downloads: DownloadManager? = null,
 ) {
     val scope = rememberCoroutineScope()
     val state by audio.state.collectAsState()
@@ -189,7 +191,8 @@ fun QueueScreen(
             error = saveError,
             onSave = { name ->
                 val tracks = queue.mapNotNull { item ->
-                    item.provider?.let { Track(item.mediaId, it, item.title, item.artist, item.artworkUrl, item.durationMs) }
+                    item.provider?.takeIf { it != ProviderId.LOCAL }
+                        ?.let { Track(item.mediaId, it, item.title, item.artist, item.artworkUrl, item.durationMs) }
                 }
                 scope.launch {
                     saving = true
@@ -408,6 +411,9 @@ fun QueueScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                        if (downloads != null && item.provider == ProviderId.JAMENDO) {
+                            item.toTrack()?.let { DownloadButton(it, downloads) }
                         }
                         if (item.provider == ProviderId.JAMENDO || item.provider == ProviderId.AUDIUS) {
                             IconButton(onClick = { if (signedIn) addTarget = item.toTrack() else onOpenAuth() }) {

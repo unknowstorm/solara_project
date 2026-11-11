@@ -16,5 +16,7 @@ internal data class JamendoTrackDto(
     @SerialName("artist_name") val artistName: String = "",
     val image: String? = null,
     val audio: String? = null,
-    @SerialName("license_ccurl") val licenseUrl: String? = null
+    @SerialName("license_ccurl") val licenseUrl: String? = null,
+    val audiodownload: String? = null,
+    @SerialName("audiodownload_allowed") val audiodownloadAllowed: Boolean? = null
 )

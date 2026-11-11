@@ -267,5 +267,15 @@ object S {
     val libPlaylists: String get() = tr("My playlists", "Мої плейлисти")
     val libHistory: String get() = tr("History", "Історія")
     val libCache: String get() = tr("Cache / downloads", "Кеш / завантажене")
+    val libLocal: String get() = tr("Files on this phone", "Файли на цьому телефоні")
+    val addFiles: String get() = tr("Add files", "Додати файли")
+    val unknownArtist: String get() = tr("Unknown artist", "Невідомий виконавець")
+    val localFilesNote: String get() = tr("Files stay on this phone: they are not uploaded and do not go to likes or playlists.", "Файли залишаються на цьому телефоні: вони нікуди не завантажуються і не потрапляють у лайки чи плейлисти.")
+    val noLocalFiles: String get() = tr("No files yet. Tap “Add files” and choose music on your phone.", "Файлів поки немає. Натисніть «Додати файли» і виберіть музику на телефоні.")
+    val downloadFailed: String get() = tr("Could not download the track. Check your connection.", "Не вдалося завантажити трек. Перевірте з’єднання.")
+    val downloadNotAllowed: String get() = tr("The author has not allowed downloading this track.", "Автор не дозволив завантажувати цей трек.")
+    val downloadsEmpty: String get() = tr("Nothing saved yet. Tap ↓ next to a Jamendo track to listen to it without internet. Only tracks whose authors allow downloading can be saved. Saved tracks stay inside Solara, for your own listening.", "Поки нічого не збережено. Натисніть ↓ біля треку Jamendo, щоб слухати його без інтернету. Зберегти можна лише треки, які автори дозволили завантажувати. Збережені треки залишаються всередині Solara, лише для вашого прослуховування.")
+    fun downloadsSummary(p0: Any?, p1: Any?): String = tr("${p0} tracks · ${p1}", "${p0} треків · ${p1}")
+    fun downloadingNow(p0: Any?): String = tr("Downloading: ${p0}", "Завантажується: ${p0}")
     // <<< ENTRIES >>>
 }

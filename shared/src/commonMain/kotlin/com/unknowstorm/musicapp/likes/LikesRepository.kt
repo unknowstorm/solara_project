@@ -121,7 +121,8 @@ class LikesRepository(
     fun toggle(track: Track) {
         if (!_signedIn.value) return
         // Deezer: only 30-second previews, not part of the shared likes
-        if (track.provider == ProviderId.DEEZER) return
+        // Local files stay on the phone: their names must not go to the cloud
+        if (track.provider == ProviderId.DEEZER || track.provider == ProviderId.LOCAL) return
         val wasLiked = _tracks.value.containsTrack(track)
         _tracks.update { list ->
             if (wasLiked) list.filterNot { it.provider == track.provider && it.id == track.id }

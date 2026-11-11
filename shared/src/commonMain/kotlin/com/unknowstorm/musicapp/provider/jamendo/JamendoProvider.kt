@@ -3,7 +3,9 @@ package com.unknowstorm.musicapp.provider.jamendo
 import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
+import com.unknowstorm.musicapp.provider.DownloadSource
 import com.unknowstorm.musicapp.provider.MusicProvider
+import com.unknowstorm.musicapp.provider.OfflineLookup
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -17,7 +19,7 @@ import kotlinx.serialization.json.Json
 class JamendoProvider(
     private val clientId: String,
     private val client: HttpClient = createClient()
-) : MusicProvider {
+) : MusicProvider, DownloadSource {
 
     override val id = ProviderId.JAMENDO
 
@@ -39,6 +41,8 @@ class JamendoProvider(
     }
 
     override suspend fun resolveStream(track: Track): String {
+        // A track saved on the phone plays from the file: no internet needed
+        OfflineLookup.fileUri(track)?.let { return it }
         track.streamUrl?.takeIf { it.isNotBlank() }?.let { return it }
         repeat(MAX_ATTEMPTS) { attempt ->
             val url = fetchTracks { parameter("id", track.id) }.firstOrNull()?.audio
@@ -46,6 +50,18 @@ class JamendoProvider(
             if (attempt < MAX_ATTEMPTS - 1) delay(RETRY_DELAY_MS)
         }
         error(S.jamendoNoAudioLinkFor(track.id))
+    }
+
+    /** The address for saving the track, only if the author allowed it. */
+    override suspend fun resolveDownload(track: Track): String? {
+        repeat(MAX_ATTEMPTS) { attempt ->
+            val dto = fetchTracks { parameter("id", track.id) }.firstOrNull()
+            if (dto != null) {
+                return if (dto.audiodownloadAllowed == true) dto.audiodownload?.takeIf { it.isNotBlank() }?.secure() else null
+            }
+            if (attempt < MAX_ATTEMPTS - 1) delay(RETRY_DELAY_MS)
+        }
+        return null
     }
 
     private suspend fun fetchTracks(block: HttpRequestBuilder.() -> Unit): List<JamendoTrackDto> {
@@ -68,7 +84,8 @@ class JamendoProvider(
         artworkUrl = image?.secure()?.replace("width=300", "width=600"),
         durationMs = (duration.toLongOrNull() ?: 0L) * 1000,
         licenseUrl = licenseUrl,
-        streamUrl = audio?.secure()
+        streamUrl = audio?.secure(),
+        downloadable = audiodownloadAllowed
     )
 
     private companion object {
