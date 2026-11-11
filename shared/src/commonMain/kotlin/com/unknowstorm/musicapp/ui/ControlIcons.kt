@@ -141,3 +141,59 @@ fun RepeatIcon(
         }
     }
 }
+
+@Composable
+fun DownloadIcon(
+    modifier: Modifier = Modifier.size(24.dp),
+    tint: Color = LocalContentColor.current,
+) {
+    Canvas(modifier) {
+        scale(size.width / 24f, pivot = Offset.Zero) {
+            val arrow = Path().apply {
+                moveTo(12f, 4f)
+                lineTo(12f, 15f)
+                moveTo(6.5f, 10f)
+                lineTo(12f, 15.5f)
+                lineTo(17.5f, 10f)
+                moveTo(5f, 20f)
+                lineTo(19f, 20f)
+            }
+            drawPath(arrow, tint, style = lineStyle(2.2f))
+        }
+    }
+}
+
+@Composable
+fun CheckIcon(
+    modifier: Modifier = Modifier.size(24.dp),
+    tint: Color = LocalContentColor.current,
+) {
+    Canvas(modifier) {
+        scale(size.width / 24f, pivot = Offset.Zero) {
+            val check = Path().apply {
+                moveTo(5f, 12.5f)
+                lineTo(10f, 17.5f)
+                lineTo(19f, 7f)
+            }
+            drawPath(check, tint, style = lineStyle(2.4f))
+        }
+    }
+}
+
+@Composable
+fun CrossIcon(
+    modifier: Modifier = Modifier.size(24.dp),
+    tint: Color = LocalContentColor.current,
+) {
+    Canvas(modifier) {
+        scale(size.width / 24f, pivot = Offset.Zero) {
+            val cross = Path().apply {
+                moveTo(6f, 6f)
+                lineTo(18f, 18f)
+                moveTo(18f, 6f)
+                lineTo(6f, 18f)
+            }
+            drawPath(cross, tint, style = lineStyle(2.2f))
+        }
+    }
+}

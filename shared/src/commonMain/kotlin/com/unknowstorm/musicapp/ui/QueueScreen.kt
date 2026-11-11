@@ -378,7 +378,7 @@ fun QueueScreen(
                                 Alignment.CenterEnd
                             },
                         ) {
-                            Text("✕", color = MaterialTheme.colorScheme.onErrorContainer)
+                            CrossIcon(Modifier.size(20.dp), MaterialTheme.colorScheme.onErrorContainer)
                         }
                     },
                 ) {
