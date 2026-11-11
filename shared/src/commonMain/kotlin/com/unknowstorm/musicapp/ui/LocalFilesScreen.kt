@@ -86,7 +86,7 @@ fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifi
                             if (track.durationMs > 0) {
                                 Text(localDuration(track.durationMs), style = MaterialTheme.typography.bodySmall)
                             }
-                            IconButton(onClick = { local.remove(track.id) }) { Text("✕") }
+                            IconButton(onClick = { local.remove(track.id) }) { CrossIcon(Modifier.size(20.dp)) }
                         }
                     },
                     colors = ListItemDefaults.colors(

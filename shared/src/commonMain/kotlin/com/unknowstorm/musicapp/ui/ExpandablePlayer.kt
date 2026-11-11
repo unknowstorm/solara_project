@@ -749,6 +749,9 @@ private fun FullContent(
                                 tint = if (currentTrack?.provider == com.unknowstorm.musicapp.model.ProviderId.DEEZER) inactive.copy(alpha = 0.3f) else if (liked) active else inactive,
                             )
                         }
+                        IconButton(onClick = { audio.toggleShuffle() }) {
+                            ShuffleIcon(tint = if (state.shuffle) active else inactive)
+                        }
                         IconButton(onClick = { audio.cycleRepeat() }) {
                             RepeatIcon(
                                 one = state.repeatMode == RepeatMode.ONE,
