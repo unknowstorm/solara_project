@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.LocalContentColor
@@ -132,13 +133,25 @@ fun TrackCover(
     }
 }
 
-/** The official YouTube icon, monochrome (white or Almost Black). [onDarkBackground] picks the contrasting version. */
+// Aspect ratio (width / height) of the trimmed official icon files
+private const val YT_ICON_ASPECT = 1.4271f
+// Height of the mark in dp. Official minimum digital height: check the YouTube brand page and set it here.
+private const val YT_ICON_HEIGHT_DP = 20f
+
+/**
+ * The official YouTube icon, monochrome (white or Almost Black), never recolored.
+ * The files are trimmed to the mark itself, so this is the real size of the mark:
+ * its height is 91% of the slot (20dp in a 22dp slot, the strict minimum digital height).
+ */
 @Composable
 private fun YouTubeBrandIcon(modifier: Modifier, onDarkBackground: Boolean) {
-    Image(
-        painter = painterResource(if (onDarkBackground) Res.drawable.youtube_icon_white else Res.drawable.youtube_icon_black),
-        contentDescription = null,
-        contentScale = ContentScale.Fit,
-        modifier = modifier,
-    )
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val h = YT_ICON_HEIGHT_DP.dp
+        Image(
+            painter = painterResource(if (onDarkBackground) Res.drawable.youtube_icon_white else Res.drawable.youtube_icon_black),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.requiredSize(width = h * YT_ICON_ASPECT, height = h),
+        )
+    }
 }
