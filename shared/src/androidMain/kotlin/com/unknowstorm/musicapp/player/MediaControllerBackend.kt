@@ -145,7 +145,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 .setTitle(title)
                 .setArtist(artist)
                 .setArtworkUri(artworkUrl?.let { Uri.parse(it) })
-                .setExtras(Bundle().apply { putString("provider", provider.name) })
+                .setExtras(Bundle().apply { putString("provider", provider.name); putLong("durationMs", durationMs) })
                 .build()
         )
         .build()
@@ -209,6 +209,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 title = m.mediaMetadata.title?.toString().orEmpty(),
                 artist = m.mediaMetadata.artist?.toString().orEmpty(),
                 artworkUrl = m.mediaMetadata.artworkUri?.toString(),
+                durationMs = m.mediaMetadata.extras?.getLong("durationMs") ?: 0L,
                 provider = m.mediaMetadata.extras?.getString("provider")
                     ?.let { n -> ProviderId.entries.firstOrNull { it.name == n } },
             )
@@ -223,6 +224,12 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 it.prepare()
                 it.play()
             }
+        }
+    }
+
+    override fun moveItem(from: Int, to: Int) {
+        controller?.let {
+            if (from in 0 until it.mediaItemCount && to in 0 until it.mediaItemCount && from != to) it.moveMediaItem(from, to)
         }
     }
 
