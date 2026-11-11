@@ -44,6 +44,8 @@ import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.downloads.rememberDownloadPlatform
 import com.unknowstorm.musicapp.history.HistoryRepository
+import com.unknowstorm.musicapp.imports.ImportRepository
+import com.unknowstorm.musicapp.imports.ImportSection
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
@@ -93,6 +95,7 @@ fun MainScreen(
         if (s == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == s }
 
     val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
+    val importRepo = remember(authRepo, likes, playlists) { ImportRepository(authRepo, likes, playlists) }
 
     val ytScope = rememberCoroutineScope()
     val session = remember { YouTubeSession(ytScope) }
@@ -186,7 +189,7 @@ fun MainScreen(
                 }
                 Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes, downloads = downloads)
                 Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore, downloads)
-                Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth)
+                Tab.SETTINGS -> SettingsScreen(authRepo, importRepo, onOpenAuth)
             }
             openPlaylist?.let { pl ->
                 PlaylistScreen(pl, playlists, providers, audio, onBack = { openPlaylist = null })
@@ -252,7 +255,7 @@ private fun InfoScreen(title: String, body: String) {
 }
 
 @Composable
-private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
+private fun SettingsScreen(authRepo: AuthRepository, importRepo: ImportRepository, onOpenAuth: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
@@ -288,6 +291,9 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         LanguageSetting()
+        Spacer(Modifier.height(24.dp))
+
+        ImportSection(importRepo)
         Spacer(Modifier.height(24.dp))
 
         LegalLinks()

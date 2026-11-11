@@ -3,6 +3,7 @@ package com.unknowstorm.musicapp.auth
 import com.unknowstorm.musicapp.Secrets
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.storage.Storage
 
@@ -18,5 +19,6 @@ val supabase by lazy {
         }
         install(Postgrest)
         install(Storage)
+        install(Functions)
     }
 }
