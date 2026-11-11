@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -64,7 +65,8 @@ import com.unknowstorm.musicapp.provider.youtube.YouTubeApi
 import com.unknowstorm.musicapp.provider.youtube.YouTubeException
 import com.unknowstorm.musicapp.provider.youtube.YouTubeVideo
 import com.unknowstorm.musicapp.resources.Res
-import com.unknowstorm.musicapp.resources.youtube_logo
+import com.unknowstorm.musicapp.resources.youtube_logo_dark_bg
+import com.unknowstorm.musicapp.resources.youtube_logo_light_bg
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -355,14 +357,18 @@ internal fun VideoRow(video: YouTubeVideo, onClick: () -> Unit) {
 /** Official YouTube logo on a solid white background, unmodified. Leads to YouTube. */
 @Composable
 fun YouTubeLogo(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // Official full-color logos on one solid plate: almost black logo on white, white logo on Almost Black
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Surface(
         onClick = onClick,
-        color = Color.White,
+        color = if (dark) Color(0xFF282828) else Color.White,
         shape = RoundedCornerShape(8.dp),
         modifier = modifier,
     ) {
         Image(
-            painter = painterResource(Res.drawable.youtube_logo),
+            painter = painterResource(
+                if (dark) Res.drawable.youtube_logo_dark_bg else Res.drawable.youtube_logo_light_bg
+            ),
             contentDescription = "YouTube",
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).height(24.dp),
         )
