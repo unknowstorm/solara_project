@@ -64,9 +64,12 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
                 .firstOrNull()?.responseCode
             // 4xx errors (except 408 and 429) are not fixed by retrying
-            val permanent = httpCode != null && httpCode in 400..499 && httpCode != 408 && httpCode != 429 && httpCode != 401 && httpCode != 403
+            val providerName = c.currentMediaItem?.mediaMetadata?.extras?.getString("provider")
+            // Audius paid / artist-restricted tracks answer 401/402/403: retrying never helps, skip them quietly
+            val gated = providerName == ProviderId.AUDIUS.name && (httpCode == 401 || httpCode == 402 || httpCode == 403)
+            val permanent = gated || (httpCode != null && httpCode in 400..499 && httpCode != 408 && httpCode != 429 && httpCode != 401 && httpCode != 403)
             val id = c.currentMediaItem?.mediaId
-            if (httpCode == 404 || httpCode == 410) {
+            if (httpCode == 404 || httpCode == 410 || gated) {
                 val dead = c.currentMediaItem?.mediaMetadata?.extras?.getString("provider")
                     ?.let { n -> ProviderId.entries.firstOrNull { it.name == n } }
                 if (id != null && dead != null) DeadTracks.mark(dead, id)
@@ -81,7 +84,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
             // When repeating a single track, "next" is the same track, so repeat is turned off
             if (c.repeatMode == Player.REPEAT_MODE_ONE) c.repeatMode = Player.REPEAT_MODE_OFF
             if (errorStreak < c.mediaItemCount && c.hasNextMediaItem()) {
-                showError(S.trackUnavailablePlayingTheNext)
+                if (!gated) showError(S.trackUnavailablePlayingTheNext)
                 c.seekToNextMediaItem()
                 c.prepare()
                 c.play()

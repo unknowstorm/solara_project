@@ -721,6 +721,7 @@ private fun FullContent(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                TrackSourceLink(state.provider, state.mediaId)
 
                 (state.error ?: likeError)?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

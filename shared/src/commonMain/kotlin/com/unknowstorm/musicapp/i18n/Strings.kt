@@ -292,4 +292,6 @@ object S {
     val signInToImport: String get() = tr("Sign in to import", "Увійдіть, щоб імпортувати")
     fun importedSummary(likes: Any?, playlists: Any?): String =
         tr("Added: ${likes} likes, ${playlists} playlists", "Додано: вподобань ${likes}, плейлистів ${playlists}")
+
+    fun openOn(service: String): String = tr("Open on $service", "Відкрити на $service")
 }

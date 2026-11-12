@@ -19,6 +19,11 @@ const jcheck = (what: string, d: any) => {
   if (d?.headers?.status === "failed") throw new Error(`jamendo_api(${what}): ${d.headers.error_message ?? d.headers.code}`);
 };
 const cid = () => Deno.env.get("JAMENDO_CLIENT_ID") ?? "";
+// Jamendo returns HTML-escaped names ("&amp;"): decode them
+const dec = (s: unknown) => String(s ?? "").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+  .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, "&");
+// By default the API returns only album tracks: singles must be requested explicitly
+const TT = "track_type=single+albumtrack";
 
 async function jamendoResolve(input: string) {
   if (!cid()) throw new Error("jamendo_client_id_missing");
@@ -32,14 +37,14 @@ async function jamendoResolve(input: string) {
   return { id: String(u.id), name: u.name ?? null };
 }
 const jTrack = (t: any): T => ({
-  provider: "JAMENDO", track_id: String(t.id), title: t.name, artist: t.artist_name ?? "",
+  provider: "JAMENDO", track_id: String(t.id), title: dec(t.name), artist: dec(t.artist_name),
   artwork_url: t.image ?? t.album_image ?? null, duration_ms: (Number(t.duration) || 0) * 1000,
 });
 async function jamendoLikes(id: string): Promise<T[]> {
-  // the heart on the site is relation=favorite; "like" is requested too and merged
+  // the heart on the site is relation=favorite; "like" is requested too and merged; newest first
   const out: T[] = [];
   for (const rel of ["favorite", "like"]) {
-    const d = await j(`${JAMENDO}/users/tracks/?client_id=${cid()}&format=json&id=${id}&relation=${rel}&limit=${MAX_LIKES}`);
+    const d = await j(`${JAMENDO}/users/tracks/?client_id=${cid()}&format=json&id=${id}&relation=${rel}&${TT}&order=updatedate_desc&limit=${MAX_LIKES}`);
     jcheck(`users/tracks ${rel}`, d);
     out.push(...(d.results ?? []).flatMap((r: any) => r.tracks ?? []).map(jTrack));
   }
@@ -47,11 +52,13 @@ async function jamendoLikes(id: string): Promise<T[]> {
 }
 async function jamendoPlaylists(id: string) {
   // one call: the user's playlists with their tracks inside
-  const d = await j(`${JAMENDO}/playlists/tracks/?client_id=${cid()}&format=json&user_id=${id}&limit=${MAX_PLAYLISTS}`);
+  const d = await j(`${JAMENDO}/playlists/tracks/?client_id=${cid()}&format=json&user_id=${id}&${TT}&limit=${MAX_PLAYLISTS}`);
   jcheck("playlists/tracks", d);
   return (d.results ?? []).map((p: any) => ({
-    external_id: String(p.id), name: String(p.name),
-    tracks: (p.tracks ?? []).slice(0, MAX_PER_PLAYLIST).map(jTrack),
+    external_id: String(p.id), name: dec(p.name),
+    // the API does not guarantee the order: sort by the position inside the playlist
+    tracks: [...(p.tracks ?? [])].sort((a: any, b: any) => Number(a.position) - Number(b.position))
+      .slice(0, MAX_PER_PLAYLIST).map(jTrack),
   }));
 }
 
