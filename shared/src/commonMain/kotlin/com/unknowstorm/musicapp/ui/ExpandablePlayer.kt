@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -114,7 +115,7 @@ private val MiniCoverCorner = 8.dp
 private val FullCoverCorner = 28.dp
 
 /** The approximate height of the "title … buttons" block that goes under the cover. */
-private val BelowCoverBlock = 340.dp
+private val BelowCoverBlock = 400.dp
 private val ScreenSideMargin = 24.dp
 private val CoverDownShift = 40.dp
 /**
@@ -709,6 +710,7 @@ private fun FullContent(
                 Text(
                     state.title ?: "",
                     style = if (landscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                    minLines = if (landscape) 1 else 2,
                     maxLines = if (landscape) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
@@ -721,14 +723,24 @@ private fun FullContent(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                TrackSourceLink(state.provider, state.mediaId)
-
-                (state.error ?: likeError)?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                // Фиксированный слот: ссылка на источник или сообщение об ошибке, высота не зависит от трека
+                Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.CenterStart) {
+                    val message = state.error ?: likeError
+                    if (message != null) {
+                        Text(
+                            message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else {
+                        TrackSourceLink(state.provider, state.mediaId)
+                    }
                 }
 
                 Row(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth().height(48.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -791,17 +803,16 @@ private fun FullContent(
                     if (landscape) {
                         Modifier.fillMaxWidth().padding(top = 8.dp)
                     } else {
-                        Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 80.dp)
+                        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 48.dp)
                     },
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = { audio.previous() }, enabled = state.hasPrevious, modifier = Modifier.size(60.dp)) {
+                    IconButton(onClick = { audio.previous() }, enabled = state.hasPrevious, modifier = Modifier.requiredSize(60.dp)) {
                         SkipIcon(next = false, modifier = Modifier.size(36.dp))
                     }
                     FilledIconButton(
-                        onClick = { if (showPause) audio.pause() else audio.resume() },
-                        modifier = Modifier.size(86.dp),
+                        onClick = { if (showPause) audio.pause() else audio.resume() }, modifier = Modifier.requiredSize(86.dp),
                     ) {
                         if (rememberDelayedFlag(state.isBuffering && !state.isPlaying, SPINNER_DELAY_MS, state.mediaId)) {
                             CircularProgressIndicator(
@@ -813,7 +824,7 @@ private fun FullContent(
                             PlayPauseIcon(showPause, Modifier.size(48.dp))
                         }
                     }
-                    IconButton(onClick = { audio.next() }, enabled = state.hasNext, modifier = Modifier.size(60.dp)) {
+                    IconButton(onClick = { audio.next() }, enabled = state.hasNext, modifier = Modifier.requiredSize(60.dp)) {
                         SkipIcon(next = true, modifier = Modifier.size(36.dp))
                     }
                 }
