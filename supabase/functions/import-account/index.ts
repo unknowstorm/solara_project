@@ -16,8 +16,7 @@ const j = async (url: string) => {
 // ---------- Jamendo ----------
 // Jamendo answers HTTP 200 even on errors: the real status is in headers.status
 const jcheck = (what: string, d: any) => {
-  console.log("jamendo", what, JSON.stringify(d?.headers ?? null), "n=" + (d?.results?.length ?? 0));
-  if (d?.headers?.status === "failed") throw new Error(`jamendo_api: ${d.headers.error_message ?? d.headers.code}`);
+  if (d?.headers?.status === "failed") throw new Error(`jamendo_api(${what}): ${d.headers.error_message ?? d.headers.code}`);
 };
 const cid = () => Deno.env.get("JAMENDO_CLIENT_ID") ?? "";
 
@@ -27,8 +26,7 @@ async function jamendoResolve(input: string) {
   jcheck("users", d);
   const u = d.results?.[0];
   if (!u) {
-    // maybe a numeric id was typed
-    if (/^\d+$/.test(input)) return { id: input, name: null };
+    if (/^\d+$/.test(input)) return { id: input, name: null }; // numeric id typed
     throw new Error("not_found");
   }
   return { id: String(u.id), name: u.name ?? null };
@@ -38,13 +36,17 @@ const jTrack = (t: any): T => ({
   artwork_url: t.image ?? t.album_image ?? null, duration_ms: (Number(t.duration) || 0) * 1000,
 });
 async function jamendoLikes(id: string): Promise<T[]> {
-  // "favorite+like" = favorite OR like (the heart on the site may be either)
-  const d = await j(`${JAMENDO}/users/tracks/?client_id=${cid()}&format=json&id=${id}&relation=favorite+like&limit=${MAX_LIKES}`);
-  jcheck("users/tracks", d);
-  return (d.results ?? []).flatMap((r: any) => r.tracks ?? []).map(jTrack);
+  // the heart on the site is relation=favorite; "like" is requested too and merged
+  const out: T[] = [];
+  for (const rel of ["favorite", "like"]) {
+    const d = await j(`${JAMENDO}/users/tracks/?client_id=${cid()}&format=json&id=${id}&relation=${rel}&limit=${MAX_LIKES}`);
+    jcheck(`users/tracks ${rel}`, d);
+    out.push(...(d.results ?? []).flatMap((r: any) => r.tracks ?? []).map(jTrack));
+  }
+  return out;
 }
 async function jamendoPlaylists(id: string) {
-  // one call: playlists of the user with their tracks inside
+  // one call: the user's playlists with their tracks inside
   const d = await j(`${JAMENDO}/playlists/tracks/?client_id=${cid()}&format=json&user_id=${id}&limit=${MAX_PLAYLISTS}`);
   jcheck("playlists/tracks", d);
   return (d.results ?? []).map((p: any) => ({
@@ -67,7 +69,6 @@ const aTrack = (t: any): T => ({
 });
 async function audiusLikes(id: string): Promise<T[]> {
   const d = await j(`${AUDIUS}/users/${id}/favorites?${app}`);
-  // VERIFY: items are either full objects ({item_type, item}) or only ids
   const tracks: T[] = [], ids: string[] = [];
   for (const f of d.data ?? []) {
     if (f.item_type && f.item_type !== "track") continue;
@@ -83,7 +84,6 @@ async function audiusLikes(id: string): Promise<T[]> {
 }
 async function audiusPlaylists(id: string) {
   const d = await j(`${AUDIUS}/users/${id}/playlists?${app}`);
-  console.log("audius playlists", "n=" + (d.data?.length ?? 0), "keys=" + Object.keys(d.data?.[0] ?? {}).join(","));
   const out = [];
   for (const p of (d.data ?? []).slice(0, MAX_PLAYLISTS)) {
     const pid = p.id ?? p.playlist_id;
@@ -120,9 +120,8 @@ Deno.serve(async (req) => {
     const [likes, lists] = provider === "JAMENDO"
       ? await Promise.all([jamendoLikes(who.id), jamendoPlaylists(who.id)])
       : await Promise.all([audiusLikes(who.id), audiusPlaylists(who.id)]);
-
-    console.log("import", provider, "account=" + who.id, "likes=" + likes.length,
-      "playlists=" + lists.length, "tracks_per_playlist=" + lists.map((p) => p.tracks.length).join(","));
+    console.log("import", provider, "likes=" + likes.length, "playlists=" + lists.length,
+      "tracks_per_playlist=" + lists.map((p) => p.tracks.length).join(","));
 
     // likes: only new ones; liked_at keeps the source order (first = newest)
     const have = await sb.from("likes").select("track_id").eq("provider", provider);
@@ -136,7 +135,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
     }
 
-    // playlists: skip those already imported (unique index), new ones get items
+    // playlists: skip those already imported, new ones get their items
     const doneP = await sb.from("playlists").select("external_id").eq("imported_from", provider);
     const doneIds = new Set((doneP.data ?? []).map((r) => r.external_id));
     let addedPlaylists = 0;

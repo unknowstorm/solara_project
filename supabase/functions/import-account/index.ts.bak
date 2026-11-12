@@ -14,11 +14,23 @@ const j = async (url: string) => {
 };
 
 // ---------- Jamendo ----------
+// Jamendo answers HTTP 200 even on errors: the real status is in headers.status
+const jcheck = (what: string, d: any) => {
+  console.log("jamendo", what, JSON.stringify(d?.headers ?? null), "n=" + (d?.results?.length ?? 0));
+  if (d?.headers?.status === "failed") throw new Error(`jamendo_api: ${d.headers.error_message ?? d.headers.code}`);
+};
+const cid = () => Deno.env.get("JAMENDO_CLIENT_ID") ?? "";
+
 async function jamendoResolve(input: string) {
-  if (/^\d+$/.test(input)) return { id: input, name: null };
-  const d = await j(`${JAMENDO}/users/?client_id=${Deno.env.get("JAMENDO_CLIENT_ID")}&format=json&name=${encodeURIComponent(input)}`);
-  const u = d.results?.[0]; // VERIFY
-  if (!u) throw new Error("not_found");
+  if (!cid()) throw new Error("jamendo_client_id_missing");
+  const d = await j(`${JAMENDO}/users/?client_id=${cid()}&format=json&name=${encodeURIComponent(input)}`);
+  jcheck("users", d);
+  const u = d.results?.[0];
+  if (!u) {
+    // maybe a numeric id was typed
+    if (/^\d+$/.test(input)) return { id: input, name: null };
+    throw new Error("not_found");
+  }
   return { id: String(u.id), name: u.name ?? null };
 }
 const jTrack = (t: any): T => ({
@@ -26,20 +38,19 @@ const jTrack = (t: any): T => ({
   artwork_url: t.image ?? t.album_image ?? null, duration_ms: (Number(t.duration) || 0) * 1000,
 });
 async function jamendoLikes(id: string): Promise<T[]> {
-  const cid = Deno.env.get("JAMENDO_CLIENT_ID");
-  const d = await j(`${JAMENDO}/users/tracks/?client_id=${cid}&format=json&id=${id}&relation=favorite&limit=${MAX_LIKES}`);
-  // VERIFY: users/tracks may nest tracks inside the user object
-  return (d.results ?? []).flatMap((r: any) => r.tracks ?? [r]).map(jTrack);
+  // "favorite+like" = favorite OR like (the heart on the site may be either)
+  const d = await j(`${JAMENDO}/users/tracks/?client_id=${cid()}&format=json&id=${id}&relation=favorite+like&limit=${MAX_LIKES}`);
+  jcheck("users/tracks", d);
+  return (d.results ?? []).flatMap((r: any) => r.tracks ?? []).map(jTrack);
 }
 async function jamendoPlaylists(id: string) {
-  const cid = Deno.env.get("JAMENDO_CLIENT_ID");
-  const d = await j(`${JAMENDO}/playlists/?client_id=${cid}&format=json&user_id=${id}&limit=${MAX_PLAYLISTS}`);
-  const out = [];
-  for (const p of d.results ?? []) {
-    const tr = await j(`${JAMENDO}/playlists/tracks/?client_id=${cid}&format=json&id=${p.id}&limit=${MAX_PER_PLAYLIST}`);
-    out.push({ external_id: String(p.id), name: String(p.name), tracks: (tr.results?.[0]?.tracks ?? []).map(jTrack) }); // VERIFY
-  }
-  return out;
+  // one call: playlists of the user with their tracks inside
+  const d = await j(`${JAMENDO}/playlists/tracks/?client_id=${cid()}&format=json&user_id=${id}&limit=${MAX_PLAYLISTS}`);
+  jcheck("playlists/tracks", d);
+  return (d.results ?? []).map((p: any) => ({
+    external_id: String(p.id), name: String(p.name),
+    tracks: (p.tracks ?? []).slice(0, MAX_PER_PLAYLIST).map(jTrack),
+  }));
 }
 
 // ---------- Audius ----------
@@ -72,6 +83,7 @@ async function audiusLikes(id: string): Promise<T[]> {
 }
 async function audiusPlaylists(id: string) {
   const d = await j(`${AUDIUS}/users/${id}/playlists?${app}`);
+  console.log("audius playlists", "n=" + (d.data?.length ?? 0), "keys=" + Object.keys(d.data?.[0] ?? {}).join(","));
   const out = [];
   for (const p of (d.data ?? []).slice(0, MAX_PLAYLISTS)) {
     const pid = p.id ?? p.playlist_id;
@@ -109,6 +121,9 @@ Deno.serve(async (req) => {
       ? await Promise.all([jamendoLikes(who.id), jamendoPlaylists(who.id)])
       : await Promise.all([audiusLikes(who.id), audiusPlaylists(who.id)]);
 
+    console.log("import", provider, "account=" + who.id, "likes=" + likes.length,
+      "playlists=" + lists.length, "tracks_per_playlist=" + lists.map((p) => p.tracks.length).join(","));
+
     // likes: only new ones; liked_at keeps the source order (first = newest)
     const have = await sb.from("likes").select("track_id").eq("provider", provider);
     const haveIds = new Set((have.data ?? []).map((r) => r.track_id));
@@ -137,12 +152,14 @@ Deno.serve(async (req) => {
       addedPlaylists++;
     }
 
-    await sb.from("linked_accounts").upsert({
+    const up = await sb.from("linked_accounts").upsert({
       user_id: u.user.id, provider, external_id: who.id, display_name: who.name, last_import_at: new Date().toISOString(),
-    });
+    }, { onConflict: "user_id,provider" });
+    if (up.error) throw up.error;
     return reply({ likesAdded: newLikes.length, playlistsAdded: addedPlaylists, account: who.name ?? who.id });
   } catch (e) {
-    console.error("import failed", provider, String(e));
-    return reply({ error: e instanceof Error && e.message === "not_found" ? "not_found" : "import_failed" }, 502);
+    const msg = e instanceof Error ? e.message : JSON.stringify(e);
+    console.error("import failed", provider, msg);
+    return reply({ error: msg === "not_found" ? "not_found" : "import_failed" }, 502);
   }
 });
