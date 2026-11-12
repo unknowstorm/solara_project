@@ -83,28 +83,12 @@ fun LibraryContent(
     val sections = LibraryTab.entries
 
     if (selected !in sections.indices) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-            sections.forEachIndexed { i, section ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable { selected = i }
-                        .padding(horizontal = 8.dp, vertical = 18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        section.label,
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        "›",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
+        val liked by likes.tracks.collectAsState()
+        val signedIn by likes.signedIn.collectAsState()
+        LibraryTiles(
+            likesCount = if (signedIn) liked.count { !DeadTracks.isDead(it) } else null,
+            onOpen = { selected = it },
+        )
         return
     }
 

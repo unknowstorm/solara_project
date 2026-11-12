@@ -302,21 +302,24 @@ private fun VideoCard(video: YouTubeVideo, onClick: () -> Unit) {
             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
         )
         Spacer(Modifier.height(6.dp))
-        Text(video.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Reserved height (2 title lines, 1 channel line, 1 duration line): all cards in a row are equally tall,
+        // so the row does not jump when it is scrolled sideways
+        Text(video.title, style = MaterialTheme.typography.titleSmall, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(
             video.channel,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            minLines = 1,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (video.durationMs > 0) {
-            Text(
-                formatYtDuration(video.durationMs),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            if (video.durationMs > 0) formatYtDuration(video.durationMs) else "",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            minLines = 1,
+            maxLines = 1,
+        )
     }
 }
 
