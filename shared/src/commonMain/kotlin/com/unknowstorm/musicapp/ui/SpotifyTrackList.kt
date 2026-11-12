@@ -59,7 +59,7 @@ internal fun SpotifyLinkBrowse(
     val ui = LocalSpotifyMini.current
     val list = s.browse
     if (list != null) {
-        SpotifyTrackList(remote, s, contextUri, onBeforePlay, onClose, modifier)
+        SpotifyTrackList(remote, s, contextUri, onBeforePlay, onClose, modifier, header = s.browseHeader)
         return
     }
     var timedOut by remember(contextUri) { mutableStateOf(false) }

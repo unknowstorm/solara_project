@@ -38,6 +38,9 @@ data class SpotifyState(
     val browseMore: Boolean = false,
     /** Exact number of tracks in the open album or playlist, as reported by Spotify. */
     val browseTotal: Int? = null,
+    /** URI and card of the open collection (kept here so the Home screen can be recreated and still show it). */
+    val browseUri: String? = null,
+    val browseHeader: SpotifyItem? = null,
     val covers: Map<String, ImageBitmap> = emptyMap(),
     val shelves: List<SpotifyShelf>? = null,
 )
