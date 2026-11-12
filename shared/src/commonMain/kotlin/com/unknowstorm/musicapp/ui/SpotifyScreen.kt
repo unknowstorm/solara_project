@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -61,7 +63,7 @@ fun SpotifyScreen(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text(S.back) }
+            TextButton(onClick = { if (s?.browse != null) remote?.closeBrowse() else onBack() }) { Text(S.back) }
         }
         if (remote == null || s == null) {
             StatusColumn {
@@ -163,9 +165,12 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
         onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
     }
     // The album or playlist opened from a shelf: tracks inside it play in its context
-    var browseContext by remember { mutableStateOf<String?>(null) }
+    val browseContext = s.browseUri
+    // The card of the opened collection (its cover is shown above the track list)
+    val browseHeader = s.browseHeader
     val tap: (SpotifyItem) -> Unit = { item ->
-        if (item.playable) {
+        val isCollection = item.uri.startsWith("spotify:album:") || item.uri.startsWith("spotify:playlist:")
+        if (item.playable && !isCollection) {
             val c = browseContext
             val index = s.browse?.indexOfFirst { it.uri == item.uri } ?: -1
             if (c != null && index >= 0 && (c.startsWith("spotify:album:") || c.startsWith("spotify:playlist:"))) {
@@ -174,13 +179,31 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
                 play(item)
             }
         } else {
-            browseContext = item.uri
             remote.openItem(item)
         }
     }
     val pad = PaddingValues(horizontal = 16.dp)
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    // Kept outside the branch below so the scroll position of Home survives opening and closing a list
+    val homeListState = rememberLazyListState()
+    val openContext = browseContext
+    if (s.browse != null && openContext != null &&
+        (openContext.startsWith("spotify:album:") || openContext.startsWith("spotify:playlist:"))
+    ) {
+        // Album or playlist: the same list as on the Search tab, with the cover of the collection
+        SpotifyTrackList(
+            remote = remote,
+            s = s,
+            contextUri = openContext,
+            onBeforePlay = onBeforePlay,
+            onClose = remote::closeBrowse,
+            header = browseHeader,
+            showBack = false,
+        )
+        return
+    }
+
+    LazyColumn(Modifier.fillMaxSize(), state = homeListState, contentPadding = PaddingValues(bottom = 16.dp)) {
         item(key = "header") {
             SpotifyHeader(S.youCanPlayMusicFrom)
         }
@@ -199,6 +222,10 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 20.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    browseHeader?.let { h ->
+                        SpotifyCover(h.imageKey?.let { s.covers[it] }, 64.dp)
+                        Spacer(Modifier.width(12.dp))
+                    }
                     Text(s.browseTitle ?: S.collection, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     TextButton(onClick = remote::closeBrowse) { Text(S.backToCollections) }
                 }
@@ -211,8 +238,8 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
             if (recent.isNotEmpty()) {
                 item(key = "recent") {
                     Column {
-                        SpotifySectionTitle(S.recentlyPlayed)
-                        SpotifyTileRow(recent, s.covers, contentPadding = pad, onOpenSpotify = remote::openSpotifyApp, onClick = play)
+                        SpotifySectionTitle(S.spotifyRecent)
+                        SpotifyTileRow(recent, s.covers, contentPadding = pad, onOpenSpotify = remote::openSpotifyApp, onClick = tap)
                     }
                 }
             }

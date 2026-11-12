@@ -41,6 +41,10 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     private var silent = false
     private var ignoreIdle = false
     private var optimisticKey: String? = null
+    // The track chosen in a list: while a collection starts, Spotify first plays track 1, which must not enter "Recent"
+    private var expectedUri: String? = null
+    private var expectedName: String? = null
+    private val clearExpected = Runnable { expectedUri = null; expectedName = null }
     private val connectTimeout = Runnable {
         _state.update {
             if (it.connecting) it.copy(
@@ -199,11 +203,14 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 lastTrackUri = track.uri
                 val keepCover = optimisticKey != null && optimisticKey == track.imageUri?.raw
                 optimisticKey = null
+                val exp = expectedUri
+                val skipHistory = exp != null && track.uri != exp && track.name != expectedName
+                if (exp != null && !skipHistory) expectedUri = null
                 requestCover(track.imageUri)
                 _state.update { st ->
                     val item = SpotifyItem(track.uri, track.name, track.artist?.name, imageKey = track.imageUri?.raw)
                     st.copy(cover = if (keepCover) st.cover else null, saved = false,
-                        history = (listOf(item) + st.history.filterNot { h -> h.uri == track.uri }).take(30))
+                        history = if (skipHistory) st.history else (listOf(item) + st.history.filterNot { h -> h.uri == track.uri }).take(30))
                 }
                 r.imagesApi.getImage(track.imageUri, Image.Dimension.LARGE).setResultCallback { bmp ->
                     if (lastTrackUri == track.uri) _state.update { it.copy(cover = bmp.asImageBitmap()) }
@@ -256,7 +263,9 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         val known = listItems[uri]
         val hist = _state.value.history.firstOrNull { it.uri == uri }
         val name = known?.title ?: hist?.title
-        if (name != null) {
+        // Only a track may pre-fill the player. A playlist or album card must never put its own
+        // title or cover into the player: they belong to the collection, not to the playing track
+        if (name != null && uri.startsWith("spotify:track:")) {
             val key = known?.imageUri?.raw ?: hist?.imageKey
             optimisticKey = key
             _state.update { st ->
@@ -335,6 +344,22 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun playInContext(contextUri: String, index: Int, item: SpotifyItem?) {
         val r = remote ?: return
         ignoreIdle = false
+        // A collection joins "Recent" only once a track has been started from it (memory only, at most 10 of 30)
+        val st0 = _state.value
+        st0.browseHeader?.takeIf { st0.browseUri == contextUri }?.let { card ->
+            _state.update { st ->
+                var collections = 0
+                st.copy(
+                    history = (listOf(card) + st.history.filterNot { it.uri == card.uri })
+                        .filter { it.uri.startsWith("spotify:track:") || ++collections <= 10 }
+                        .take(30),
+                )
+            }
+        }
+        expectedUri = item?.uri
+        expectedName = item?.title
+        handler.removeCallbacks(clearExpected)
+        if (item != null) handler.postDelayed(clearExpected, 5000)
         // Shuffle would make "next" random; the user can turn it back on in the Spotify app
         r.playerApi.setShuffle(false)
         r.playerApi.play(contextUri)
@@ -419,6 +444,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             .setResultCallback {
                 showItems(item.title, it.items)
                 startPaging(li, 20, it.items?.size ?: 0, it.total)
+                _state.update { st -> st.copy(browseUri = item.uri, browseHeader = item) }
             }
             .setErrorCallback { _state.update { st -> st.copy(error = S.couldNotOpenTheCollection) } }
     }
@@ -488,6 +514,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 android.util.Log.d("SpotifyBrowse", "${uri} -> items: ${res.items?.size}")
                 android.util.Log.d("SpotifyBrowse", "page0 total=${res.total} offset=${res.offset} limit=${res.limit}")
                 showItems(if (kind == "album") S.album else S.playlist, res.items)
+                _state.update { st -> st.copy(browseUri = uri, browseHeader = null) }
                 startPaging(li, 50, res.items?.size ?: 0, res.total)
             }
             .setErrorCallback { e ->
@@ -498,7 +525,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
 
     override fun closeBrowse() {
         browseParent = null
-        _state.update { it.copy(browse = null, browseTitle = null, browseMore = false, browseTotal = null) }
+        _state.update { it.copy(browse = null, browseTitle = null, browseMore = false, browseTotal = null, browseUri = null, browseHeader = null) }
     }
 
     override fun openSpotifyApp() {

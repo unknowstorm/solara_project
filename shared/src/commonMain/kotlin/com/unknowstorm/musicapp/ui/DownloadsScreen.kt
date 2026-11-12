@@ -62,7 +62,7 @@ fun DownloadButton(track: Track, downloads: DownloadManager, modifier: Modifier 
         val saved = items.any { downloads.keyOf(it) == key }
         Box(modifier.size(40.dp), contentAlignment = Alignment.Center) {
             when {
-                saved -> Text("✓", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                saved -> CheckIcon(Modifier.size(22.dp), MaterialTheme.colorScheme.primary)
                 progress != null -> Box(
                     Modifier.size(40.dp).clickable { downloads.cancel(key) },
                     contentAlignment = Alignment.Center,
@@ -74,7 +74,7 @@ fun DownloadButton(track: Track, downloads: DownloadManager, modifier: Modifier 
                     }
                 }
                 else -> IconButton(onClick = { downloads.download(track) }) {
-                    Text("↓", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    DownloadIcon(Modifier.size(22.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -140,7 +140,9 @@ fun DownloadsContent(downloads: DownloadManager, audio: AudioBackend, modifier: 
                             if (d.durationMs > 0) {
                                 Text(humanDuration(d.durationMs), style = MaterialTheme.typography.bodySmall)
                             }
-                            IconButton(onClick = { downloads.remove(downloads.keyOf(d)) }) { Text("✕") }
+                            IconButton(onClick = { downloads.remove(downloads.keyOf(d)) }) {
+                                CrossIcon(Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     },
                     colors = ListItemDefaults.colors(

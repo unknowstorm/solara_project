@@ -213,7 +213,7 @@ fun PlaylistScreen(
                                         }
                                     }
                                 }) {
-                                    Text("✕", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    CrossIcon(Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

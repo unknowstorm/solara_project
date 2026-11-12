@@ -277,5 +277,22 @@ object S {
     val downloadsEmpty: String get() = tr("Nothing saved yet. Tap ↓ next to a Jamendo track to listen to it without internet. Only tracks whose authors allow downloading can be saved. Saved tracks stay inside Solara, for your own listening.", "Поки нічого не збережено. Натисніть ↓ біля треку Jamendo, щоб слухати його без інтернету. Зберегти можна лише треки, які автори дозволили завантажувати. Збережені треки залишаються всередині Solara, лише для вашого прослуховування.")
     fun downloadsSummary(p0: Any?, p1: Any?): String = tr("${p0} tracks · ${p1}", "${p0} треків · ${p1}")
     fun downloadingNow(p0: Any?): String = tr("Downloading: ${p0}", "Завантажується: ${p0}")
+    val spotifyRecent: String get() = tr("Recent", "Нещодавні")
     // <<< ENTRIES >>>
+
+    val importFavoritesTitle: String get() = tr("Import favorites and playlists", "Імпорт вподобань і плейлистів")
+    val importPublicOnly: String get() = tr("We read only the public profile: favorites and playlists. No password or token is requested or stored.", "Ми читаємо лише публічний профіль: вподобання й плейлисти. Пароль чи токен не запитуємо й не зберігаємо.")
+    val importAccountHint: String get() = tr("Nickname, profile link or id", "Нік, посилання на профіль або id")
+    val importAction: String get() = tr("Import", "Імпортувати")
+    val importAgain: String get() = tr("Import again", "Імпортувати знову")
+    val importing: String get() = tr("Importing…", "Імпортую…")
+    val disconnectAccount: String get() = tr("Disconnect", "Відключити")
+    val alsoDeleteImported: String get() = tr("Also delete imported tracks and playlists", "Також видалити імпортовані треки й плейлисти")
+    val accountNotFound: String get() = tr("Account not found", "Акаунт не знайдено")
+    val importFailed: String get() = tr("Import failed, try again later", "Не вдалося імпортувати, спробуйте пізніше")
+    val signInToImport: String get() = tr("Sign in to import", "Увійдіть, щоб імпортувати")
+    fun importedSummary(likes: Any?, playlists: Any?): String =
+        tr("Added: ${likes} likes, ${playlists} playlists", "Додано: вподобань ${likes}, плейлистів ${playlists}")
+
+    fun openOn(service: String): String = tr("Open on $service", "Відкрити на $service")
 }

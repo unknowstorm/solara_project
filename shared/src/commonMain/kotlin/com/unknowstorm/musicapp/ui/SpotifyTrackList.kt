@@ -59,7 +59,7 @@ internal fun SpotifyLinkBrowse(
     val ui = LocalSpotifyMini.current
     val list = s.browse
     if (list != null) {
-        SpotifyTrackList(remote, s, contextUri, onBeforePlay, onClose, modifier)
+        SpotifyTrackList(remote, s, contextUri, onBeforePlay, onClose, modifier, header = s.browseHeader)
         return
     }
     var timedOut by remember(contextUri) { mutableStateOf(false) }
@@ -96,6 +96,9 @@ internal fun SpotifyTrackList(
     onBeforePlay: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The album or playlist card: its cover is shown next to the title, unchanged. */
+    header: com.unknowstorm.musicapp.spotify.SpotifyItem? = null,
+    showBack: Boolean = true,
 ) {
     val ui = LocalSpotifyMini.current
     val list = s.browse ?: return
@@ -111,17 +114,25 @@ internal fun SpotifyTrackList(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onClose) { Text(S.back) }
+            if (showBack) TextButton(onClick = onClose) { Text(S.back) }
             Spacer(Modifier.weight(1f))
             SpotifyLogoBar(Modifier.padding(end = 8.dp))
         }
         Column(Modifier.padding(horizontal = 16.dp)) {
-            Text(s.browseTitle ?: kind, style = MaterialTheme.typography.titleLarge)
-            Text(
-                S.spotifyTracksCount(s.browseTotal ?: if (s.browseMore) "${list.size}+" else list.size),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (header != null) {
+                    SpotifyCover(header.imageKey?.let { s.covers[it] }, 96.dp)
+                    Spacer(Modifier.width(12.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(s.browseTitle ?: kind, style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        S.spotifyTracksCount(s.browseTotal ?: if (s.browseMore) "${list.size}+" else list.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = {

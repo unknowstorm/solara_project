@@ -60,6 +60,8 @@ import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.downloads.rememberDownloadPlatform
 import com.unknowstorm.musicapp.history.HistoryRepository
+import com.unknowstorm.musicapp.imports.ImportRepository
+import com.unknowstorm.musicapp.imports.ImportSection
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
@@ -118,6 +120,7 @@ fun MainScreen(
         if (s == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == s }
 
     val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
+    val importRepo = remember(authRepo, likes, playlists) { ImportRepository(authRepo, likes, playlists) }
 
     val ytScope = rememberCoroutineScope()
     val session = remember { YouTubeSession(ytScope) }
