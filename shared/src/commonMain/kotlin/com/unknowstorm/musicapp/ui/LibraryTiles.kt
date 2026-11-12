@@ -10,14 +10,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,10 +60,18 @@ import com.unknowstorm.musicapp.i18n.S
  */
 @Composable
 fun LibraryTiles(likesCount: Int?, onOpen: (Int) -> Unit, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        // Низкое окно (телефон в альбомной ориентации): широкая плитка и сетка не помещаются, всё идёт одним рядом
+        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen) else LibraryTilesGrid(likesCount, onOpen)
+    }
+}
+
+@Composable
+private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit) {
     val cs = MaterialTheme.colorScheme
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -103,24 +114,70 @@ fun LibraryTiles(likesCount: Int?, onOpen: (Int) -> Unit, modifier: Modifier = M
     }
 }
 
+/** Все пять плиток одного размера в один ряд: для низкого окна, где сетка не помещается без прокрутки. */
+@Composable
+private fun LibraryTilesRow(likesCount: Int?, onOpen: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val tile = Modifier.weight(1f).fillMaxHeight().heightIn(max = 190.dp)
+        SquareTile(
+            S.libLikes, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(0) },
+            modifier = tile, compact = true, subtitle = likesCount?.let { S.tracks(it) },
+        ) { HeartIcon(true, Modifier.size(24.dp), it) }
+        SquareTile(S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) }, modifier = tile, compact = true) {
+            PlaylistGlyph(Modifier.size(24.dp), it)
+        }
+        SquareTile(S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) }, modifier = tile, compact = true) {
+            HistoryGlyph(Modifier.size(24.dp), it)
+        }
+        SquareTile(S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) }, modifier = tile, compact = true) {
+            FolderGlyph(Modifier.size(24.dp), it)
+        }
+        SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }, modifier = tile, compact = true) {
+            DownloadTrayGlyph(Modifier.size(24.dp), it)
+        }
+    }
+}
+
 @Composable
 private fun SquareTile(
     label: String,
     container: Color,
     content: Color,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+    compact: Boolean = false,
+    subtitle: String? = null,
     icon: @Composable (Color) -> Unit,
 ) {
-    TileSurface(container, content, onClick, Modifier.fillMaxWidth().aspectRatio(1f)) {
-        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            IconDisc(48.dp, content) { icon(content) }
-            Text(
-                label,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+    TileSurface(container, content, onClick, modifier) {
+        Column(
+            Modifier.fillMaxSize().padding(if (compact) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            IconDisc(if (compact) 40.dp else 48.dp, content) { icon(content) }
+            Column {
+                Text(
+                    label,
+                    style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (subtitle != null) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = content.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
