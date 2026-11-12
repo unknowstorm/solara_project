@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -61,7 +62,7 @@ fun SpotifyScreen(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text(S.back) }
+            TextButton(onClick = { if (s?.browse != null) remote?.closeBrowse() else onBack() }) { Text(S.back) }
         }
         if (remote == null || s == null) {
             StatusColumn {
@@ -164,8 +165,11 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
     }
     // The album or playlist opened from a shelf: tracks inside it play in its context
     var browseContext by remember { mutableStateOf<String?>(null) }
+    // The card of the opened album or playlist (its cover is shown above the track list)
+    var browseHeader by remember { mutableStateOf<SpotifyItem?>(null) }
     val tap: (SpotifyItem) -> Unit = { item ->
-        if (item.playable) {
+        val isCollection = item.uri.startsWith("spotify:album:") || item.uri.startsWith("spotify:playlist:")
+        if (item.playable && !isCollection) {
             val c = browseContext
             val index = s.browse?.indexOfFirst { it.uri == item.uri } ?: -1
             if (c != null && index >= 0 && (c.startsWith("spotify:album:") || c.startsWith("spotify:playlist:"))) {
@@ -175,12 +179,32 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
             }
         } else {
             browseContext = item.uri
+            browseHeader = item
             remote.openItem(item)
         }
     }
     val pad = PaddingValues(horizontal = 16.dp)
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    // Kept outside the branch below so the scroll position of Home survives opening and closing a list
+    val homeListState = rememberLazyListState()
+    val openContext = browseContext
+    if (s.browse != null && openContext != null &&
+        (openContext.startsWith("spotify:album:") || openContext.startsWith("spotify:playlist:"))
+    ) {
+        // Album or playlist: the same list as on the Search tab, with the cover of the collection
+        SpotifyTrackList(
+            remote = remote,
+            s = s,
+            contextUri = openContext,
+            onBeforePlay = onBeforePlay,
+            onClose = remote::closeBrowse,
+            header = browseHeader,
+            showBack = false,
+        )
+        return
+    }
+
+    LazyColumn(Modifier.fillMaxSize(), state = homeListState, contentPadding = PaddingValues(bottom = 16.dp)) {
         item(key = "header") {
             SpotifyHeader(S.youCanPlayMusicFrom)
         }
