@@ -28,7 +28,11 @@ import com.unknowstorm.musicapp.provider.audius.AudiusProvider
 import com.unknowstorm.musicapp.provider.deezer.DeezerProvider
 import com.unknowstorm.musicapp.provider.jamendo.JamendoProvider
 import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
+import com.unknowstorm.musicapp.theme.PALETTE_KEY
+import com.unknowstorm.musicapp.theme.PaletteSettings
 import com.unknowstorm.musicapp.theme.SolaraTheme
+import com.unknowstorm.musicapp.ui.ISLAND_KEY
+import com.unknowstorm.musicapp.ui.IslandSettings
 import com.unknowstorm.musicapp.ui.LocalSpotifyMini
 import com.unknowstorm.musicapp.ui.SpotifyExpandablePlayer
 import com.unknowstorm.musicapp.ui.SpotifyMiniState
@@ -65,7 +69,12 @@ private class AppBoot(
 
 @Composable
 fun App() {
-    SolaraTheme {
+    // Saved palette is restored before the theme is first composed, so the colors do not blink
+    val paletteStore = rememberTextStore()
+    remember(paletteStore) { PaletteSettings.restore(paletteStore.get(PALETTE_KEY)); Unit }
+    // Порядок сервисов в островке тоже восстанавливается до первой композиции, чтобы панель не мигала
+    remember(paletteStore) { IslandSettings.restore(paletteStore.get(ISLAND_KEY)); Unit }
+    SolaraTheme(palette = PaletteSettings.choice) {
         Surface(Modifier.fillMaxSize()) {
             // UI language: the saved choice, otherwise the system language (English by default)
             val languageStore = rememberTextStore()
