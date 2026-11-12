@@ -458,7 +458,6 @@ fun TopBar(
     position: (() -> Float)? = null,
 ) {
     val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val active = Service.entries.filter { it.ready && it != Service.SPOTIFY }
     val soon = Service.entries.filter { !it.ready }
 
     val cs = MaterialTheme.colorScheme
@@ -474,6 +473,8 @@ fun TopBar(
 
     // The chip index = the pager page index: ♡ = 0 (if present), then the services
     val order = pagerOrder(onLikes != null)
+    // The chips are the same list as the pager pages (without ♡): "All" + the services from the "Island" settings
+    val active = order.filterNotNull()
     val chipRects = remember { mutableStateMapOf<Int, Rect>() }
     var rowWindow by remember { mutableStateOf(Offset.Zero) }
 

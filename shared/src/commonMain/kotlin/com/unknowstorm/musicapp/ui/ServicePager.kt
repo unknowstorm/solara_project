@@ -11,16 +11,20 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import com.unknowstorm.musicapp.model.Service
 
-/** Page order as in the bar: ♡ (null), then chips left to right. Spotify is outside the pager: entry via "+". */
-fun pagerOrder(hasLikes: Boolean): List<Service?> =
-    (if (hasLikes) listOf<Service?>(null) else emptyList<Service?>()) +
-        Service.entries.filter { it.ready && it != Service.SPOTIFY }
+/**
+ * Page order as in the bar: ♡ (null), "All", then the services from the "Island" settings (hidden ones are absent).
+ * Spotify is outside the pager: entry via "+". TopBar takes its chips from this same list, so the chip index = the page index.
+ * Reads IslandSettings (snapshot state): called in composition, it re-reads after "Save" in the editor.
+ */
+fun pagerOrder(hasLikes: Boolean, visible: List<Service> = IslandSettings.visible()): List<Service?> =
+    (if (hasLikes) listOf<Service?>(null) else emptyList<Service?>()) + Service.ALL + visible
 
 /**
  * Source pages under the fixed bar. Neighboring pages are drawn during the gesture.
@@ -40,7 +44,29 @@ fun ServicePager(
     onPosition: (Float) -> Unit = {},
     page: @Composable (service: Service?, active: Boolean) -> Unit,
 ) {
-    val pages = remember(hasLikes) { pagerOrder(hasLikes) }
+    val visible = IslandSettings.visible()
+    val pages = remember(hasLikes, visible) { pagerOrder(hasLikes, visible) }
+    // The order changed: the pager is rebuilt on the page of the current service, otherwise for a moment
+    // the old index would point to another service and the "settled page" effect would select it
+    key(pages) {
+        ServicePagerBody(pages, current, likesSelected, hasLikes, swipeEnabled, onSelect, onLikes, modifier, onPosition, page)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ServicePagerBody(
+    pages: List<Service?>,
+    current: Service,
+    likesSelected: Boolean,
+    hasLikes: Boolean,
+    swipeEnabled: Boolean,
+    onSelect: (Service) -> Unit,
+    onLikes: () -> Unit,
+    modifier: Modifier,
+    onPosition: (Float) -> Unit,
+    page: @Composable (service: Service?, active: Boolean) -> Unit,
+) {
     val target = if (likesSelected && hasLikes) 0
     else pages.indexOf(current).let { if (it >= 0) it else pages.indexOf(Service.ALL) }
     val state = rememberPagerState(initialPage = target) { pages.size }
@@ -82,4 +108,3 @@ fun ServicePager(
         key = { pages[it]?.name ?: "likes" },
     ) { index -> page(pages[index], state.settledPage == index) }
 }
-

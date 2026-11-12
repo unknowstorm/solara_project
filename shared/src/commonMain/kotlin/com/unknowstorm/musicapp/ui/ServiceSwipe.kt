@@ -47,7 +47,8 @@ fun Modifier.serviceSwipe(
     val select by rememberUpdatedState(onSelect)
     val openLikes by rememberUpdatedState(onLikes)
     val scope = rememberCoroutineScope()
-    val order = remember { Service.entries.filter { it.ready && it != Service.SPOTIFY } }
+    // The same order as the pager pages and the bar chips; updated after "Save" in the Island editor
+    val orderNow by rememberUpdatedState(pagerOrder(false).filterNotNull())
 
     var offsetPx by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableFloatStateOf(1f) }
@@ -55,6 +56,7 @@ fun Modifier.serviceSwipe(
 
     // direction: -1 = finger moves left (next chip), 1 = right (previous chip). null = past the edge of the list
     fun targetFor(direction: Int): Int? {
+        val order = orderNow
         val idx = if (likes) -1 else order.indexOf(cur)
         if (!likes && idx < 0) return null
         val t = idx + if (direction < 0) 1 else -1
@@ -81,7 +83,7 @@ fun Modifier.serviceSwipe(
             // the old screen quickly slides off the edge
             animate(offsetPx, out, velocity, tween(150, easing = FastOutLinearInEasing)) { v, _ -> offsetPx = v }
             // the chip changes and the new screen appears from the opposite side in the same frame
-            if (target == -1) openLikes() else select(order[target])
+            if (target == -1) openLikes() else orderNow.getOrNull(target)?.let { select(it) }
             offsetPx = -out
             animate(-out, 0f, 0f, slideSpring()) { v, _ -> offsetPx = v }
         }
