@@ -256,7 +256,9 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         val known = listItems[uri]
         val hist = _state.value.history.firstOrNull { it.uri == uri }
         val name = known?.title ?: hist?.title
-        if (name != null) {
+        // Only a track may pre-fill the player. A playlist or album card must never put its own
+        // title or cover into the player: they belong to the collection, not to the playing track
+        if (name != null && uri.startsWith("spotify:track:")) {
             val key = known?.imageUri?.raw ?: hist?.imageKey
             optimisticKey = key
             _state.update { st ->
