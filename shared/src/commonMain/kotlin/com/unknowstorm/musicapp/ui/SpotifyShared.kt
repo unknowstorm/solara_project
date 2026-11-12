@@ -73,35 +73,44 @@ internal fun SpotifyCover(bitmap: ImageBitmap?, size: Dp, modifier: Modifier = M
 internal fun SpotifyTile(item: SpotifyItem, covers: Map<String, ImageBitmap>, onClick: () -> Unit) {
     // Spotify does not provide a cover for top-level shelves: we show a neutral tile with the title
     if (item.imageKey.isNullOrBlank()) {
-        Box(
-            Modifier.size(120.dp).clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onClick).padding(10.dp),
-            contentAlignment = Alignment.BottomStart,
-        ) {
-            Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.width(120.dp)) {
+            Box(
+                Modifier.size(120.dp).clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(onClick = onClick).padding(10.dp),
+                contentAlignment = Alignment.BottomStart,
+            ) {
+                Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            }
+            TileCaption(null, null)
         }
         return
     }
     Column(Modifier.width(120.dp).clickable(onClick = onClick)) {
         SpotifyCover(covers[item.imageKey], 120.dp)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            item.title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        item.subtitle?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        TileCaption(item.title, item.subtitle)
     }
+}
+
+/** Title (2 lines) and subtitle (1 line) with reserved height: every tile and every row has the same height. */
+@Composable
+private fun TileCaption(title: String?, subtitle: String?) {
+    Spacer(Modifier.height(6.dp))
+    Text(
+        title ?: "",
+        style = MaterialTheme.typography.titleSmall,
+        minLines = 2,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+    )
+    Text(
+        subtitle?.takeIf { it.isNotBlank() } ?: "",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        minLines = 1,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** Row of Spotify tiles: at most 20 items, with a link to the Spotify app at the end. */
@@ -119,6 +128,7 @@ internal fun SpotifyTileRow(
         if (onOpenSpotify != null) {
             item {
                 // Last tile of the row: the same size as the covers, 4 dp corners
+                Column(Modifier.width(120.dp)) {
                 Column(
                     Modifier.size(120.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onOpenSpotify).padding(8.dp),
@@ -134,6 +144,8 @@ internal fun SpotifyTileRow(
                         maxLines = 2,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
+                }
+                TileCaption(null, null)
                 }
             }
         }
@@ -228,9 +240,14 @@ fun SpotifySearchPane(
         }) { Text(S.spotifyOpenLink) }
         s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (s.history.isNotEmpty()) {
-            Text(S.recentlyPlayed, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(S.spotifyRecent, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
             SpotifyTileRow(s.history, s.covers) { item ->
-                onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
+                if (item.uri.startsWith("spotify:album:") || item.uri.startsWith("spotify:playlist:")) {
+                    remote.openItem(item)
+                    linkContext = item.uri
+                } else {
+                    onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
+                }
             }
         }
         TextButton(onClick = onOpenSection) { Text(S.openTheSpotifySection) }

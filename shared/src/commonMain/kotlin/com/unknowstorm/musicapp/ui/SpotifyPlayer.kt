@@ -519,7 +519,7 @@ private fun SpSharedCover(
                 translationX = lerp(miniXY, bigX, p)
                 translationY = lerp(miniXY, bigY, p)
                 // Spotify rules: we do not animate the cover, so it is hidden along the way and appears in the end positions
-                alpha = if (p < 0.02f || p > 0.98f) 1f else 0f
+                alpha = if (p < 0.001f || p > 0.999f) 1f else 0f
             }
     ) {
         Box(
