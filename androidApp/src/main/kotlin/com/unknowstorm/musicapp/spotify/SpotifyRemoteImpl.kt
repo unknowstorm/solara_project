@@ -20,8 +20,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 private const val AUTH_REQUEST = 7341
+private const val LIB_REDIRECT = "solara://spotify-library"
 
 class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     companion object {
@@ -228,12 +235,15 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
 
     override fun disconnect() {
         prefs.edit().putBoolean("auto", false).apply()
+        vault.clear()
         teardown()
     }
 
     private fun teardown() {
         coverRequested.clear()
         shelvesLoading = false
+        // Memory only: the stored refresh token (auto-import) stays until the user turns it off or disconnects
+        wipeLibraryMemory()
         if (current === this) current = null
         sub?.cancel(); sub = null
         remote?.let { SpotifyAppRemote.disconnect(it) }
@@ -242,6 +252,178 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         handler.removeCallbacks(ticker)
         // Everything that came from Spotify is erased from memory
         _state.value = SpotifyState(appInstalled = SpotifyAppRemote.isSpotifyInstalled(activity))
+    }
+
+    // ---------- Library import (Web API): token and data only in memory ----------
+    private val web = SpotifyWebApi(SpotifyConfig.CLIENT_ID, LIB_REDIRECT)
+    private val libScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var libraryJob: Job? = null
+    private var playlistJob: Job? = null
+    private var libVerifier: String? = null
+    private var libState: String? = null
+    private val vault by lazy { SpotifyTokenVault(prefs) }
+
+    private fun setLibrary(block: (SpotifyLibrary) -> SpotifyLibrary) {
+        _state.update { it.copy(library = block(it.library)) }
+    }
+
+    /** Button "Import": with a stored token it reads the library right away, otherwise it signs in through the browser. */
+    override fun importLibrary() {
+        val rt = vault.load()
+        if (rt != null) loadWithToken(rt, browserOnRevoked = true) else startBrowserAuth()
+    }
+
+    /** Called when the Spotify section opens: repeats the import without a tap if the user imported before. */
+    override fun autoImportLibrary() {
+        if (_state.value.library.status != LibraryStatus.IDLE) return
+        val rt = vault.load()
+        if (rt == null) {
+            if (vault.has()) vault.clear() // cannot be decrypted (for example after a backup restore)
+            return
+        }
+        loadWithToken(rt, browserOnRevoked = false)
+    }
+
+    override fun disableAutoImport() {
+        vault.clear()
+        setLibrary { it.copy(autoImport = false) }
+    }
+
+    private fun loadWithToken(refresh: String, browserOnRevoked: Boolean) {
+        setLibrary { it.copy(status = LibraryStatus.LOADING, autoImport = true, error = null) }
+        libraryJob?.cancel()
+        libraryJob = libScope.launch {
+            try {
+                val keep = web.refreshAccess(refresh)
+                if (keep != refresh) vault.save(keep)
+                readLibrary()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.d("SpotifyLibrary", "auto import failed: ${e.message}")
+                web.clear()
+                if (e is SpotifyHttpError && e.code == 400) {
+                    // access revoked or the refresh token expired: forget it
+                    vault.clear()
+                    if (browserOnRevoked) {
+                        handler.post { startBrowserAuth() }
+                    } else {
+                        setLibrary { SpotifyLibrary(status = LibraryStatus.ERROR, error = spotifyAccessRevokedText()) }
+                    }
+                } else {
+                    setLibrary { SpotifyLibrary(status = LibraryStatus.ERROR, error = spotifyLibraryErrorText(e), autoImport = true) }
+                }
+            }
+        }
+    }
+
+    private suspend fun readLibrary() {
+        val playlists = web.playlists()
+        val (saved, total) = web.savedTracks()
+        setLibrary {
+            SpotifyLibrary(
+                status = LibraryStatus.READY, playlists = playlists, saved = saved,
+                savedTotal = total, autoImport = vault.has(),
+            )
+        }
+    }
+
+    /**
+     * Authorization code + PKCE in the system browser (the Spotify auth library does not pass the PKCE challenge,
+     * so Spotify would ask for a client secret). The redirect comes back through SpotifyLibraryCallbackActivity.
+     */
+    private fun startBrowserAuth() {
+        if (SpotifyConfig.CLIENT_ID.isBlank()) {
+            setLibrary { SpotifyLibrary(status = LibraryStatus.ERROR, error = S.spotifyClientIdIsNot) }
+            return
+        }
+        val flags = android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP
+        val rnd = java.security.SecureRandom()
+        val verifier = android.util.Base64.encodeToString(ByteArray(64).also { rnd.nextBytes(it) }, flags)
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
+        val challenge = android.util.Base64.encodeToString(digest, flags)
+        val state = android.util.Base64.encodeToString(ByteArray(16).also { rnd.nextBytes(it) }, flags)
+        libVerifier = verifier
+        libState = state
+        setLibrary { SpotifyLibrary(status = LibraryStatus.AUTHORIZING) }
+        val uri = Uri.Builder()
+            .scheme("https").authority("accounts.spotify.com").path("authorize")
+            .appendQueryParameter("client_id", SpotifyConfig.CLIENT_ID)
+            .appendQueryParameter("response_type", "code")
+            .appendQueryParameter("redirect_uri", LIB_REDIRECT)
+            .appendQueryParameter("scope", "user-library-read playlist-read-private playlist-read-collaborative")
+            .appendQueryParameter("code_challenge_method", "S256")
+            .appendQueryParameter("code_challenge", challenge)
+            .appendQueryParameter("state", state)
+            .build()
+        runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure {
+            libVerifier = null
+            libState = null
+            setLibrary { SpotifyLibrary(status = LibraryStatus.ERROR, error = S.couldNotConnectToSpotify) }
+        }
+    }
+
+    /** Called by SpotifyLibraryCallbackActivity with solara://spotify-library?code=...&state=... */
+    fun onLibraryRedirect(data: Uri?) {
+        val verifier = libVerifier
+        val expected = libState
+        libVerifier = null
+        libState = null
+        val code = data?.getQueryParameter("code")
+        if (verifier == null || data == null || data.getQueryParameter("state") != expected || code.isNullOrBlank()) {
+            setLibrary { SpotifyLibrary(status = LibraryStatus.ERROR, error = S.spotifyDidNotConfirmAccess) }
+            return
+        }
+        setLibrary { it.copy(status = LibraryStatus.LOADING, error = null) }
+        libraryJob?.cancel()
+        libraryJob = libScope.launch {
+            try {
+                web.exchangeCode(code, verifier)?.let { vault.save(it) }
+                readLibrary()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.d("SpotifyLibrary", "import failed: ${e.message}")
+                web.clear()
+                setLibrary { SpotifyLibrary(status = LibraryStatus.ERROR, error = spotifyLibraryErrorText(e)) }
+            }
+        }
+    }
+
+    override fun openLibraryPlaylist(playlist: SpotifyLibPlaylist) {
+        setLibrary { it.copy(openPlaylist = playlist, playlistTracks = null, error = null) }
+        playlistJob?.cancel()
+        playlistJob = libScope.launch {
+            try {
+                val tracks = web.playlistTracks(playlist.id)
+                setLibrary { if (it.openPlaylist?.id == playlist.id) it.copy(playlistTracks = tracks) else it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.d("SpotifyLibrary", "playlist failed: ${e.message}")
+                setLibrary { if (it.openPlaylist?.id == playlist.id) it.copy(playlistTracks = emptyList(), error = spotifyLibraryErrorText(e)) else it }
+            }
+        }
+    }
+
+    override fun closeLibraryPlaylist() {
+        playlistJob?.cancel()
+        setLibrary { it.copy(openPlaylist = null, playlistTracks = null, error = null) }
+    }
+
+    private fun wipeLibraryMemory() {
+        libraryJob?.cancel()
+        playlistJob?.cancel()
+        libVerifier = null
+        libState = null
+        web.clear()
+        setLibrary { SpotifyLibrary() }
+    }
+
+    /** "Remove import and sign out": memory and the stored token. */
+    override fun forgetLibrary() {
+        wipeLibraryMemory()
+        vault.clear()
     }
 
     /** Called when the activity is closed. If the app was closed completely (not a screen rotation), we pause Spotify. */
