@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.auth.AuthRepository
 import com.unknowstorm.musicapp.auth.AvatarUpdate
 import com.unknowstorm.musicapp.auth.Profile
+import com.unknowstorm.musicapp.imports.ImportHolder
+import com.unknowstorm.musicapp.imports.ImportSection
 import kotlinx.coroutines.launch
 
 private val NickRegex = Regex("^[a-zA-Z0-9_]{3,20}$")
@@ -193,11 +195,9 @@ fun OnboardingScreen(
                         )
                     }
                 }
-                Text(
-                    S.signingInToAService,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Импорт из Jamendo и Audius и подключение YouTube (вместо старой заглушки)
+                ImportHolder.repo?.let { ImportSection(it) }
+                YouTubeLinkRow()
 
                 error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)

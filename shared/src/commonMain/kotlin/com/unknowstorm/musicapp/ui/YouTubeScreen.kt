@@ -25,6 +25,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import com.unknowstorm.musicapp.i18n.tr
+import com.unknowstorm.musicapp.provider.youtube.YouTubeLinkRepository
+import com.unknowstorm.musicapp.provider.youtube.YtLinkException
+import com.unknowstorm.musicapp.provider.youtube.YtPlaylist
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
@@ -267,6 +271,7 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
                     }
                 }
             }
+            item(key = "mine") { MyYouTubeBlock(onPlay = { v, l -> play(v, l) }) }
             item(key = "legal") { LegalFooter() }
         }
     }
@@ -393,4 +398,116 @@ internal fun formatYtDuration(ms: Long): String {
     val s = total % 60
     return if (h > 0) "$h:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}"
     else "$m:${s.toString().padStart(2, '0')}"
+}
+
+// ---------- My YouTube (own account, read-only) ----------
+
+/** Playlists and liked videos of the connected YouTube account. Memory only, not mixed with anything else. */
+@Composable
+private fun MyYouTubeBlock(onPlay: (YouTubeVideo, List<YouTubeVideo>) -> Unit) {
+    val repo = remember { YouTubeLinkRepository() }
+    val scope = rememberCoroutineScope()
+    val openLink = rememberExternalLinkOpener()
+    var linked by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var playlists by remember { mutableStateOf<List<YtPlaylist>>(emptyList()) }
+    var liked by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
+    var opened by remember { mutableStateOf<Pair<YtPlaylist, List<YouTubeVideo>>?>(null) }
+
+    LaunchedEffect(linked) {
+        if (!linked) {
+            playlists = emptyList(); liked = emptyList(); opened = null
+            return@LaunchedEffect
+        }
+        busy = true
+        message = null
+        try {
+            val o = repo.overview()
+            playlists = o.playlists
+            liked = o.liked
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            message = ytLinkMessage(e)
+            if ((e as? YtLinkException)?.code == "revoked") linked = false
+        } finally {
+            busy = false
+        }
+    }
+
+    Column(Modifier.fillMaxWidth()) {
+        FeedTitle(tr("My YouTube", "Мій YouTube"))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            YouTubeLogo(onClick = { openLink(YOUTUBE_HOME) })
+            Spacer(Modifier.width(12.dp))
+            Text(
+                tr(
+                    "Optional. Your own playlists and liked videos, shown only here and kept only in memory.",
+                    "За бажанням. Ваші плейлисти та вподобані відео: показуються лише тут і зберігаються лише в пам’яті.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        YouTubeLinkRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), onLinked = { linked = it })
+        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        message?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        }
+        if (linked) {
+            if (liked.isNotEmpty()) {
+                Text(
+                    tr("Liked videos", "Вподобані відео"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
+                )
+                VideoStrip(liked) { onPlay(it, liked) }
+            }
+            if (playlists.isNotEmpty()) {
+                Text(
+                    tr("Playlists", "Плейлисти"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+                )
+                LazyRow(contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    items(playlists, key = { it.id }) { p ->
+                        TextButton(onClick = {
+                            scope.launch {
+                                try {
+                                    opened = p to repo.playlist(p.id)
+                                    message = null
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    message = ytLinkMessage(e)
+                                }
+                            }
+                        }) { Text("${p.title} (${p.count})", maxLines = 1) }
+                    }
+                }
+            }
+            opened?.let { (p, videos) ->
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.title, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 1)
+                    TextButton(onClick = { opened = null }) { Text(tr("Close", "Закрити")) }
+                }
+                if (videos.isEmpty()) {
+                    Text(
+                        tr("No videos that can be played here.", "Немає відео, які можна відтворити тут."),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    VideoStrip(videos) { onPlay(it, videos) }
+                }
+            }
+        }
+    }
 }
