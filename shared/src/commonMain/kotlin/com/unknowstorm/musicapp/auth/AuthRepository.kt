@@ -1,5 +1,8 @@
 package com.unknowstorm.musicapp.auth
 
+import kotlinx.serialization.json.JsonObject
+import io.github.jan.supabase.functions.functions
+import io.ktor.client.statement.bodyAsText
 import com.unknowstorm.musicapp.i18n.S
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.OtpType
@@ -175,13 +178,44 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         }
     }
 
-    /** Sign-in by email or by login (nickname): the login is first turned into an email via the RPC `email_by_username`. */
+    /**
+     * Sign-in by email or by login (nickname). An email goes straight to Supabase. A nickname goes through the Edge Function
+     * `login-by-username`: the server finds the email itself, so it never reaches the app and cannot be looked up by a stranger.
+     */
     suspend fun signIn(login: String, password: String): Result<Unit> = safe {
-        val mail = resolveEmailOrNull(login) ?: error("Invalid login credentials")
-        client.auth.signInWith(Email) {
-            this.email = mail
-            this.password = password
+        val v = login.trim()
+        if ('@' in v) {
+            client.auth.signInWith(Email) {
+                this.email = v
+                this.password = password
+            }
+        } else {
+            signInByNickname(v, password)
         }
+    }
+
+    private suspend fun signInByNickname(nick: String, password: String) {
+        if (nick.isEmpty()) error("Invalid login credentials")
+        val text = client.functions.invoke(
+            function = "login-by-username",
+            body = buildJsonObject {
+                put("action", "login")
+                put("login", nick)
+                put("password", password)
+            },
+        ).bodyAsText()
+        val obj = Json.parseToJsonElement(text).jsonObject
+        obj["error"]?.jsonPrimitive?.contentOrNull?.let { code ->
+            when (code) {
+                "email_not_confirmed" -> error("Email not confirmed")
+                "too_many_attempts" -> error("Too many attempts. Try again later")
+                else -> error("Invalid login credentials")
+            }
+        }
+        val access = obj["access_token"]?.jsonPrimitive?.contentOrNull
+        val refresh = obj["refresh_token"]?.jsonPrimitive?.contentOrNull
+        if (access.isNullOrBlank() || refresh.isNullOrBlank()) error("Invalid login credentials")
+        client.auth.importAuthToken(access, refresh, retrieveUser = true, autoRefresh = true)
     }
 
     /** If [login] contains '@', it is an email. Otherwise we look up the email by nickname on the server; null if there is no such nickname. */
@@ -201,9 +235,35 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
      * It must be passed on to [resetPasswordWithCode] and [sendResetCode].
      */
     suspend fun startPasswordReset(login: String): Result<String> = safe {
-        val mail = resolveEmailOrNull(login) ?: error("login not found")
-        client.auth.resetPasswordForEmail(mail)
-        mail
+        val v = login.trim()
+        if ('@' in v) {
+            client.auth.resetPasswordForEmail(v)
+        } else {
+            // Nickname: the server finds the email and sends the code. The reply is the same whether the nickname exists or not.
+            callNicknameFunction("reset_start", v)
+        }
+        v
+    }
+
+    /** One call to the Edge Function `login-by-username`. Returns its JSON reply; too many attempts is raised here. */
+    private suspend fun callNicknameFunction(
+        action: String,
+        login: String,
+        code: String? = null,
+        password: String? = null,
+    ): JsonObject {
+        val text = client.functions.invoke(
+            function = "login-by-username",
+            body = buildJsonObject {
+                put("action", action)
+                put("login", login)
+                if (code != null) put("code", code)
+                if (password != null) put("password", password)
+            },
+        ).bodyAsText()
+        val obj = Json.parseToJsonElement(text).jsonObject
+        if (obj["error"]?.jsonPrimitive?.contentOrNull == "too_many_attempts") error("Too many attempts. Try again later")
+        return obj
     }
 
     /** Close the waiting-for-email screen (e.g. "Change email"). */
@@ -289,7 +349,9 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
 
     /** Step 1 of the code password reset: sends an email with a code to the address (without a redirect link). */
     suspend fun sendResetCode(email: String): Result<Unit> = safe {
-        client.auth.resetPasswordForEmail(email.trim())
+        val v = email.trim()
+        if ('@' in v) client.auth.resetPasswordForEmail(v) else callNicknameFunction("reset_start", v)
+        Unit
     }
 
     /**
@@ -298,12 +360,23 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
      * and after success the user ends up signed in.
      */
     suspend fun resetPasswordWithCode(email: String, code: String, newPassword: String): Result<Unit> = safe {
-        client.auth.verifyEmailOtp(
-            type = OtpType.Email.RECOVERY,
-            email = email.trim(),
-            token = code.filter { it.isDigit() },
-        )
-        client.auth.updateUser { password = newPassword }
+        val v = email.trim()
+        val digits = code.filter { it.isDigit() }
+        if ('@' in v) {
+            client.auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = v, token = digits)
+            client.auth.updateUser { password = newPassword }
+        } else {
+            val obj = callNicknameFunction("reset_finish", v, code = digits, password = newPassword)
+            when (obj["error"]?.jsonPrimitive?.contentOrNull) {
+                null -> Unit
+                "weak_password" -> error("Password is too weak")
+                else -> error("Token has expired or is invalid")
+            }
+            val access = obj["access_token"]?.jsonPrimitive?.contentOrNull
+            val refresh = obj["refresh_token"]?.jsonPrimitive?.contentOrNull
+            if (access.isNullOrBlank() || refresh.isNullOrBlank()) error("Token has expired or is invalid")
+            client.auth.importAuthToken(access, refresh, retrieveUser = true, autoRefresh = true)
+        }
     }
 
     /** Password change from settings for an already signed-in user. */

@@ -280,8 +280,12 @@ object S {
     val spotifyRecent: String get() = tr("Recent", "Нещодавні")
     // <<< ENTRIES >>>
 
+    val notConnected: String get() = tr("Not connected", "Не підключено")
+    val youtubeAccountNote: String get() = tr("Read-only. Your playlists and liked videos are shown in the YouTube section and kept only in memory.", "Лише читання. Ваші плейлисти й вподобані відео показуються в розділі YouTube і зберігаються лише в пам’яті.")
+    val accountsAndImport: String get() = tr("Accounts and import", "Акаунти та імпорт")
+    val spotifyRemoteNote: String get() = tr("Solara works as a remote for the Spotify app and stores nothing from Spotify. Everything is in the Spotify section.", "Solara працює як пульт для застосунку Spotify і нічого зі Spotify не зберігає. Усе керування в розділі Spotify.")
     val importFavoritesTitle: String get() = tr("Import favorites and playlists", "Імпорт вподобань і плейлистів")
-    val importPublicOnly: String get() = tr("We read only the public profile: favorites and playlists. No password or token is requested or stored.", "Ми читаємо лише публічний профіль: вподобання й плейлисти. Пароль чи токен не запитуємо й не зберігаємо.")
+    val importPublicOnly: String get() = tr("Jamendo and Audius: we read only the public profile (favorites and playlists). No password or token is requested or stored.", "Jamendo і Audius: ми читаємо лише публічний профіль (вподобання й плейлисти). Пароль чи токен не запитуємо й не зберігаємо.")
     val importAccountHint: String get() = tr("Nickname, profile link or id", "Нік, посилання на профіль або id")
     val importAction: String get() = tr("Import", "Імпортувати")
     val importAgain: String get() = tr("Import again", "Імпортувати знову")
