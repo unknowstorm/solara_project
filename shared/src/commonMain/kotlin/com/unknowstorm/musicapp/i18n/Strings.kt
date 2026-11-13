@@ -277,6 +277,9 @@ object S {
     val downloadsEmpty: String get() = tr("Nothing saved yet. Tap ↓ next to a Jamendo track to listen to it without internet. Only tracks whose authors allow downloading can be saved. Saved tracks stay inside Solara, for your own listening.", "Поки нічого не збережено. Натисніть ↓ біля треку Jamendo, щоб слухати його без інтернету. Зберегти можна лише треки, які автори дозволили завантажувати. Збережені треки залишаються всередині Solara, лише для вашого прослуховування.")
     fun downloadsSummary(p0: Any?, p1: Any?): String = tr("${p0} tracks · ${p1}", "${p0} треків · ${p1}")
     fun downloadingNow(p0: Any?): String = tr("Downloading: ${p0}", "Завантажується: ${p0}")
+    val download: String get() = tr("Download", "Завантажити")
+    val trackDetails: String get() = tr("Track info", "Про трек")
+    val createPlaylist: String get() = tr("New playlist", "Новий плейлист")
     val spotifyRecent: String get() = tr("Recent", "Нещодавні")
     // <<< ENTRIES >>>
 
