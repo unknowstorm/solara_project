@@ -18,6 +18,9 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.unknowstorm.musicapp.widget.WidgetData
+import com.unknowstorm.musicapp.widget.WidgetPlayerListener
+import com.unknowstorm.musicapp.widget.WidgetStore
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private val resolvedUrls = ConcurrentHashMap<String, Uri>()
+    private var widgetListener: WidgetPlayerListener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -112,6 +116,12 @@ class PlaybackService : MediaSessionService() {
             }
         })
         EqualizerEngine.attach(player.audioSessionId)
+        // Home-screen widgets follow the player
+        WidgetStore.player = player
+        val widgetListener = WidgetPlayerListener(this)
+        this.widgetListener = widgetListener
+        player.addListener(widgetListener)
+        widgetListener.sync(player.currentMediaItem, player.isPlaying)
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
         val builder = MediaSession.Builder(this, player)
         if (launchIntent != null) {
@@ -166,6 +176,11 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        WidgetStore.player = null
+        widgetListener?.release()
+        widgetListener = null
+        WidgetStore.data.value = WidgetData()
+        WidgetStore.push(this)
         EqualizerEngine.release()
         mediaSession?.run {
             player.release()

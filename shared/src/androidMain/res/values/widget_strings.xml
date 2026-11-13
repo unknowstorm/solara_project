@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_2x2_label">Solara 2×2</string>
+    <string name="widget_4x2_label">Solara 4×1</string>
+    <string name="widget_2x2_description">Обложка и кнопка play/pause</string>
+    <string name="widget_4x2_description">Обложка, трек, исполнитель и управление</string>
+    <string name="widget_play">Играть</string>
+    <string name="widget_pause">Пауза</string>
+    <string name="widget_next">Следующий трек</string>
+    <string name="widget_previous">Предыдущий трек</string>
+    <string name="widget_nothing_playing">Ничего не играет</string>
+</resources>
