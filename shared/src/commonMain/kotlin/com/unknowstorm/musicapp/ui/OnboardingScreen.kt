@@ -62,7 +62,6 @@ import kotlinx.coroutines.launch
 private val NickRegex = Regex("^[a-zA-Z0-9_]{3,20}$")
 
 private val ServiceChoices = listOf(
-    "soundcloud" to "SoundCloud",
     "spotify" to "Spotify",
     "youtube" to "YouTube",
 )
@@ -183,22 +182,6 @@ fun OnboardingScreen(
                     )
                 }
 
-                // Services: square buttons with rounded corners
-                Text(S.services, style = MaterialTheme.typography.titleMedium)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ServiceChoices.forEach { (key, title) ->
-                        ServiceTile(
-                            title = title,
-                            selected = key in services,
-                            onClick = { services = if (key in services) services - key else services + key },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-                // Импорт из Jamendo и Audius и подключение YouTube (вместо старой заглушки)
-                ImportHolder.repo?.let { ImportSection(it) }
-                YouTubeLinkRow()
-
                 error?.let {
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -278,7 +261,7 @@ private fun ServiceTile(
                 textAlign = TextAlign.Center,
             )
             Text(
-                if (selected) S.selected else S.connect,
+                if (selected) S.selected else "",
                 style = MaterialTheme.typography.labelSmall,
                 color = content,
                 maxLines = 1,

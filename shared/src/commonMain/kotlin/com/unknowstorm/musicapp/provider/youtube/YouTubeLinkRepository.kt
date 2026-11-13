@@ -16,6 +16,8 @@ data class YtPlaylist(val id: String, val title: String, val count: Int = 0)
 
 class YtOverview(val playlists: List<YtPlaylist>, val liked: List<YouTubeVideo>)
 
+class YtLinkStatus(val linked: Boolean, val account: String?)
+
 /** code: unauthorized, revoked, quota, not_linked, failed. */
 class YtLinkException(val code: String) : Exception(code)
 
@@ -24,6 +26,8 @@ private data class LinkReply(
     val error: String? = null,
     val url: String? = null,
     val linked: Boolean = false,
+    /** Title of the connected channel (optional). */
+    val account: String? = null,
     val playlists: List<YtPlaylist> = emptyList(),
     val liked: List<YouTubeVideo> = emptyList(),
     val videos: List<YouTubeVideo> = emptyList(),
@@ -62,6 +66,9 @@ class YouTubeLinkRepository(private val client: SupabaseClient = supabase) {
     }
 
     suspend fun isLinked(): Boolean = call("status").linked
+
+    /** Link state plus the channel title (if the server returns it). Not stored anywhere. */
+    suspend fun status(): YtLinkStatus = call("status").let { YtLinkStatus(it.linked, it.account) }
 
     /** The Google consent page address. Open it in the browser. */
     suspend fun start(): String = call("start").url ?: throw YtLinkException("failed")

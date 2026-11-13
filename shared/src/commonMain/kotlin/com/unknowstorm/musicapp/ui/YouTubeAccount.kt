@@ -1,6 +1,7 @@
 package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,7 @@ import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.i18n.tr
 import com.unknowstorm.musicapp.provider.youtube.YouTubeLinkRepository
 import com.unknowstorm.musicapp.provider.youtube.YtLinkException
+import com.unknowstorm.musicapp.provider.youtube.YtLinkStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -40,16 +42,41 @@ internal fun ytLinkMessage(e: Throwable): String = when ((e as? YtLinkException)
     else -> tr("Could not reach YouTube. Try again.", "Не вдалося звернутися до YouTube. Спробуйте ще раз.")
 }
 
+/** What the link row shows: the state and two actions. The look is up to the caller (a plain row or a card). */
+class YtLinkUi(
+    val linked: Boolean?,
+    /** The title of the connected channel, if the server returned it. Kept in memory only. */
+    val account: String?,
+    val waiting: Boolean,
+    val busy: Boolean,
+    val message: String?,
+    val connect: () -> Unit,
+    val disconnect: () -> Unit,
+)
+
+internal fun ytLinkSubtitle(ui: YtLinkUi): String = when {
+    ui.linked == true -> ui.account?.let { tr("Connected as $it", "Підключено як $it") }
+        ?: tr("Connected, read-only", "Підключено, лише читання")
+    ui.waiting -> tr("Waiting for confirmation in the browser…", "Чекаємо підтвердження в браузері…")
+    else -> tr("Your playlists and liked videos, read-only", "Ваші плейлисти та вподобані відео, лише читання")
+}
+
 /**
  * Connect / disconnect your YouTube account (read-only). Sign-in happens on Google's page in the browser;
  * the token never reaches the app. The user must accept the YouTube terms and the privacy policy first.
+ * [content] draws the row; by default it is the plain row used on the YouTube screen.
  */
 @Composable
-fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = {}) {
+fun YouTubeLinkRow(
+    modifier: Modifier = Modifier,
+    onLinked: (Boolean) -> Unit = {},
+    content: @Composable (YtLinkUi) -> Unit = { DefaultYouTubeLinkRow(it) },
+) {
     val repo = remember { YouTubeLinkRepository() }
     val scope = rememberCoroutineScope()
     val openLink = rememberExternalLinkOpener()
     var linked by remember { mutableStateOf<Boolean?>(null) }
+    var account by remember { mutableStateOf<String?>(null) }
     var waiting by remember { mutableStateOf(false) }
     var askConsent by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
@@ -57,14 +84,18 @@ fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = 
     var message by remember { mutableStateOf<String?>(null) }
     val report by rememberUpdatedState(onLinked)
 
+    suspend fun status(): YtLinkStatus? = try {
+        repo.status()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
     LaunchedEffect(Unit) {
-        linked = try {
-            repo.isLinked()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            false
-        }
+        val st = status()
+        linked = st?.linked ?: false
+        account = if (st?.linked == true) st.account else null
     }
     LaunchedEffect(linked) { linked?.let { report(it) } }
 
@@ -73,15 +104,10 @@ fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = 
         if (!waiting) return@LaunchedEffect
         repeat(40) {
             delay(3000)
-            val ok = try {
-                repo.isLinked()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                false
-            }
-            if (ok) {
+            val st = status()
+            if (st?.linked == true) {
                 linked = true
+                account = st.account
                 waiting = false
                 return@LaunchedEffect
             }
@@ -101,31 +127,16 @@ fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = 
         }
     }
 
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("YouTube", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    when {
-                        linked == true -> tr("Connected, read-only", "Підключено, лише читання")
-                        waiting -> tr("Waiting for confirmation in the browser…", "Чекаємо підтвердження в браузері…")
-                        else -> tr("Your playlists and liked videos, read-only", "Ваші плейлисти та вподобані відео, лише читання")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (linked == true) {
-                TextButton(onClick = { confirm = true }, enabled = !busy) { Text(tr("Disconnect", "Відключити")) }
-            } else {
-                Button(onClick = { askConsent = true }, enabled = linked != null && !waiting) {
-                    Text(tr("Connect", "Підключити"))
-                }
-            }
-        }
-        if (waiting) LinearProgressIndicator(Modifier.fillMaxWidth())
-        message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-    }
+    val ui = YtLinkUi(
+        linked = linked,
+        account = account,
+        waiting = waiting,
+        busy = busy,
+        message = message,
+        connect = { askConsent = true },
+        disconnect = { confirm = true },
+    )
+    Box(modifier.fillMaxWidth()) { content(ui) }
 
     // The consent gate shows the YouTube terms and the privacy policy if they were not accepted yet
     if (askConsent) {
@@ -137,7 +148,7 @@ fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = 
                 YouTubeConsentGate(onLeave = { askConsent = false }) {
                     LaunchedEffect(Unit) {
                         askConsent = false
-                        // Окно закрывается прямо сейчас, поэтому запрос идёт во внешней области
+                        // The dialog closes right now, so the request runs in the outer scope
                         scope.launch { connect() }
                     }
                 }
@@ -165,6 +176,7 @@ fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = 
                         try {
                             repo.disconnect()
                             linked = false
+                            account = null
                             message = null
                         } catch (e: CancellationException) {
                             throw e
@@ -178,5 +190,30 @@ fun YouTubeLinkRow(modifier: Modifier = Modifier, onLinked: (Boolean) -> Unit = 
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text(S.cancel) } },
         )
+    }
+}
+
+@Composable
+private fun DefaultYouTubeLinkRow(ui: YtLinkUi) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("YouTube", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    ytLinkSubtitle(ui),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (ui.linked == true) {
+                TextButton(onClick = ui.disconnect, enabled = !ui.busy) { Text(tr("Disconnect", "Відключити")) }
+            } else {
+                Button(onClick = ui.connect, enabled = ui.linked != null && !ui.waiting) {
+                    Text(tr("Connect", "Підключити"))
+                }
+            }
+        }
+        if (ui.waiting) LinearProgressIndicator(Modifier.fillMaxWidth())
+        ui.message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
     }
 }
