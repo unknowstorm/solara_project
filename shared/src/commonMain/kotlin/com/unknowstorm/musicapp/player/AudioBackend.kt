@@ -39,6 +39,44 @@ data class QueueItem(
 
 private val EmptyQueue: StateFlow<List<QueueItem>> = MutableStateFlow(emptyList<QueueItem>()).asStateFlow()
 
+/** Одна полоса эквалайзера: центральная частота в Гц и допустимый диапазон уровня в миллибелах (100 = 1 дБ). */
+data class EqualizerBand(val centerHz: Int, val minLevel: Int, val maxLevel: Int)
+
+/** Что умеет эквалайзер устройства: полосы и названия системных пресетов. */
+data class EqualizerInfo(val bands: List<EqualizerBand>, val presets: List<String>)
+
+/** Настройки эквалайзера. [levels] идут по полосам, в миллибелах; пустой список = все по нулям. */
+data class EqualizerSettings(val enabled: Boolean = false, val levels: List<Int> = emptyList()) {
+    fun encode(): String = "e=" + (if (enabled) "1" else "0") + ";l=" + levels.joinToString(",")
+
+    companion object {
+        fun decode(raw: String?): EqualizerSettings {
+            if (raw.isNullOrBlank()) return EqualizerSettings()
+            var enabled = false
+            var levels = emptyList<Int>()
+            raw.split(';').forEach { part ->
+                val pieces = part.split('=', limit = 2)
+                val value = pieces.getOrElse(1) { "" }
+                when (pieces[0]) {
+                    "e" -> enabled = value == "1"
+                    "l" -> levels = value.split(',').mapNotNull { it.trim().toIntOrNull() }
+                }
+            }
+            return EqualizerSettings(enabled, levels)
+        }
+    }
+}
+
+/** Управление эквалайзером. Есть только там, где платформа его поддерживает (сейчас Android). */
+interface EqualizerController {
+    /** null, пока эффект не создан или устройство его не поддерживает. */
+    val info: StateFlow<EqualizerInfo?>
+    /** Применяет настройки сразу; если эффект ещё не создан, запоминает и применит при создании. */
+    fun apply(settings: EqualizerSettings)
+    /** Уровни полос системного пресета с номером [index]. */
+    fun presetLevels(index: Int): List<Int>
+}
+
 /** Sound playback. Each platform has its own implementation. */
 interface AudioBackend {
     val state: StateFlow<PlaybackState>
@@ -63,6 +101,9 @@ interface AudioBackend {
     fun removeAt(index: Int) {}
     /** Moves a queue item (drag and drop). Platforms without queue support ignore it. */
     fun moveItem(from: Int, to: Int) {}
+
+    /** Эквалайзер. null там, где он не реализован (Desktop). */
+    val equalizer: EqualizerController? get() = null
 }
 
 @Composable

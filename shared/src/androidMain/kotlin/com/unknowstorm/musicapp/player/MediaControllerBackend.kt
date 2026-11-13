@@ -31,6 +31,8 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     private val _queue = MutableStateFlow<List<QueueItem>>(emptyList())
     override val queue: StateFlow<List<QueueItem>> = _queue.asStateFlow()
 
+    override val equalizer: EqualizerController? = EqualizerEngine
+
     private val handler = Handler(Looper.getMainLooper())
     private var controller: MediaController? = null
     private var pendingQueue: Pair<List<MediaItem>, Int>? = null
