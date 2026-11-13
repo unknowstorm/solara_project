@@ -114,7 +114,7 @@ private fun DocumentationSheet(onDismiss: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun SettingsSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),

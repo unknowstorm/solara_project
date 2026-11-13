@@ -1,6 +1,17 @@
 package com.unknowstorm.musicapp.ui
 
 import com.unknowstorm.musicapp.i18n.S
+import com.unknowstorm.musicapp.i18n.tr
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.StrokeCap
+import com.unknowstorm.musicapp.player.EqualizerController
+import com.unknowstorm.musicapp.player.EqualizerSettings
+import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +35,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -60,8 +72,6 @@ import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.downloads.rememberDownloadPlatform
 import com.unknowstorm.musicapp.history.HistoryRepository
-import com.unknowstorm.musicapp.imports.ImportRepository
-import com.unknowstorm.musicapp.imports.ImportSection
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
@@ -70,6 +80,9 @@ import com.unknowstorm.musicapp.model.Service
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.provider.MusicProvider
 import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
+
+/** Ключ в текстовом хранилище для настроек эквалайзера. */
+private const val EQUALIZER_KEY = "equalizer_v1"
 
 enum class Tab(private val labelFn: () -> String) {
     HOME({ S.home }),
@@ -101,15 +114,6 @@ fun MainScreen(
         mutableFloatStateOf(pagerOrder(true).indexOf(if (showLikes) null else service).coerceAtLeast(0).toFloat())
     }
 
-    // After "Save" in the Island editor the selected service may turn out hidden: return to "All"
-    // so the pager does not stay on a page that no longer exists. "All" and Spotify (entry via "+") are not hideable.
-    val islandVisible = IslandSettings.visible()
-    LaunchedEffect(islandVisible) {
-        if (service != Service.ALL && service != Service.SPOTIFY && service !in islandVisible) {
-            service = Service.ALL
-        }
-    }
-
     val feeds = remember(providers, I18n.language) {
         providers.mapNotNull { provider ->
             val s = Service.entries.firstOrNull { it.name == provider.id.toString() }
@@ -120,8 +124,6 @@ fun MainScreen(
         if (s == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == s }
 
     val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
-    val importRepo = remember(authRepo, likes, playlists) { ImportRepository(authRepo, likes, playlists) }
-    androidx.compose.runtime.SideEffect { com.unknowstorm.musicapp.imports.ImportHolder.repo = importRepo }
 
     val ytScope = rememberCoroutineScope()
     val session = remember { YouTubeSession(ytScope) }
@@ -136,6 +138,9 @@ fun MainScreen(
     }
     val playback by audio.state.collectAsState()
     val queueTexts = rememberTextStore()
+    // Сохранённый эквалайзер применяется при старте, а не только когда открыта шторка
+    val equalizer = audio.equalizer
+    LaunchedEffect(equalizer) { equalizer?.apply(EqualizerSettings.decode(queueTexts.get(EQUALIZER_KEY))) }
     val queueStore = remember(queueTexts) { QueueStore(queueTexts) }
     QueuePersistence(audio, queueStore)
     val localLibrary = remember(queueTexts) { LocalLibrary(queueTexts) }
@@ -215,7 +220,7 @@ fun MainScreen(
                     }
                     Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes, downloads = downloads)
                     Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore, downloads)
-                    Tab.SETTINGS -> SettingsScreen(authRepo, onOpenAuth, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY })
+                    Tab.SETTINGS -> SettingsScreen(authRepo, audio, onOpenAuth)
                 }
                 openPlaylist?.let { pl ->
                     PlaylistScreen(pl, playlists, providers, audio, onBack = { openPlaylist = null })
@@ -285,10 +290,9 @@ private const val SETTINGS_GENERAL = "General"
 private const val SETTINGS_SOUNDS = "Sounds"
 private const val SETTINGS_STORAGE = "Storage cache"
 private const val SETTINGS_STATUS = "System status"
-private const val SETTINGS_SPOTIFY = "Spotify"
 
 @Composable
-private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit, onOpenSpotify: () -> Unit = {}) {
+private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpenAuth: () -> Unit) {
     val scope = rememberCoroutineScope()
     Column(
         Modifier
@@ -320,31 +324,36 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit, onO
         }
         Spacer(Modifier.height(20.dp))
 
-        SettingsSection(SETTINGS_GENERAL, IconTune) {
+        SettingsSection(SETTINGS_GENERAL) {
             GeneralSettings()
         }
         Spacer(Modifier.height(4.dp))
 
-        // Jamendo and Audius import (public profile) and the YouTube link: all accounts in one place
-        SettingsSection(S.accountsAndImport, IconLink) {
-            AccountsSection(com.unknowstorm.musicapp.imports.ImportHolder.repo, onOpenSpotify, Modifier.padding(horizontal = 4.dp))
-        }
-        Spacer(Modifier.height(4.dp))
-
-
-        // Placeholder: no equalizer / sound settings in the code yet
-        SettingsSection(SETTINGS_SOUNDS, IconVolume) {
-            SettingsGroup(listOf { shape -> SettingsRow(shape, "Coming soon") })
+        SettingsSection(SETTINGS_SOUNDS) {
+            var showEqualizer by remember { mutableStateOf(false) }
+            val eq = audio.equalizer
+            SettingsGroup(
+                listOf { shape ->
+                    SettingsRow(
+                        shape,
+                        tr("Equalizer", "Еквалайзер"),
+                        subtitle = if (eq == null) tr("Android only", "Лише Android") else null,
+                        tile = { EqualizerTileIcon() },
+                        onClick = if (eq != null) ({ showEqualizer = true }) else null,
+                    )
+                }
+            )
+            if (showEqualizer && eq != null) EqualizerSheet(eq) { showEqualizer = false }
         }
         Spacer(Modifier.height(4.dp))
 
         // Placeholder: no cache settings in the code yet
-        SettingsSection(SETTINGS_STORAGE, IconStorage) {
+        SettingsSection(SETTINGS_STORAGE) {
             SettingsGroup(listOf { shape -> SettingsRow(shape, "Coming soon") })
         }
         Spacer(Modifier.height(4.dp))
 
-        SettingsSection(SETTINGS_STATUS, IconInfo) {
+        SettingsSection(SETTINGS_STATUS) {
             SettingsGroup(
                 Service.entries.filter { it != Service.ALL }.map { service ->
                     val row: @Composable (Shape) -> Unit = { shape ->
@@ -359,30 +368,17 @@ private fun SettingsScreen(authRepo: AuthRepository, onOpenAuth: () -> Unit, onO
                 }
             )
         }
-
-        // Account actions (the redesign dropped them): only for a signed-in user
-        if (authState is AuthState.SignedIn) {
-            Spacer(Modifier.height(12.dp))
-            val accountRows: List<@Composable (Shape) -> Unit> = listOf(
-                { shape -> SettingsRow(shape, S.changePassword, onClick = { showChangePassword = true }) },
-                { shape -> SettingsRow(shape, S.signOut, onClick = { scope.launch { authRepo.signOut() } }) },
-            )
-            SettingsGroup(accountRows)
-        }
     }
 }
 
 /** A settings tab: a plain large row (no card, no arrow) with a softly rounded highlight; the group opens below it. */
 @Composable
-private fun SettingsSection(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
+private fun SettingsSection(title: String, content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             headlineContent = { Text(title, style = MaterialTheme.typography.headlineSmall) },
-            leadingContent = if (icon != null) ({
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
-            }) else null,
             // clip first, then clickable: the press highlight gets the rounded shape
             modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable { open = !open },
         )
@@ -463,30 +459,6 @@ private fun settingsVector(path: String): ImageVector =
         viewportHeight = 24f,
     ).addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black)).build()
 
-private val IconTune: ImageVector by lazy {
-    settingsVector("M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z")
-}
-
-private val IconVolume: ImageVector by lazy {
-    settingsVector("M3,9v6h4l5,5V4L7,9H3zM16.5,12c0,-1.77 -1.02,-3.29 -2.5,-4.03v8.05c1.48,-0.73 2.5,-2.25 2.5,-4.02zM14,3.23v2.06c2.89,0.86 5,3.54 5,6.71s-2.11,5.85 -5,6.71v2.06c4.01,-0.91 7,-4.49 7,-8.77s-2.99,-7.86 -7,-8.77z")
-}
-
-private val IconStorage: ImageVector by lazy {
-    settingsVector("M2,20h20v-4H2v4zM4,17h2v2H4v-2zM2,4v4h20V4H2zM6,7H4V5h2v2zM2,14h20v-4H2v4zM4,11h2v2H4v-2z")
-}
-
-private val IconInfo: ImageVector by lazy {
-    settingsVector("M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2V7h2v2z")
-}
-
-private val IconLink: ImageVector by lazy {
-    settingsVector(
-        "M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1z" +
-            "M8,13h8v-2H8v2z" +
-            "M17,7h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"
-    )
-}
-
 private val IconLock: ImageVector by lazy {
     settingsVector(
         "M18,8h-1V6c0,-2.76 -2.24,-5 -5,-5S7,3.24 7,6v2H6c-1.1,0 -2,0.9 -2,2v10c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V10" +
@@ -497,4 +469,109 @@ private val IconLock: ImageVector by lazy {
 
 private val IconLogout: ImageVector by lazy {
     settingsVector("M17,7l-1.41,1.41L18.17,11H8v2h10.17l-2.58,2.58L17,17l5,-5zM4,5h8V3H4c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h8v-2H4V5z")
+}
+/** Иконка плитки эквалайзера: три вертикальные полосы с ползунками. */
+@Composable
+private fun EqualizerTileIcon() {
+    val color = MaterialTheme.colorScheme.onSurface
+    Canvas(Modifier.size(28.dp)) {
+        val w = size.width
+        val h = size.height
+        listOf(0.25f to 0.35f, 0.5f to 0.65f, 0.75f to 0.45f).forEach { (x, knob) ->
+            drawLine(color, Offset(x * w, h * 0.15f), Offset(x * w, h * 0.85f), w * 0.07f, StrokeCap.Round)
+            drawCircle(color, radius = w * 0.1f, center = Offset(x * w, knob * h))
+        }
+    }
+}
+
+/**
+ * Шторка эквалайзера: переключатель, пресеты устройства и слайдер на каждую полосу.
+ * Звук меняется сразу, пока двигаешь слайдер; в хранилище пишем, когда отпустил.
+ */
+@Composable
+private fun EqualizerSheet(controller: EqualizerController, onDismiss: () -> Unit) {
+    val store = rememberTextStore()
+    val info by controller.info.collectAsState()
+    var settings by remember { mutableStateOf(EqualizerSettings.decode(store.get(EQUALIZER_KEY))) }
+
+    fun change(new: EqualizerSettings, save: Boolean) {
+        settings = new
+        controller.apply(new)
+        if (save) store.set(EQUALIZER_KEY, new.encode())
+    }
+
+    SettingsSheet(tr("Equalizer", "Еквалайзер"), onDismiss = onDismiss) {
+        val current = info
+        if (current == null) {
+            Text(
+                tr("The equalizer is not available on this device", "Еквалайзер недоступний на цьому пристрої"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@SettingsSheet
+        }
+        val levels = if (settings.levels.size == current.bands.size) settings.levels else List(current.bands.size) { 0 }
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("Enabled", "Увімкнено"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Switch(
+                checked = settings.enabled,
+                onCheckedChange = { change(settings.copy(enabled = it, levels = levels), save = true) },
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+
+        if (current.presets.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                current.presets.forEachIndexed { index, name ->
+                    AssistChip(
+                        onClick = {
+                            val preset = controller.presetLevels(index)
+                            if (preset.size == current.bands.size) change(EqualizerSettings(true, preset), save = true)
+                        },
+                        label = { Text(name) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+
+        current.bands.forEachIndexed { i, band ->
+            val level = levels[i]
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (band.centerHz >= 1000) "${(band.centerHz / 100) / 10.0} kHz" else "${band.centerHz} Hz",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.width(64.dp),
+                )
+                Slider(
+                    value = level.toFloat(),
+                    onValueChange = { v ->
+                        change(settings.copy(levels = levels.toMutableList().also { it[i] = v.roundToInt() }), save = false)
+                    },
+                    onValueChangeFinished = { store.set(EQUALIZER_KEY, settings.encode()) },
+                    valueRange = band.minLevel.toFloat()..band.maxLevel.toFloat(),
+                    enabled = settings.enabled,
+                    modifier = Modifier.weight(1f),
+                )
+                val db = (level / 10f).roundToInt() / 10f
+                Text(
+                    (if (db > 0f) "+" else "") + db + " dB",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(64.dp),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            TextButton(onClick = { change(settings.copy(levels = List(current.bands.size) { 0 }), save = true) }) {
+                Text(tr("Reset", "Скинути"))
+            }
+        }
+    }
 }
