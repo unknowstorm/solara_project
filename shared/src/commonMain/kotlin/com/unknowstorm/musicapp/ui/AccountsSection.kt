@@ -209,7 +209,9 @@ private fun YouTubeCard() {
             logo = { ServiceLogo(Service.YOUTUBE, Modifier.size(28.dp), colors.onTertiaryContainer) },
             onClick = if (ui.linked == true) ({ expanded = !expanded }) else null,
         ) {
-            AnimatedVisibility(expanded || ui.linked != true) {
+            // While the status is still unknown (linked == null) nothing is shown: otherwise the card opens,
+            // and when the status arrives the closing animation briefly shows the "connected" content
+            AnimatedVisibility(expanded || ui.linked == false) {
                 Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (ui.linked == true) {
                         TextButton(onClick = ui.disconnect, enabled = !ui.busy) { Text(S.disconnectAccount) }
