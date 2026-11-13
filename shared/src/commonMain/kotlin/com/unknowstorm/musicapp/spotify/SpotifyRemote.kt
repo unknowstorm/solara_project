@@ -16,6 +16,41 @@ data class SpotifyItem(
 /** A row (shelf) of Spotify recommendations: title and items. */
 data class SpotifyShelf(val title: String, val items: List<SpotifyItem>)
 
+enum class LibraryStatus { IDLE, AUTHORIZING, LOADING, READY, ERROR }
+
+/** A track of the user's library (Web API). Memory only. position is its index inside the playlist (for the playback context). */
+data class SpotifyLibTrack(
+    val uri: String,
+    val title: String,
+    val artist: String,
+    val imageUrl: String?,
+    val position: Int = 0,
+)
+
+data class SpotifyLibPlaylist(
+    val id: String,
+    val uri: String,
+    val name: String,
+    val owner: String?,
+    val trackCount: Int?,
+    val imageUrl: String?,
+    /** Spotify gives the contents only of playlists the user owns or collaborates on. */
+    val readable: Boolean,
+)
+
+/** The imported library: lives only in memory and is erased on disconnect. */
+data class SpotifyLibrary(
+    val status: LibraryStatus = LibraryStatus.IDLE,
+    val error: String? = null,
+    val playlists: List<SpotifyLibPlaylist> = emptyList(),
+    val saved: List<SpotifyLibTrack> = emptyList(),
+    val savedTotal: Int? = null,
+    val openPlaylist: SpotifyLibPlaylist? = null,
+    val playlistTracks: List<SpotifyLibTrack>? = null,
+    /** An encrypted refresh token is stored on this device, so the import repeats by itself. */
+    val autoImport: Boolean = false,
+)
+
 /** Spotify state lives only in memory. Nothing from it is saved. */
 data class SpotifyState(
     val appInstalled: Boolean = true,
@@ -43,6 +78,7 @@ data class SpotifyState(
     val browseHeader: SpotifyItem? = null,
     val covers: Map<String, ImageBitmap> = emptyMap(),
     val shelves: List<SpotifyShelf>? = null,
+    val library: SpotifyLibrary = SpotifyLibrary(),
 )
 
 interface SpotifyRemote {
@@ -69,6 +105,16 @@ interface SpotifyRemote {
     fun openByUri(uri: String) {}
     /** Plays an album or playlist from the given track index, so "next" follows the list. */
     fun playInContext(contextUri: String, index: Int, item: SpotifyItem? = null) {}
+    /** Sign in (PKCE, read-only) and read the user's playlists and saved tracks into memory. */
+    fun importLibrary() {}
+    /** Called when the Spotify section opens: repeats the import without a tap if the user imported before. */
+    fun autoImportLibrary() {}
+    /** Deletes the stored token (the library already on screen stays until the app is closed). */
+    fun disableAutoImport() {}
+    fun openLibraryPlaylist(playlist: SpotifyLibPlaylist) {}
+    fun closeLibraryPlaylist() {}
+    /** Erases the token and everything imported from memory. */
+    fun forgetLibrary() {}
 }
 
 val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }

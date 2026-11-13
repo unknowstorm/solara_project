@@ -55,7 +55,13 @@ fun SpotifyScreen(
     val s = remote?.state?.collectAsState()?.value
     PlatformBackHandler(
         enabled = !ui.expanded,
-        onBack = { if (s?.browse != null) remote.closeBrowse() else onBack() },
+        onBack = {
+            when {
+                s?.library?.openPlaylist != null -> remote.closeLibraryPlaylist()
+                s?.browse != null -> remote.closeBrowse()
+                else -> onBack()
+            }
+        },
     )
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         // Spotify rules: its brand does not stand next to the brands of other services, so there is no bar with their logos here
@@ -63,7 +69,13 @@ fun SpotifyScreen(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = { if (s?.browse != null) remote?.closeBrowse() else onBack() }) { Text(S.back) }
+            TextButton(onClick = {
+                when {
+                    s?.library?.openPlaylist != null -> remote.closeLibraryPlaylist()
+                    s?.browse != null -> remote.closeBrowse()
+                    else -> onBack()
+                }
+            }) { Text(S.back) }
         }
         if (remote == null || s == null) {
             StatusColumn {
@@ -160,6 +172,7 @@ private fun SpotifyRowLabel(text: String) {
 private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: () -> Unit) {
     val ui = LocalSpotifyMini.current
     LaunchedEffect(Unit) { if (s.shelves == null) remote.loadRecommended() }
+    LaunchedEffect(Unit) { remote.autoImportLibrary() }
 
     val play: (SpotifyItem) -> Unit = { item ->
         onBeforePlay(); ui.dismissedUri = null; remote.playUri(item.uri)
@@ -203,6 +216,11 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
         return
     }
 
+    s.library.openPlaylist?.let { pl ->
+        SpotifyLibraryPlaylistView(remote, s, pl, onBeforePlay)
+        return
+    }
+
     LazyColumn(Modifier.fillMaxSize(), state = homeListState, contentPadding = PaddingValues(bottom = 16.dp)) {
         item(key = "header") {
             SpotifyHeader(S.youCanPlayMusicFrom)
@@ -213,6 +231,8 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
                 Text(message, Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.error)
             }
         }
+
+        if (s.browse == null) spotifyLibraryItems(remote, s, onBeforePlay)
 
         val browse = s.browse
         if (browse != null) {
