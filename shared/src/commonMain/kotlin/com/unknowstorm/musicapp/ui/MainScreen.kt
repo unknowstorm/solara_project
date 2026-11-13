@@ -121,6 +121,7 @@ fun MainScreen(
 
     val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
     val importRepo = remember(authRepo, likes, playlists) { ImportRepository(authRepo, likes, playlists) }
+    androidx.compose.runtime.SideEffect { com.unknowstorm.musicapp.imports.ImportHolder.repo = importRepo }
 
     val ytScope = rememberCoroutineScope()
     val session = remember { YouTubeSession(ytScope) }

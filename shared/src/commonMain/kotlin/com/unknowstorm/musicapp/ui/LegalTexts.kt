@@ -58,7 +58,7 @@ object LegalTexts {
         1. Who is responsible for the data. The Solara project (a student project). Contact: $CONTACT_EMAIL.
 
         2. What data we process.
-        • Account: email address, nickname, avatar and settings. When you sign in with Google, we receive your Google profile name, email address and photo. We do not request access to your YouTube account data.
+        • Account: email address, nickname, avatar and settings. When you sign in with Google, we receive your Google profile name, email address and photo. We request access to your YouTube account data only if you connect it yourself (see section 3).
         • Library: likes, playlists and listening history for music from Jamendo, Audius, Deezer and local files. They are used for recommendations. Spotify and YouTube data does not enter the library.
         • Imports: if you connect a Jamendo or Audius account, we store its public ID and name, the date of the last import, and the likes and playlists read from the public profile (track titles, artists, artwork links and order). Imported items are marked as imported.
         • Technical data: your IP address and device information are passed to the services the app contacts (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
@@ -69,6 +69,10 @@ object LegalTexts {
         • The video you pick from the list starts automatically. Therefore the YouTube player collects and transmits device and app data already when it loads and while it plays, not after a separate “Play” tap. A video never starts on its own without your selection.
         • YouTube search results are kept only in the memory of the running app. Solara does not save videos and does not add YouTube data to likes, playlists, history or recommendations.
         • Videos marked by YouTube as “made for kids” are not shown in Solara.
+        • Connecting your YouTube account is optional and starts only when you tap “Connect”. You sign in on Google's own page; Solara never sees your Google password. Solara asks only for read-only access (youtube.readonly) to your playlists and liked videos.
+        • These playlists and liked videos are read through the YouTube API and shown only in the YouTube section. They are kept only in the memory of the running app, are not stored on our server, are not added to likes, playlists, history, recommendations or the queue, and are not mixed with other sources.
+        • On our server we store only an encrypted token that lets Solara read your YouTube data again, and the date of connection. The token is not available to the app on your device. We check regularly that access has not been revoked.
+        • “Disconnect” revokes the token at Google and deletes it from our server right away. This does not affect your data on YouTube itself. If you revoke access on Google's page ($GOOGLE_PERMISSIONS_URL), we delete the stored token within 30 days. Deleting your Solara account also deletes the token.
 
         4. Spotify. The Spotify section controls the Spotify app on your device; the Spotify app itself plays the music (Spotify Premium is required). Spotify terms: $SPOTIFY_TERMS_URL. Spotify Privacy Policy: $SPOTIFY_PRIVACY_URL.
         • After connecting, Solara receives from the Spotify app the title and artist of the current track, the artwork, the playback state and position, and Spotify's recommendation collections, in order to show them in the mini-player, the player and the Spotify section.
@@ -88,7 +92,7 @@ object LegalTexts {
 
         7. Cookies and on-device data. The embedded YouTube player may store cookies. The app stores local settings, for example your agreement to the terms.
 
-        8. Your rights. You can request deletion of your data and account by writing to $CONTACT_EMAIL. Imported data can also be deleted in the app: Settings → “Disconnect” with the option “Also delete imported tracks and playlists”.
+        8. Your rights. You can request deletion of your data and account by writing to $CONTACT_EMAIL. Imported data can also be deleted in the app: Settings → “Disconnect” with the option “Also delete imported tracks and playlists”. The YouTube connection is removed with “Disconnect” (it revokes the token and deletes it from our server).
 
         9. Google access. If you signed in with Google, you can revoke access at: $GOOGLE_PERMISSIONS_URL.
 
@@ -127,7 +131,7 @@ object LegalTexts {
         1. Хто відповідає за дані. Проєкт Solara (навчальний проєкт). Контакт: $CONTACT_EMAIL.
 
         2. Які дані ми обробляємо.
-        • Акаунт: адреса електронної пошти, нікнейм, аватар і налаштування. Під час входу через Google ми отримуємо ім’я, адресу пошти та фото вашого профілю Google. Ми не запитуємо доступ до даних вашого акаунта YouTube.
+        • Акаунт: адреса електронної пошти, нікнейм, аватар і налаштування. Під час входу через Google ми отримуємо ім’я, адресу пошти та фото вашого профілю Google. Ми запитуємо доступ до даних вашого акаунта YouTube лише якщо ви підключите його самі (див. розділ 3).
         • Бібліотека: вподобання, плейлисти та історія прослуховування музики з Jamendo, Audius, Deezer і локальних файлів. Вони використовуються для рекомендацій. Дані Spotify і YouTube до бібліотеки не потрапляють.
         • Імпорт: якщо ви підключаєте акаунт Jamendo або Audius, ми зберігаємо його публічний id та ім’я, дату останнього імпорту й вподобання та плейлисти, прочитані з публічного профілю (назви треків, виконавці, посилання на обкладинки та порядок). Імпортовані елементи позначаються як імпортовані.
         • Технічні дані: IP-адреса та відомості про пристрій передаються сервісам, до яких звертається застосунок (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
@@ -138,6 +142,10 @@ object LegalTexts {
         • Відео, яке ви вибрали у списку, запускається автоматично. Тому плеєр YouTube збирає й передає дані про пристрій і застосунок уже під час завантаження та відтворення, а не після окремого натискання «Play». Відео ніколи не запускається саме без вашого вибору.
         • Результати пошуку YouTube зберігаються лише в пам’яті запущеного застосунку. Solara не зберігає відео й не додає дані YouTube до вподобань, плейлистів, історії та рекомендацій.
         • Відео, позначені YouTube як «для дітей», у Solara не показуються.
+        • Підключення акаунта YouTube є добровільним і починається лише після натискання «Підключити». Ви входите на сторінці самого Google; Solara не бачить ваш пароль Google. Solara запитує лише доступ на читання (youtube.readonly) до ваших плейлистів і вподобаних відео.
+        • Ці плейлисти та вподобані відео читаються через YouTube API й показуються лише в розділі YouTube. Вони зберігаються лише в пам’яті запущеного застосунку, не зберігаються на нашому сервері, не додаються до вподобань, плейлистів, історії, рекомендацій і черги та не змішуються з іншими джерелами.
+        • На нашому сервері ми зберігаємо лише зашифрований токен, який дозволяє Solara знову читати ваші дані YouTube, і дату підключення. Токен недоступний застосунку на вашому пристрої. Ми регулярно перевіряємо, чи не відкликано доступ.
+        • «Відключити» відкликає токен у Google і одразу видаляє його з нашого сервера. Це не зачіпає ваші дані на самому YouTube. Якщо ви відкличете доступ на сторінці Google ($GOOGLE_PERMISSIONS_URL), ми видалимо збережений токен протягом 30 днів. Видалення акаунта Solara також видаляє токен.
 
         4. Spotify. Розділ Spotify керує застосунком Spotify на вашому пристрої, музику відтворює сам застосунок Spotify (потрібен Spotify Premium). Умови Spotify: $SPOTIFY_TERMS_URL. Політика конфіденційності Spotify: $SPOTIFY_PRIVACY_URL.
         • Після підключення Solara отримує від застосунку Spotify назву та виконавця поточного треку, обкладинку, стан і позицію відтворення, а також добірки рекомендацій Spotify, щоб показати їх у міні-плеєрі, плеєрі та розділі Spotify.
@@ -157,7 +165,7 @@ object LegalTexts {
 
         7. Cookies і дані на пристрої. Вбудований плеєр YouTube може зберігати cookies. Застосунок зберігає локальні налаштування, наприклад вашу згоду з умовами.
 
-        8. Ваші права. Ви можете запросити видалення своїх даних і акаунта, написавши на $CONTACT_EMAIL. Імпортовані дані можна також видалити в застосунку: «Налаштування» → «Відключити» з позначкою «Також видалити імпортовані треки й плейлисти».
+        8. Ваші права. Ви можете запросити видалення своїх даних і акаунта, написавши на $CONTACT_EMAIL. Імпортовані дані можна також видалити в застосунку: «Налаштування» → «Відключити» з позначкою «Також видалити імпортовані треки й плейлисти». Підключення YouTube знімається кнопкою «Відключити» (вона відкликає токен і видаляє його з нашого сервера).
 
         9. Доступ Google. Якщо ви входили через Google, ви можете відкликати доступ на сторінці: $GOOGLE_PERMISSIONS_URL.
 
