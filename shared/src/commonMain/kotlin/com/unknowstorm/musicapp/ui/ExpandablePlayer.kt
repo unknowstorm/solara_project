@@ -41,7 +41,10 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LocalContentColor
@@ -72,6 +75,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -84,19 +88,25 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.toService
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.likes.asTrack
 import com.unknowstorm.musicapp.likes.containsTrack
 import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.player.RepeatMode
+import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -140,6 +150,7 @@ val LocalMiniPlayerAnchor = staticCompositionLocalOf { MiniPlayerAnchor() }
 fun ExpandablePlayer(
     audio: AudioBackend,
     likes: LikesRepository,
+    playlists: PlaylistsRepository,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     onNeedAuth: () -> Unit,
@@ -371,6 +382,7 @@ fun ExpandablePlayer(
                 FullContent(
                     audio = audio,
                     likes = likes,
+                    playlists = playlists,
                     onNeedAuth = onNeedAuth,
                     expandProgress = { progress.floatValue },
                     width = fullWidthDp,
@@ -395,7 +407,6 @@ fun ExpandablePlayer(
         }
     }
 }
-
 // ---------------------------------------------------------------------------------------------
 // Mini player (content). There is no cover here, an empty place instead; the cover is drawn by SharedCover.
 // ---------------------------------------------------------------------------------------------
@@ -635,6 +646,7 @@ private fun SharedCover(
 private fun FullContent(
     audio: AudioBackend,
     likes: LikesRepository,
+    playlists: PlaylistsRepository,
     onNeedAuth: () -> Unit,
     expandProgress: () -> Float,
     width: Dp,
@@ -654,6 +666,25 @@ private fun FullContent(
     val currentTrack = state.asTrack()
     val liked = likedTracks.containsTrack(currentTrack)
     var showDetails by remember { mutableStateOf(false) }
+
+    // The "⋮" menu and the "add to playlist" flow
+    val scope = rememberCoroutineScope()
+    val playlistsList by playlists.playlists.collectAsState()
+    val playlistsSignedIn by playlists.signedIn.collectAsState()
+    var menuOpen by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
+    var showCreate by remember { mutableStateOf(false) }
+    var playlistBusy by remember { mutableStateOf(false) }
+    var playlistError by remember { mutableStateOf<String?>(null) }
+    var playlistInfo by remember { mutableStateOf<String?>(null) }
+    val canAddToPlaylist = currentTrack != null &&
+        (currentTrack.provider == ProviderId.JAMENDO || currentTrack.provider == ProviderId.AUDIUS)
+    LaunchedEffect(playlistInfo) {
+        if (playlistInfo != null) {
+            delay(3000)
+            playlistInfo = null
+        }
+    }
 
     val trackProgress = if (state.durationMs > 0) {
         (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
@@ -726,10 +757,19 @@ private fun FullContent(
                 // Фиксированный слот: ссылка на источник или сообщение об ошибке, высота не зависит от трека
                 Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.CenterStart) {
                     val message = state.error ?: likeError
+                    val info = playlistInfo
                     if (message != null) {
                         Text(
                             message,
                             color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    } else if (info != null) {
+                        Text(
+                            info,
+                            color = active,
                             style = MaterialTheme.typography.bodySmall,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
@@ -744,12 +784,80 @@ private fun FullContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = { showDetails = true }) {
-                        MoreIcon()
+                    val dl = DownloadsHolder.manager
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            MoreIcon()
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(S.addToPlaylist) },
+                                leadingIcon = {
+                                    Icon(
+                                        PlayerMenuPlaylistAddIcon,
+                                        contentDescription = null,
+                                        tint = LocalContentColor.current.copy(alpha = if (canAddToPlaylist) 1f else 0.38f),
+                                    )
+                                },
+                                enabled = canAddToPlaylist,
+                                onClick = {
+                                    menuOpen = false
+                                    when {
+                                        currentTrack == null -> Unit
+                                        !playlistsSignedIn -> onNeedAuth()
+                                        else -> {
+                                            playlistError = null
+                                            showPicker = true
+                                        }
+                                    }
+                                },
+                            )
+                            if (dl != null && currentTrack != null && currentTrack.provider != ProviderId.DEEZER) {
+                                // Same rule as inside DownloadButton: it draws something only for Jamendo tracks
+                                // that the author allowed to download
+                                val canDownload = currentTrack.provider == ProviderId.JAMENDO && currentTrack.downloadable != false
+                                if (canDownload) {
+                                    // DownloadButton keeps its own state (progress / saved), so it is used as is.
+                                    // Fixed 48dp slot: the icon stays in the same column as the other menu icons.
+                                    Row(
+                                        Modifier.padding(end = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                            DownloadButton(currentTrack, dl)
+                                        }
+                                        Text(S.download, style = MaterialTheme.typography.bodyLarge)
+                                    }
+                                } else {
+                                    // Nothing to download for this track: keep the item, but dimmed and inactive
+                                    DropdownMenuItem(
+                                        text = { Text(S.download) },
+                                        leadingIcon = {
+                                            DownloadIcon(
+                                                Modifier.size(24.dp),
+                                                LocalContentColor.current.copy(alpha = 0.38f),
+                                            )
+                                        },
+                                        enabled = false,
+                                        onClick = {},
+                                    )
+                                }
+                            }
+                            DropdownMenuItem(
+                                text = { Text(S.trackDetails) },
+                                leadingIcon = { Icon(PlayerMenuInfoIcon, contentDescription = null) },
+                                onClick = {
+                                    menuOpen = false
+                                    showDetails = true
+                                },
+                            )
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val dl = DownloadsHolder.manager
-                        if (dl != null && currentTrack != null && currentTrack.provider != com.unknowstorm.musicapp.model.ProviderId.DEEZER) DownloadButton(currentTrack, dl)
                         IconButton(enabled = currentTrack?.provider != com.unknowstorm.musicapp.model.ProviderId.DEEZER, onClick = {
                             when {
                                 currentTrack == null -> Unit
@@ -840,9 +948,95 @@ private fun FullContent(
             text = { Text(S.artistSource(state.artist ?: "—", state.provider?.toService()?.title ?: "—")) },
         )
     }
+
+    if (showPicker) {
+        AddToPlaylistDialog(
+            playlists = playlistsList,
+            busy = playlistBusy,
+            error = playlistError,
+            onPick = { pl ->
+                val track = currentTrack
+                if (track != null) scope.launch {
+                    playlistBusy = true
+                    playlistError = null
+                    playlists.addTracks(pl.id, listOf(track))
+                        .onSuccess { added ->
+                            playlistInfo = if (added > 0) S.addedTo(pl.name) else S.alreadyIn(pl.name)
+                            showPicker = false
+                        }
+                        .onFailure { playlistError = it.message }
+                    playlistBusy = false
+                }
+            },
+            onNew = {
+                playlistError = null
+                showPicker = false
+                showCreate = true
+            },
+            onDismiss = {
+                playlistError = null
+                showPicker = false
+            },
+        )
+    }
+
+    if (showCreate) {
+        SavePlaylistDialog(
+            saving = playlistBusy,
+            error = playlistError,
+            onSave = { name ->
+                val track = currentTrack
+                if (track != null) scope.launch {
+                    playlistBusy = true
+                    playlistError = null
+                    playlists.create(name, listOf(track))
+                        .onSuccess {
+                            playlistInfo = S.playlistCreated(name.trim().take(100))
+                            showCreate = false
+                        }
+                        .onFailure { playlistError = it.message }
+                    playlistBusy = false
+                }
+            },
+            onDismiss = {
+                playlistError = null
+                showCreate = false
+            },
+            initialName = currentTrack?.title ?: S.myQueue,
+            title = S.createPlaylist,
+            confirmLabel = S.save,
+        )
+    }
 }
 
 private fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000
     return "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
+}
+
+// Icons for the player's overflow menu (24dp material paths, tinted by LocalContentColor)
+private fun playerMenuIcon(name: String, pathData: String): ImageVector =
+    ImageVector.Builder(
+        name = name,
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).addPath(
+        pathData = addPathNodes(pathData),
+        fill = SolidColor(Color.Black),
+    ).build()
+
+private val PlayerMenuPlaylistAddIcon: ImageVector by lazy {
+    playerMenuIcon(
+        "PlaylistAdd",
+        "M14,10H3v2h11V10zM14,6H3v2h11V6zM18,14v-4h-2v4h-4v2h4v4h2v-4h4v-2H18zM3,16h7v-2H3V16z",
+    )
+}
+
+private val PlayerMenuInfoIcon: ImageVector by lazy {
+    playerMenuIcon(
+        "Info",
+        "M11,7h2v2h-2zM11,11h2v6h-2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z",
+    )
 }

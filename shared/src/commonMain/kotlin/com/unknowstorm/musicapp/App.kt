@@ -185,6 +185,7 @@ private fun AppContent(boot: AppBoot) {
             ExpandablePlayer(
                 audio = audio,
                 likes = likes,
+                playlists = playlists,
                 expanded = showPlayer,
                 onExpandedChange = { showPlayer = it },
                 // A guest tapped ♡: collapse the player and open sign-in
