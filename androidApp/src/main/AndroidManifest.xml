@@ -58,6 +58,30 @@
         </service>
 
             <service android:name="com.unknowstorm.musicapp.spotify.SpotifyTaskGuard" android:exported="false" android:stopWithTask="false" />
+
+        <receiver
+            android:name="com.unknowstorm.musicapp.widget.SolaraWidget2x2Receiver"
+            android:exported="true"
+            android:label="@string/widget_2x2_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_2x2_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.unknowstorm.musicapp.widget.SolaraWidget4x1Receiver"
+            android:exported="true"
+            android:label="@string/widget_4x2_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_4x1_info" />
+        </receiver>
     </application>
 
 </manifest>

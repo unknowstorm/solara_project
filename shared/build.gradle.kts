@@ -41,6 +41,9 @@ kotlin {
             implementation(libs.androidx.media3.session)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.ktx)
+            // Виджеты (Material You)
+            implementation(libs.androidx.glance.appwidget)
+            implementation(libs.androidx.glance.material3)
         }
         jvmMain.dependencies {
             implementation(libs.ktor.client.okhttp)
@@ -76,6 +79,7 @@ kotlin {
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
+
 compose.resources {
     packageOfResClass = "com.unknowstorm.musicapp.resources"
 }
