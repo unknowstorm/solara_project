@@ -43,6 +43,11 @@ import com.unknowstorm.musicapp.imports.ImportRepository
 import com.unknowstorm.musicapp.imports.LinkedAccount
 import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Service
+import com.unknowstorm.musicapp.spotify.LibraryStatus
+import com.unknowstorm.musicapp.spotify.LocalSpotifyRemote
+import com.unknowstorm.musicapp.spotify.SpotifyState
+import androidx.compose.ui.platform.LocalUriHandler
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /** "Accounts and import": one rounded card per service, one column, in the style of the Library tiles. */
@@ -67,7 +72,7 @@ fun AccountsSection(repo: ImportRepository?, onOpenSpotify: () -> Unit = {}, mod
             }
         }
         YouTubeCard()
-        AddServiceButton(onOpenSpotify)
+        SpotifyOrAddButton(onOpenSpotify)
     }
 }
 
@@ -254,6 +259,65 @@ private fun AddServiceButton(onOpenSpotify: () -> Unit) {
                 text = { Text("Spotify") },
                 onClick = { open = false; onOpenSpotify() },
             )
+        }
+    }
+}
+
+
+/** Spotify card: shown only after the user connected Spotify; otherwise the "+" entry stays. Neutral colors, no logo. */
+@Composable
+private fun SpotifyOrAddButton(onOpenSpotify: () -> Unit) {
+    val remote = LocalSpotifyRemote.current
+    val flow = remember(remote) { remote?.state ?: MutableStateFlow(SpotifyState()) }
+    val st by flow.collectAsState()
+    val lib = st.library
+    val colors = MaterialTheme.colorScheme
+    val uriHandler = LocalUriHandler.current
+    var expanded by remember { mutableStateOf(false) }
+    val active = remote != null && (st.connected || st.connecting || lib.status != LibraryStatus.IDLE)
+    if (!active || remote == null) {
+        AddServiceButton(onOpenSpotify)
+        return
+    }
+    val subtitle = when {
+        lib.status == LibraryStatus.READY ->
+            lib.accountName?.let { tr("Connected as $it", "Підключено як $it") } ?: tr("Connected", "Підключено")
+        lib.status == LibraryStatus.LOADING || lib.status == LibraryStatus.AUTHORIZING || st.connecting ->
+            tr("Connecting…", "Підключення…")
+        st.connected -> tr("Spotify app connected", "Підключено застосунок Spotify")
+        else -> S.notConnected
+    }
+    AccountCardFrame(
+        container = colors.surfaceVariant,
+        content = colors.onSurfaceVariant,
+        title = "Spotify",
+        subtitle = subtitle,
+        logo = { Text("♪", style = MaterialTheme.typography.headlineSmall) },
+        onClick = { expanded = !expanded },
+    ) {
+        AnimatedVisibility(expanded) {
+            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onOpenSpotify) { Text(tr("Spotify section", "Розділ Spotify")) }
+                    TextButton(onClick = { if (st.appInstalled) remote.openSpotifyApp() else remote.getSpotifyApp() }) {
+                        Text(if (st.appInstalled) "Open Spotify" else "Get Spotify Free")
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { remote.forgetLibrary(); remote.disconnect() }) { Text(S.disconnectSpotify) }
+                    TextButton(onClick = { uriHandler.openUri(LegalTexts.SPOTIFY_APPS_URL) }) {
+                        Text(tr("Revoke access", "Відкликати доступ"))
+                    }
+                }
+                Text(
+                    tr(
+                        "Spotify data is kept only in memory and is erased when you disconnect or close the app.",
+                        "Дані Spotify зберігаються лише в пам’яті й стираються під час відключення або закриття застосунку.",
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                lib.error?.let { Text(it, color = colors.error, style = MaterialTheme.typography.bodySmall) }
+            }
         }
     }
 }

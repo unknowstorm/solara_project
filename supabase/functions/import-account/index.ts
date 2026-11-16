@@ -7,10 +7,28 @@ const MAX_LIKES = 200, MAX_PLAYLISTS = 20, MAX_PER_PLAYLIST = 200;
 type T = { provider: "JAMENDO" | "AUDIUS"; track_id: string; title: string; artist: string;
            artwork_url: string | null; duration_ms: number };
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Jamendo sometimes answers 200 with headers.status="failed" ("Internal Error") for a second or two:
+// retry such answers and 5xx a few times before giving up
 const j = async (url: string) => {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`${r.status} ${url.split("?")[0]}`);
-  return r.json();
+  let last = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (attempt) await sleep(700 * attempt);
+    try {
+      const r = await fetch(url);
+      if (r.status >= 500) { last = `${r.status} ${url.split("?")[0]}`; continue; }
+      if (!r.ok) throw new Error(`${r.status} ${url.split("?")[0]}`);
+      const d = await r.json();
+      if (d?.headers?.status === "failed" && /internal/i.test(String(d.headers.error_message ?? ""))) {
+        last = `jamendo: ${d.headers.error_message}`; continue;
+      }
+      return d;
+    } catch (e) {
+      if (attempt === 3) throw e;
+      last = String(e);
+    }
+  }
+  throw new Error(last || "fetch_failed");
 };
 
 // ---------- Jamendo ----------

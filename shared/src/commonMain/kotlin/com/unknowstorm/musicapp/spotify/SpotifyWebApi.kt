@@ -36,10 +36,14 @@ class SpotifyWebApi(private val clientId: String, private val redirectUri: Strin
 
     @Volatile private var token: String? = null
     @Volatile private var meId: String? = null
+    /** Spotify profile name of the signed-in user. Memory only; erased by clear(). */
+    @Volatile var accountName: String? = null
+        private set
 
     fun clear() {
         token = null
         meId = null
+        accountName = null
     }
 
     /** Returns the refresh token (null if Spotify did not issue one). */
@@ -73,7 +77,9 @@ class SpotifyWebApi(private val clientId: String, private val redirectUri: Strin
         }
         val o = json.parseToJsonElement(r.bodyAsText()).jsonObject
         token = o["access_token"].str() ?: throw SpotifyHttpError(0)
-        meId = get("/me")["id"].str()
+        val me = get("/me")
+        meId = me["id"].str()
+        accountName = me["display_name"].str()?.takeIf { it.isNotBlank() }
         return o["refresh_token"].str()
     }
 

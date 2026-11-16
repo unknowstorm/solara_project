@@ -35,8 +35,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -72,6 +72,8 @@ import com.unknowstorm.musicapp.auth.AuthState
 import com.unknowstorm.musicapp.downloads.DownloadManager
 import com.unknowstorm.musicapp.downloads.rememberDownloadPlatform
 import com.unknowstorm.musicapp.history.HistoryRepository
+import com.unknowstorm.musicapp.imports.ImportRepository
+import com.unknowstorm.musicapp.imports.ImportSection
 import com.unknowstorm.musicapp.likes.LikesRepository
 import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.recommendations.RecommendationsFeed
@@ -114,6 +116,15 @@ fun MainScreen(
         mutableFloatStateOf(pagerOrder(true).indexOf(if (showLikes) null else service).coerceAtLeast(0).toFloat())
     }
 
+    // After "Save" in the Island editor the selected service may turn out hidden: return to "All"
+    // so the pager does not stay on a page that no longer exists. "All" and Spotify (entry via "+") are not hideable.
+    val islandVisible = IslandSettings.visible()
+    LaunchedEffect(islandVisible) {
+        if (service != Service.ALL && service != Service.SPOTIFY && service !in islandVisible) {
+            service = Service.ALL
+        }
+    }
+
     val feeds = remember(providers, I18n.language) {
         providers.mapNotNull { provider ->
             val s = Service.entries.firstOrNull { it.name == provider.id.toString() }
@@ -124,6 +135,8 @@ fun MainScreen(
         if (s == Service.ALL) feeds.filter { it.service.kind == com.unknowstorm.musicapp.model.PlaybackKind.IN_APP } else feeds.filter { it.service == s }
 
     val recs = remember(providers, history, likes) { RecommendationsFeed(history, likes, providers) }
+    val importRepo = remember(authRepo, likes, playlists) { ImportRepository(authRepo, likes, playlists) }
+    androidx.compose.runtime.SideEffect { com.unknowstorm.musicapp.imports.ImportHolder.repo = importRepo }
 
     val ytScope = rememberCoroutineScope()
     val session = remember { YouTubeSession(ytScope) }
@@ -220,7 +233,7 @@ fun MainScreen(
                     }
                     Tab.SEARCH -> TrackListScreen(providers, audio, session, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY }, likes = likes, downloads = downloads)
                     Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore, downloads)
-                    Tab.SETTINGS -> SettingsScreen(authRepo, audio, onOpenAuth)
+                    Tab.SETTINGS -> SettingsScreen(authRepo, audio, onOpenAuth, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY })
                 }
                 openPlaylist?.let { pl ->
                     PlaylistScreen(pl, playlists, providers, audio, onBack = { openPlaylist = null })
@@ -290,9 +303,10 @@ private const val SETTINGS_GENERAL = "General"
 private const val SETTINGS_SOUNDS = "Sounds"
 private const val SETTINGS_STORAGE = "Storage cache"
 private const val SETTINGS_STATUS = "System status"
+private const val SETTINGS_SPOTIFY = "Spotify"
 
 @Composable
-private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpenAuth: () -> Unit) {
+private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpenAuth: () -> Unit, onOpenSpotify: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     Column(
         Modifier
@@ -324,12 +338,19 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
         }
         Spacer(Modifier.height(20.dp))
 
-        SettingsSection(SETTINGS_GENERAL) {
+        SettingsSection(SETTINGS_GENERAL, IconTune) {
             GeneralSettings()
         }
         Spacer(Modifier.height(4.dp))
 
-        SettingsSection(SETTINGS_SOUNDS) {
+        // Jamendo and Audius import (public profile) and the YouTube link: all accounts in one place
+        SettingsSection(S.accountsAndImport, IconLink) {
+            AccountsSection(com.unknowstorm.musicapp.imports.ImportHolder.repo, onOpenSpotify, Modifier.padding(horizontal = 4.dp))
+        }
+        Spacer(Modifier.height(4.dp))
+
+
+        SettingsSection(SETTINGS_SOUNDS, IconVolume) {
             var showEqualizer by remember { mutableStateOf(false) }
             val eq = audio.equalizer
             SettingsGroup(
@@ -348,12 +369,12 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
         Spacer(Modifier.height(4.dp))
 
         // Placeholder: no cache settings in the code yet
-        SettingsSection(SETTINGS_STORAGE) {
+        SettingsSection(SETTINGS_STORAGE, IconStorage) {
             SettingsGroup(listOf { shape -> SettingsRow(shape, "Coming soon") })
         }
         Spacer(Modifier.height(4.dp))
 
-        SettingsSection(SETTINGS_STATUS) {
+        SettingsSection(SETTINGS_STATUS, IconInfo) {
             SettingsGroup(
                 Service.entries.filter { it != Service.ALL }.map { service ->
                     val row: @Composable (Shape) -> Unit = { shape ->
@@ -368,17 +389,30 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
                 }
             )
         }
+
+        // Account actions (the redesign dropped them): only for a signed-in user
+        if (authState is AuthState.SignedIn) {
+            Spacer(Modifier.height(12.dp))
+            val accountRows: List<@Composable (Shape) -> Unit> = listOf(
+                { shape -> SettingsRow(shape, S.changePassword, onClick = { showChangePassword = true }) },
+                { shape -> SettingsRow(shape, S.signOut, onClick = { scope.launch { authRepo.signOut() } }) },
+            )
+            SettingsGroup(accountRows)
+        }
     }
 }
 
 /** A settings tab: a plain large row (no card, no arrow) with a softly rounded highlight; the group opens below it. */
 @Composable
-private fun SettingsSection(title: String, content: @Composable () -> Unit) {
+private fun SettingsSection(title: String, icon: ImageVector? = null, content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         ListItem(
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             headlineContent = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+            leadingContent = if (icon != null) ({
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
+            }) else null,
             // clip first, then clickable: the press highlight gets the rounded shape
             modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable { open = !open },
         )
@@ -458,6 +492,30 @@ private fun settingsVector(path: String): ImageVector =
         viewportWidth = 24f,
         viewportHeight = 24f,
     ).addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black)).build()
+
+private val IconTune: ImageVector by lazy {
+    settingsVector("M3,17v2h6v-2H3zM3,5v2h10V5H3zM13,21v-2h8v-2h-8v-2h-2v6h2zM7,9v2H3v2h4v2h2V9H7zM21,13v-2H11v2h10zM15,9h2V7h4V5h-4V3h-2v6z")
+}
+
+private val IconVolume: ImageVector by lazy {
+    settingsVector("M3,9v6h4l5,5V4L7,9H3zM16.5,12c0,-1.77 -1.02,-3.29 -2.5,-4.03v8.05c1.48,-0.73 2.5,-2.25 2.5,-4.02zM14,3.23v2.06c2.89,0.86 5,3.54 5,6.71s-2.11,5.85 -5,6.71v2.06c4.01,-0.91 7,-4.49 7,-8.77s-2.99,-7.86 -7,-8.77z")
+}
+
+private val IconStorage: ImageVector by lazy {
+    settingsVector("M2,20h20v-4H2v4zM4,17h2v2H4v-2zM2,4v4h20V4H2zM6,7H4V5h2v2zM2,14h20v-4H2v4zM4,11h2v2H4v-2z")
+}
+
+private val IconInfo: ImageVector by lazy {
+    settingsVector("M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM13,17h-2v-6h2v6zM13,9h-2V7h2v2z")
+}
+
+private val IconLink: ImageVector by lazy {
+    settingsVector(
+        "M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1z" +
+            "M8,13h8v-2H8v2z" +
+            "M17,7h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z"
+    )
+}
 
 private val IconLock: ImageVector by lazy {
     settingsVector(

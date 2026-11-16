@@ -323,7 +323,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         setLibrary {
             SpotifyLibrary(
                 status = LibraryStatus.READY, playlists = playlists, saved = saved,
-                savedTotal = total, autoImport = vault.has(),
+                savedTotal = total, autoImport = vault.has(), accountName = web.accountName,
             )
         }
     }

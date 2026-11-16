@@ -49,6 +49,8 @@ data class SpotifyLibrary(
     val playlistTracks: List<SpotifyLibTrack>? = null,
     /** An encrypted refresh token is stored on this device, so the import repeats by itself. */
     val autoImport: Boolean = false,
+    /** Spotify profile name of the signed-in user (memory only; null if Spotify did not give one). */
+    val accountName: String? = null,
 )
 
 /** Spotify state lives only in memory. Nothing from it is saved. */
