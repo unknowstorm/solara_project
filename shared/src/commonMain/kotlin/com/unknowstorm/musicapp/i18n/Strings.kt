@@ -283,6 +283,9 @@ object S {
     val spotifyRecent: String get() = tr("Recent", "Нещодавні")
     val spotifyShuffle: String get() = tr("Shuffle", "Перемішати")
     val spotifyRepeat: String get() = tr("Repeat", "Повтор")
+    val spotifyAddToQueue: String get() = tr("Add to queue", "Додати до черги")
+    val spotifyAddedToQueue: String get() = tr("Added to queue", "Додано до черги")
+    val spotifyQueueFailed: String get() = tr("Could not add to the queue", "Не вдалося додати до черги")
     // <<< ENTRIES >>>
 
     val notConnected: String get() = tr("Not connected", "Не підключено")
