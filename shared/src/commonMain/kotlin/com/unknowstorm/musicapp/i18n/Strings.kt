@@ -281,6 +281,8 @@ object S {
     val trackDetails: String get() = tr("Track info", "Про трек")
     val createPlaylist: String get() = tr("New playlist", "Новий плейлист")
     val spotifyRecent: String get() = tr("Recent", "Нещодавні")
+    val spotifyShuffle: String get() = tr("Shuffle", "Перемішати")
+    val spotifyRepeat: String get() = tr("Repeat", "Повтор")
     // <<< ENTRIES >>>
 
     val notConnected: String get() = tr("Not connected", "Не підключено")

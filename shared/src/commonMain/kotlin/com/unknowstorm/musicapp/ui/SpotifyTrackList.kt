@@ -3,6 +3,7 @@ package com.unknowstorm.musicapp.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -88,6 +89,7 @@ internal fun SpotifyLinkBrowse(
 }
 
 /** Vertical list: cover, title, artist. A tap plays from that track inside the album or playlist. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun SpotifyTrackList(
     remote: SpotifyRemote,
@@ -134,10 +136,16 @@ internal fun SpotifyTrackList(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Wraps by itself on a narrow screen: "OPEN SPOTIFY" moves to the next line
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
-                    onBeforePlay(); ui.dismissedUri = null; remote.playInContext(contextUri, 0, list.firstOrNull())
+                    onBeforePlay(); ui.dismissedUri = null
+                    // With shuffle on, "Play" starts from a random track instead of the first one
+                    val start = if (s.shuffling && list.size > 1) list.indices.random() else 0
+                    remote.playInContext(contextUri, start, list.getOrNull(start))
                 }) { Text(S.spotifyPlayAll) }
+                SpotifyShuffleButton(s, remote)
+                SpotifyRepeatButton(s, remote)
                 SpotifyOpenButton({ remote.openInSpotify(contextUri) })
             }
             Spacer(Modifier.height(8.dp))

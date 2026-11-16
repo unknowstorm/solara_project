@@ -16,6 +16,7 @@ import com.spotify.sdk.android.auth.AuthorizationRequest
 import com.spotify.sdk.android.auth.AuthorizationResponse
 import com.spotify.protocol.types.Image
 import com.spotify.protocol.types.PlayerState
+import com.spotify.protocol.types.Repeat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -204,6 +205,15 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                     positionMs = ps.playbackPosition,
                     durationMs = track?.duration ?: 0L,
                     error = null,
+                    shuffling = if (holdShuffle) it.shuffling else (ps.playbackOptions?.isShuffling ?: false),
+                    repeat = when (ps.playbackOptions?.repeatMode) {
+                        Repeat.ONE -> SpotifyRepeat.TRACK
+                        Repeat.ALL -> SpotifyRepeat.CONTEXT
+                        else -> SpotifyRepeat.OFF
+                    },
+                    canShuffle = ps.playbackRestrictions?.canToggleShuffle ?: true,
+                    canRepeatContext = ps.playbackRestrictions?.canRepeatContext ?: true,
+                    canRepeatTrack = ps.playbackRestrictions?.canRepeatTrack ?: true,
                 )
             }
             if (track != null && track.uri != lastTrackUri) {
@@ -501,6 +511,26 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun previous() { remote?.playerApi?.skipPrevious() }
     override fun seekTo(ms: Long) { remote?.playerApi?.seekTo(ms) }
 
+    // While a list starts playing from a chosen track, shuffle is switched off for a moment: the displayed state is held
+    private var holdShuffle = false
+    private val releaseShuffle = Runnable { holdShuffle = false }
+
+    override fun setShuffle(on: Boolean) {
+        _state.update { it.copy(shuffling = on) }
+        remote?.playerApi?.setShuffle(on)
+    }
+
+    override fun setRepeat(mode: SpotifyRepeat) {
+        _state.update { it.copy(repeat = mode) }
+        remote?.playerApi?.setRepeat(
+            when (mode) {
+                SpotifyRepeat.TRACK -> Repeat.ONE
+                SpotifyRepeat.CONTEXT -> Repeat.ALL
+                SpotifyRepeat.OFF -> Repeat.OFF
+            }
+        )
+    }
+
     override fun toggleSaved() {
         val r = remote ?: return
         val uri = _state.value.uri ?: return
@@ -564,13 +594,24 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         expectedName = item?.title
         handler.removeCallbacks(clearExpected)
         if (item != null) handler.postDelayed(clearExpected, 5000)
-        // Shuffle would make "next" random; the user can turn it back on in the Spotify app
+        // Starting from a chosen track needs shuffle off; the user's choice is restored once that track plays
+        val wantShuffle = _state.value.shuffling
+        holdShuffle = wantShuffle
+        handler.removeCallbacks(releaseShuffle)
+        if (wantShuffle) handler.postDelayed(releaseShuffle, 6000)
         r.playerApi.setShuffle(false)
         r.playerApi.play(contextUri)
             .setResultCallback {
                 run {
                     r.playerApi.skipToIndex(contextUri, index)
-                        .setResultCallback { android.util.Log.d("SpotifyBrowse", "skipToIndex #$index ok") }
+                        .setResultCallback {
+                            android.util.Log.d("SpotifyBrowse", "skipToIndex #$index ok")
+                            if (wantShuffle) {
+                                r.playerApi.setShuffle(true)
+                                    .setResultCallback { holdShuffle = false }
+                                    .setErrorCallback { holdShuffle = false }
+                            }
+                        }
                         .setErrorCallback { e ->
                             android.util.Log.d("SpotifyBrowse", "skipToIndex error: ${e.message}")
                             item?.let { playUri(it.uri) }

@@ -680,6 +680,7 @@ private fun SpFullContent(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    SpotifyShuffleButton(s, remote, size = 44.dp)
                     IconButton(onClick = remote::previous, modifier = Modifier.size(60.dp)) {
                         SkipIcon(next = false, modifier = Modifier.size(36.dp))
                     }
@@ -690,6 +691,7 @@ private fun SpFullContent(
                     IconButton(onClick = remote::next, modifier = Modifier.size(60.dp)) {
                         SkipIcon(next = true, modifier = Modifier.size(36.dp))
                     }
+                    SpotifyRepeatButton(s, remote, size = 44.dp, cycleTrack = true)
                 }
             }
         }

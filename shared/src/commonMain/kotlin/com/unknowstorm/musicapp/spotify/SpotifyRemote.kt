@@ -53,6 +53,9 @@ data class SpotifyLibrary(
     val accountName: String? = null,
 )
 
+/** Repeat modes as Spotify reports them: off, the whole playlist/album, a single track. */
+enum class SpotifyRepeat { OFF, CONTEXT, TRACK }
+
 /** Spotify state lives only in memory. Nothing from it is saved. */
 data class SpotifyState(
     val appInstalled: Boolean = true,
@@ -67,6 +70,12 @@ data class SpotifyState(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val saved: Boolean = false,
+    /** Shuffle and repeat as Spotify reports them, and whether Spotify currently allows changing them. */
+    val shuffling: Boolean = false,
+    val repeat: SpotifyRepeat = SpotifyRepeat.OFF,
+    val canShuffle: Boolean = true,
+    val canRepeatContext: Boolean = true,
+    val canRepeatTrack: Boolean = true,
     val error: String? = null,
     val history: List<SpotifyItem> = emptyList(),
     val browse: List<SpotifyItem>? = null,
@@ -93,6 +102,8 @@ interface SpotifyRemote {
     fun next()
     fun previous()
     fun seekTo(ms: Long)
+    fun setShuffle(on: Boolean) {}
+    fun setRepeat(mode: SpotifyRepeat) {}
     fun toggleSaved()
     fun openSpotifyApp()
     /** Opens specific content (spotify:track:…, spotify:album:…, spotify:playlist:…) in the Spotify app. */
