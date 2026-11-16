@@ -288,11 +288,16 @@ private fun SpotifyOrAddButton(onOpenSpotify: () -> Unit) {
         else -> S.notConnected
     }
     AccountCardFrame(
-        container = colors.surfaceVariant,
-        content = colors.onSurfaceVariant,
+        container = spotifyContainer(colors),
+        content = colors.onSurface,
         title = "Spotify",
         subtitle = subtitle,
-        logo = { Text("♪", style = MaterialTheme.typography.headlineSmall) },
+        logo = {
+            androidx.compose.material3.Icon(
+                GenericNote, contentDescription = null,
+                modifier = Modifier.size(28.dp), tint = colors.onSurface,
+            )
+        },
         onClick = { expanded = !expanded },
     ) {
         AnimatedVisibility(expanded) {
@@ -320,4 +325,36 @@ private fun SpotifyOrAddButton(onOpenSpotify: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * Spotify card: a neutral surface with a hint of the theme accent. If the accent is greenish
+ * (so the card could look like Spotify's own brand green), the plain neutral surface is used.
+ */
+private fun spotifyContainer(c: androidx.compose.material3.ColorScheme): Color {
+    if (isGreenish(c.primary) || isGreenish(c.primaryContainer)) return c.surfaceVariant
+    return androidx.compose.ui.graphics.lerp(c.surfaceVariant, c.primary, 0.16f)
+}
+
+private fun isGreenish(c: Color): Boolean {
+    val r = c.red; val g = c.green; val b = c.blue
+    val max = maxOf(r, g, b); val d = max - minOf(r, g, b)
+    if (d < 0.05f) return false // almost gray: no real hue
+    var h = when (max) { r -> ((g - b) / d) % 6f; g -> (b - r) / d + 2f; else -> (r - g) / d + 4f } * 60f
+    if (h < 0f) h += 360f
+    return h in 75f..175f
+}
+
+/** A generic "music" note (Material Icons): not Spotify's logo, so no circle or waves on purpose. */
+private val GenericNote: androidx.compose.ui.graphics.vector.ImageVector by lazy {
+    androidx.compose.ui.graphics.vector.ImageVector.Builder(
+        name = "GenericNote",
+        defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f,
+    ).addPath(
+        pathData = androidx.compose.ui.graphics.vector.addPathNodes(
+            "M12,3v10.55c-0.59,-0.34 -1.27,-0.55 -2,-0.55 -2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4V7h4V3h-6z"
+        ),
+        fill = androidx.compose.ui.graphics.SolidColor(Color.Black),
+    ).build()
 }
