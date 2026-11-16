@@ -111,6 +111,8 @@ interface SpotifyRemote {
     fun importLibrary() {}
     /** Called when the Spotify section opens: repeats the import without a tap if the user imported before. */
     fun autoImportLibrary() {}
+    /** Settings card: reads only the profile name (no library) if a stored token exists. Memory only. */
+    fun refreshProfile() {}
     /** Deletes the stored token (the library already on screen stays until the app is closed). */
     fun disableAutoImport() {}
     fun openLibraryPlaylist(playlist: SpotifyLibPlaylist) {}

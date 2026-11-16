@@ -284,6 +284,28 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         loadWithToken(rt, browserOnRevoked = false)
     }
 
+    /** Settings card: only the profile name (token refresh + /me), no library. Does nothing without a stored token. */
+    override fun refreshProfile() {
+        val lib = _state.value.library
+        if (lib.accountName != null || lib.status != LibraryStatus.IDLE) return
+        val rt = vault.load() ?: return
+        libScope.launch {
+            try {
+                val keep = web.refreshAccess(rt)
+                if (keep != rt) vault.save(keep)
+                val name = web.accountName
+                setLibrary { if (it.status == LibraryStatus.IDLE) it.copy(accountName = name) else it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.d("SpotifyLibrary", "profile failed: ${e.message}")
+                if (e is SpotifyHttpError && e.code == 400) vault.clear()
+            } finally {
+                if (_state.value.library.status == LibraryStatus.IDLE) web.clear()
+            }
+        }
+    }
+
     override fun disableAutoImport() {
         vault.clear()
         setLibrary { it.copy(autoImport = false) }
