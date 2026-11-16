@@ -72,7 +72,7 @@ fun AccountsSection(repo: ImportRepository?, onOpenSpotify: () -> Unit = {}, mod
             }
         }
         YouTubeCard()
-        SpotifyOrAddButton(onOpenSpotify)
+        SpotifyCard(onOpenSpotify)
     }
 }
 
@@ -239,52 +239,24 @@ private fun YouTubeCard() {
     }
 }
 
-/** "+" like on Home and Search: Spotify is entered only through it, as text without a logo (Spotify design rules). */
-@Composable
-private fun AddServiceButton(onOpenSpotify: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Surface(
-            onClick = { open = true },
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Box(Modifier.padding(vertical = 14.dp), contentAlignment = Alignment.Center) {
-                AddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text("Spotify") },
-                onClick = { open = false; onOpenSpotify() },
-            )
-        }
-    }
-}
 
-
-/** Spotify card: shown only after the user connected Spotify; otherwise the "+" entry stays. Neutral colors, no logo. */
+/** Spotify card: always shown on Android, same layout as the others. Not connected: status line + "Connect". Neutral colors, no logo. */
 @Composable
-private fun SpotifyOrAddButton(onOpenSpotify: () -> Unit) {
-    val remote = LocalSpotifyRemote.current
-    val flow = remember(remote) { remote?.state ?: MutableStateFlow(SpotifyState()) }
-    val st by flow.collectAsState()
+private fun SpotifyCard(onOpenSpotify: () -> Unit) {
+    val remote = LocalSpotifyRemote.current ?: return
+    val st by remote.state.collectAsState()
     val lib = st.library
     val colors = MaterialTheme.colorScheme
     val uriHandler = LocalUriHandler.current
     var expanded by remember { mutableStateOf(false) }
-    val active = remote != null && (st.connected || st.connecting || lib.status != LibraryStatus.IDLE)
-    if (!active || remote == null) {
-        AddServiceButton(onOpenSpotify)
-        return
-    }
+    androidx.compose.runtime.LaunchedEffect(remote) { remote.refreshProfile() }
+    val working = st.connecting || lib.status == LibraryStatus.LOADING || lib.status == LibraryStatus.AUTHORIZING
+    val connected = st.connected || lib.status == LibraryStatus.READY || lib.accountName != null
     val subtitle = when {
-        lib.status == LibraryStatus.READY ->
-            lib.accountName?.let { tr("Connected as $it", "Підключено як $it") } ?: tr("Connected", "Підключено")
-        lib.status == LibraryStatus.LOADING || lib.status == LibraryStatus.AUTHORIZING || st.connecting ->
-            tr("Connecting…", "Підключення…")
+        working -> tr("Connecting…", "Підключення…")
+        lib.accountName != null -> tr("Connected as ${lib.accountName}", "Підключено як ${lib.accountName}")
         st.connected -> tr("Spotify app connected", "Підключено застосунок Spotify")
+        lib.status == LibraryStatus.READY -> tr("Connected", "Підключено")
         else -> S.notConnected
     }
     AccountCardFrame(
@@ -298,30 +270,46 @@ private fun SpotifyOrAddButton(onOpenSpotify: () -> Unit) {
                 modifier = Modifier.size(28.dp), tint = colors.onSurface,
             )
         },
-        onClick = { expanded = !expanded },
+        onClick = if (connected) ({ expanded = !expanded }) else null,
     ) {
-        AnimatedVisibility(expanded) {
+        AnimatedVisibility(expanded || !connected) {
             Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onOpenSpotify) { Text(tr("Spotify section", "Розділ Spotify")) }
-                    TextButton(onClick = { if (st.appInstalled) remote.openSpotifyApp() else remote.getSpotifyApp() }) {
-                        Text(if (st.appInstalled) "Open Spotify" else "Get Spotify Free")
+                if (connected) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onOpenSpotify) { Text(tr("Spotify section", "Розділ Spotify")) }
+                        TextButton(onClick = { if (st.appInstalled) remote.openSpotifyApp() else remote.getSpotifyApp() }) {
+                            Text(if (st.appInstalled) "Open Spotify" else "Get Spotify Free")
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { remote.forgetLibrary(); remote.disconnect() }) { Text(S.disconnectSpotify) }
+                        TextButton(onClick = { uriHandler.openUri(LegalTexts.SPOTIFY_APPS_URL) }) {
+                            Text(tr("Revoke access", "Відкликати доступ"))
+                        }
+                    }
+                    Text(
+                        tr(
+                            "Spotify data is kept only in memory and is erased when you disconnect or close the app.",
+                            "Дані Spotify зберігаються лише в пам’яті й стираються під час відключення або закриття застосунку.",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                } else {
+                    Text(
+                        tr(
+                            "Music plays in the Spotify app (Premium is required). Your Spotify library is shown only in memory.",
+                            "Музику відтворює застосунок Spotify (потрібен Premium). Ваша бібліотека Spotify показується лише в пам’яті.",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (st.appInstalled) {
+                        Button(onClick = { remote.connect() }, enabled = !working) { Text(S.connect) }
+                    } else {
+                        Button(onClick = { remote.getSpotifyApp() }) { Text("Get Spotify Free") }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { remote.forgetLibrary(); remote.disconnect() }) { Text(S.disconnectSpotify) }
-                    TextButton(onClick = { uriHandler.openUri(LegalTexts.SPOTIFY_APPS_URL) }) {
-                        Text(tr("Revoke access", "Відкликати доступ"))
-                    }
-                }
-                Text(
-                    tr(
-                        "Spotify data is kept only in memory and is erased when you disconnect or close the app.",
-                        "Дані Spotify зберігаються лише в пам’яті й стираються під час відключення або закриття застосунку.",
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                lib.error?.let { Text(it, color = colors.error, style = MaterialTheme.typography.bodySmall) }
+                if (working) LinearProgressIndicator(Modifier.fillMaxWidth())
+                (st.error ?: lib.error)?.let { Text(it, color = colors.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
