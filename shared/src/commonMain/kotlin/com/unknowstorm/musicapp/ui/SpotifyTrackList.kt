@@ -1,5 +1,6 @@
 package com.unknowstorm.musicapp.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,11 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +31,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.i18n.S
@@ -105,6 +112,9 @@ internal fun SpotifyTrackList(
     val ui = LocalSpotifyMini.current
     val list = s.browse ?: return
     val kind = if (contextUri.startsWith("spotify:album:")) S.album else S.playlist
+    // Short confirmation after a track is added to the Spotify queue
+    var queueNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(queueNote) { if (queueNote != null) { delay(2000); queueNote = null } }
     // Near the end of the list: ask for the next page (Spotify returns tracks in pages)
     val listState = rememberLazyListState()
     val nearEnd by remember(list.size) {
@@ -148,7 +158,13 @@ internal fun SpotifyTrackList(
                 SpotifyRepeatButton(s, remote)
                 SpotifyOpenButton({ remote.openInSpotify(contextUri) })
             }
-            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth().height(24.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                queueNote?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+            }
         }
         LazyColumn(Modifier.weight(1f), state = listState) {
             itemsIndexed(list, key = { index, item -> "$index:${item.uri}" }) { index, item ->
@@ -185,8 +201,32 @@ internal fun SpotifyTrackList(
                             )
                         }
                     }
+                    if (item.playable && item.uri.startsWith("spotify:track:")) {
+                        IconButton(onClick = {
+                            remote.queueUri(item.uri)
+                            queueNote = S.spotifyAddedToQueue
+                        }) {
+                            SpotifyQueueAddIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+/** "Add to queue" icon: three lines and a plus, drawn on a 24x24 grid. */
+@Composable
+private fun SpotifyQueueAddIcon(modifier: Modifier = Modifier, tint: Color) {
+    Canvas(modifier.semantics { contentDescription = S.spotifyAddToQueue }) {
+        val k = size.width / 24f
+        val stroke = 2f * k
+        fun line(x1: Float, y1: Float, x2: Float, y2: Float) =
+            drawLine(tint, Offset(x1 * k, y1 * k), Offset(x2 * k, y2 * k), stroke, StrokeCap.Round)
+        line(4f, 6f, 15f, 6f)
+        line(4f, 11f, 15f, 11f)
+        line(4f, 16f, 11f, 16f)
+        line(18f, 12f, 18f, 20f)
+        line(14f, 16f, 22f, 16f)
     }
 }

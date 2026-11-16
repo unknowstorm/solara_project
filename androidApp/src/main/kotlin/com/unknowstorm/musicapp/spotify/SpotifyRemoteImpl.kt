@@ -511,6 +511,15 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun previous() { remote?.playerApi?.skipPrevious() }
     override fun seekTo(ms: Long) { remote?.playerApi?.seekTo(ms) }
 
+    /** The queue belongs to Spotify: we only send the command and keep nothing. */
+    override fun queueUri(uri: String) {
+        val r = remote ?: return
+        if (!uri.startsWith("spotify:track:")) return
+        r.playerApi.queue(uri).setErrorCallback {
+            _state.update { st -> st.copy(error = com.unknowstorm.musicapp.i18n.S.spotifyQueueFailed) }
+        }
+    }
+
     // While a list starts playing from a chosen track, shuffle is switched off for a moment: the displayed state is held
     private var holdShuffle = false
     private val releaseShuffle = Runnable { holdShuffle = false }

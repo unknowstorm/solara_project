@@ -102,6 +102,8 @@ interface SpotifyRemote {
     fun next()
     fun previous()
     fun seekTo(ms: Long)
+    /** Appends a track to the end of the Spotify queue (App Remote can only append: no reordering, no removing). */
+    fun queueUri(uri: String) {}
     fun setShuffle(on: Boolean) {}
     fun setRepeat(mode: SpotifyRepeat) {}
     fun toggleSaved()
