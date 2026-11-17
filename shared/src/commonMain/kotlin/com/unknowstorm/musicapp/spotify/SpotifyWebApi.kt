@@ -136,6 +136,14 @@ class SpotifyWebApi(private val clientId: String, private val redirectUri: Strin
         return out to total
     }
 
+    /** The user's queue: the track that is playing and the tracks queued after it (tracks only). Read-only. */
+    suspend fun queue(): Pair<SpotifyLibTrack?, List<SpotifyLibTrack>> {
+        val o = get("/me/player/queue")
+        val now = parseTrack(o["currently_playing"].obj(), 0)
+        val next = o["queue"].arr().orEmpty().mapIndexedNotNull { i, e -> parseTrack(e.obj(), i + 1) }
+        return now to next
+    }
+
     private fun image(images: JsonElement?): String? {
         val a = images.arr() ?: return null
         return (a.getOrNull(1) ?: a.firstOrNull()).obj()?.get("url").str()

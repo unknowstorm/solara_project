@@ -4,6 +4,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.flow.StateFlow
 
+/** Turns the read-only queue view of the Spotify player on or off. */
+const val SPOTIFY_QUEUE_ENABLED = true
+
 data class SpotifyItem(
     val uri: String,
     val title: String,
@@ -56,6 +59,16 @@ data class SpotifyLibrary(
 /** Repeat modes as Spotify reports them: off, the whole playlist/album, a single track. */
 enum class SpotifyRepeat { OFF, CONTEXT, TRACK }
 
+enum class QueueStatus { OFF, NEEDS_CONSENT, AUTHORIZING, LOADING, READY, ERROR }
+
+/** The user's Spotify queue (Web API, read-only): what is playing and what is queued after it. Memory only. */
+data class SpotifyQueue(
+    val status: QueueStatus = QueueStatus.OFF,
+    val error: String? = null,
+    val nowPlaying: SpotifyLibTrack? = null,
+    val next: List<SpotifyLibTrack> = emptyList(),
+)
+
 /** Spotify state lives only in memory. Nothing from it is saved. */
 data class SpotifyState(
     val appInstalled: Boolean = true,
@@ -90,6 +103,7 @@ data class SpotifyState(
     val covers: Map<String, ImageBitmap> = emptyMap(),
     val shelves: List<SpotifyShelf>? = null,
     val library: SpotifyLibrary = SpotifyLibrary(),
+    val queue: SpotifyQueue = SpotifyQueue(),
 )
 
 interface SpotifyRemote {
@@ -132,6 +146,15 @@ interface SpotifyRemote {
     fun closeLibraryPlaylist() {}
     /** Erases the token and everything imported from memory. */
     fun forgetLibrary() {}
+    /** Queue panel opened: loads the queue if the user already allowed it, otherwise asks for consent. */
+    fun openQueue() {}
+    fun refreshQueue() {}
+    /** Queue panel closed: stops refreshing and erases the queue from memory. */
+    fun closeQueue() {}
+    /** Separate one-time consent for reading the queue (read-only). */
+    fun grantQueueAccess() {}
+    /** Deletes the stored queue token and the queue from memory. */
+    fun forgetQueue() {}
 }
 
 val LocalSpotifyRemote = staticCompositionLocalOf<SpotifyRemote?> { null }
