@@ -17,8 +17,13 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,7 +61,8 @@ fun PlaylistScreen(
 ) {
     val scope = rememberCoroutineScope()
     val all by repo.playlists.collectAsState()
-    val name = all.firstOrNull { it.id == playlist.id }?.name ?: playlist.name
+    val current = all.firstOrNull { it.id == playlist.id } ?: playlist
+    val name = current.name
     var entries by remember(playlist.id) { mutableStateOf<List<PlaylistEntry>?>(null) }
     var failed by remember(playlist.id) { mutableStateOf(false) }
     var message by remember(playlist.id) { mutableStateOf<String?>(null) }
@@ -63,6 +70,17 @@ fun PlaylistScreen(
     var renaming by remember { mutableStateOf(false) }
     var renameError by remember { mutableStateOf<String?>(null) }
     var showDelete by remember { mutableStateOf(false) }
+    var showCoverMenu by remember { mutableStateOf(false) }
+    var coverBusy by remember { mutableStateOf(false) }
+    // The same picker as for avatars: the photo arrives already cropped to a square JPEG
+    val pickCover = rememberAvatarPicker { jpeg ->
+        scope.launch {
+            coverBusy = true
+            message = null
+            repo.setCover(playlist.id, jpeg).onFailure { message = it.message }
+            coverBusy = false
+        }
+    }
 
     PlatformBackHandler(onBack = onBack)
 
@@ -117,25 +135,89 @@ fun PlaylistScreen(
             .pointerInput(Unit) {}
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            val list = entries
+
             Row(
                 Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) { Text("←", style = MaterialTheme.typography.titleLarge) }
-                Text(
-                    name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                Spacer(Modifier.weight(1f))
                 TextButton(onClick = { showDelete = true }) {
                     Text(S.delete, color = MaterialTheme.colorScheme.error)
                 }
             }
 
-            val list = entries
             if (list == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+
+            // Big cover (own photo or a collage of tracks) next to the name; tap it to change
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box {
+                    PlaylistCover(
+                        repo = repo,
+                        playlist = current,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clickable(enabled = !coverBusy) { showCoverMenu = true },
+                        shape = RoundedCornerShape(20.dp),
+                        artworks = list?.map { it.track.artworkUrl },
+                    )
+                    if (coverBusy) {
+                        CircularProgressIndicator(Modifier.align(Alignment.Center).size(28.dp))
+                    } else {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("✎", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+                    DropdownMenu(expanded = showCoverMenu, onDismissRequest = { showCoverMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(PlaylistCoverText.change) },
+                            onClick = { showCoverMenu = false; pickCover() },
+                        )
+                        if (current.cover != null) {
+                            DropdownMenuItem(
+                                text = { Text(PlaylistCoverText.remove) },
+                                onClick = {
+                                    showCoverMenu = false
+                                    scope.launch {
+                                        coverBusy = true
+                                        message = null
+                                        repo.removeCover(playlist.id).onFailure { message = it.message }
+                                        coverBusy = false
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (list != null) {
+                        Text(
+                            "♪ ${list.size}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
 
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
