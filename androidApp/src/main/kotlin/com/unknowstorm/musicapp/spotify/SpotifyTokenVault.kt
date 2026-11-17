@@ -14,9 +14,11 @@ import javax.crypto.spec.GCMParameterSpec
  * Keeps ONE value on this device: the user's Spotify refresh token, encrypted with a key that never leaves the Android Keystore.
  * It is never sent to our server. If it cannot be decrypted (for example after a backup restore), it is simply dropped.
  */
-internal class SpotifyTokenVault(private val prefs: SharedPreferences) {
-    private val alias = "solara_spotify_refresh_key"
-    private val prefKey = "lib_refresh"
+internal class SpotifyTokenVault(
+    private val prefs: SharedPreferences,
+    private val prefKey: String = "lib_refresh",
+    private val alias: String = "solara_spotify_refresh_key",
+) {
     private val flags = Base64.NO_WRAP
 
     private fun key(): SecretKey {

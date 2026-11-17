@@ -91,6 +91,7 @@ import com.unknowstorm.musicapp.player.AudioBackend
 import com.unknowstorm.musicapp.resources.Res
 import com.unknowstorm.musicapp.resources.spotify_like
 import com.unknowstorm.musicapp.resources.spotify_liked
+import com.unknowstorm.musicapp.spotify.SPOTIFY_QUEUE_ENABLED
 import com.unknowstorm.musicapp.spotify.SpotifyRemote
 import com.unknowstorm.musicapp.spotify.SpotifyState
 import kotlinx.coroutines.Job
@@ -555,6 +556,7 @@ private fun SpFullContent(
     val s by stateHolder
     var dragValue by remember { mutableStateOf<Float?>(null) }
     var showDetails by remember { mutableStateOf(false) }
+    var showQueue by remember { mutableStateOf(false) }
     // A message on like per Spotify rules; disappears by itself
     var likeNote by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(likeNote) { if (likeNote != null) { delay(2000); likeNote = null } }
@@ -628,10 +630,19 @@ private fun SpFullContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = { showDetails = true }) { MoreIcon() }
+                    // Both sides are 96 dp wide, so OPEN SPOTIFY stays in the middle
+                    Row(Modifier.width(96.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showDetails = true }) { MoreIcon() }
+                        if (SPOTIFY_QUEUE_ENABLED) {
+                            IconButton(onClick = { showQueue = true }) {
+                                SpotifyQueueViewIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
                     // The link leads to the current track in Spotify
                     SpotifyOpenButton({ s.uri?.let { remote.openInSpotify(it) } ?: remote.openSpotifyApp() })
                     // "+" puts the track into Spotify's own Liked Songs, nothing is stored on our side
+                    Box(Modifier.width(96.dp), contentAlignment = Alignment.CenterEnd) {
                     IconButton(onClick = {
                         likeNote = if (!s.saved) "Added to Liked Songs" else "Removed from Liked Songs"
                         remote.toggleSaved()
@@ -641,6 +652,7 @@ private fun SpFullContent(
                             contentDescription = if (s.saved) "Liked" else "Like",
                             modifier = Modifier.size(32.dp).clip(CircleShape).background(if (!s.saved && MaterialTheme.colorScheme.surface.luminance() >= 0.179f) Color.Black else Color.Transparent),
                         )
+                    }
                     }
                 }
 
@@ -696,6 +708,8 @@ private fun SpFullContent(
             }
         }
     }
+
+    if (showQueue) SpotifyQueueDialog(remote, s, onDismiss = { showQueue = false })
 
     if (showDetails) {
         AlertDialog(

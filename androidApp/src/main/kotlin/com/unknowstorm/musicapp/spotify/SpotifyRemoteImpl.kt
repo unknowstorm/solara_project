@@ -218,6 +218,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
             }
             if (track != null && track.uri != lastTrackUri) {
                 lastTrackUri = track.uri
+                if (queueWatching) { handler.removeCallbacks(queueRefresh); handler.postDelayed(queueRefresh, 800) }
                 val keepCover = optimisticKey != null && optimisticKey == track.imageUri?.raw
                 optimisticKey = null
                 val exp = expectedUri
@@ -246,12 +247,17 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun disconnect() {
         prefs.edit().putBoolean("auto", false).apply()
         vault.clear()
+        queueVault.clear()
         teardown()
     }
 
     private fun teardown() {
         coverRequested.clear()
         shelvesLoading = false
+        queueWatching = false
+        handler.removeCallbacks(queueRefresh)
+        queueJob?.cancel()
+        queueWeb.clear()
         // Memory only: the stored refresh token (auto-import) stays until the user turns it off or disconnects
         wipeLibraryMemory()
         if (current === this) current = null
@@ -397,6 +403,9 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
 
     /** Called by SpotifyLibraryCallbackActivity with solara://spotify-library?code=...&state=... */
     fun onLibraryRedirect(data: Uri?) {
+        // The same redirect address serves the queue consent: its own state value tells them apart
+        val st = data?.getQueryParameter("state")
+        if (st != null && st == queueAuthState) { onQueueRedirect(data); return }
         val verifier = libVerifier
         val expected = libState
         libVerifier = null
@@ -456,6 +465,142 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun forgetLibrary() {
         wipeLibraryMemory()
         vault.clear()
+    }
+
+    // ---------- Queue view (Web API, read-only): token and data only in memory ----------
+    private val queueWeb = SpotifyWebApi(SpotifyConfig.CLIENT_ID, LIB_REDIRECT)
+    private val queueVault by lazy { SpotifyTokenVault(prefs, "queue_refresh", "solara_spotify_queue_key") }
+    private var queueJob: Job? = null
+    private var queueVerifier: String? = null
+    private var queueAuthState: String? = null
+    private var queueWatching = false
+    private val queueRefresh = Runnable { if (queueWatching) refreshQueue() }
+
+    private fun setQueue(block: (SpotifyQueue) -> SpotifyQueue) {
+        _state.update { it.copy(queue = block(it.queue)) }
+    }
+
+    override fun openQueue() {
+        if (!SPOTIFY_QUEUE_ENABLED) return
+        queueWatching = true
+        if (queueVault.load() == null) {
+            if (queueVault.has()) queueVault.clear() // cannot be decrypted: drop it
+            setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT) }
+        } else {
+            refreshQueue()
+        }
+    }
+
+    override fun closeQueue() {
+        queueWatching = false
+        handler.removeCallbacks(queueRefresh)
+        queueJob?.cancel()
+        queueWeb.clear()
+        setQueue { SpotifyQueue() }
+    }
+
+    override fun refreshQueue() {
+        val rt = queueVault.load()
+        if (rt == null) {
+            setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT) }
+            return
+        }
+        // While refreshing, the list that is already on screen stays; the progress bar only shows the first time
+        setQueue { it.copy(status = if (it.nowPlaying == null && it.next.isEmpty()) QueueStatus.LOADING else it.status, error = null) }
+        queueJob?.cancel()
+        queueJob = libScope.launch { loadQueue(rt) }
+    }
+
+    private suspend fun loadQueue(refresh: String) {
+        try {
+            val (now, next) = try {
+                queueWeb.queue()
+            } catch (e: SpotifyHttpError) {
+                if (e.code != 401) throw e
+                val keep = queueWeb.refreshAccess(refresh)
+                if (keep != refresh) queueVault.save(keep)
+                queueWeb.queue()
+            }
+            setQueue { SpotifyQueue(status = QueueStatus.READY, nowPlaying = now, next = next) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.d("SpotifyQueue", "queue failed: ${e.message}")
+            if (e is SpotifyHttpError && e.code == 400) {
+                // access revoked or the refresh token expired: forget it
+                queueVault.clear()
+                queueWeb.clear()
+                setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT, error = spotifyAccessRevokedText()) }
+            } else {
+                setQueue { it.copy(status = QueueStatus.ERROR, error = spotifyLibraryErrorText(e)) }
+            }
+        }
+    }
+
+    /** One-time consent in the system browser (authorization code + PKCE), read-only scopes. */
+    override fun grantQueueAccess() {
+        if (SpotifyConfig.CLIENT_ID.isBlank()) {
+            setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT, error = S.spotifyClientIdIsNot) }
+            return
+        }
+        val flags = android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP
+        val rnd = java.security.SecureRandom()
+        val verifier = android.util.Base64.encodeToString(ByteArray(64).also { rnd.nextBytes(it) }, flags)
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
+        val challenge = android.util.Base64.encodeToString(digest, flags)
+        val state = android.util.Base64.encodeToString(ByteArray(16).also { rnd.nextBytes(it) }, flags)
+        queueVerifier = verifier
+        queueAuthState = state
+        setQueue { SpotifyQueue(status = QueueStatus.AUTHORIZING) }
+        val uri = Uri.Builder()
+            .scheme("https").authority("accounts.spotify.com").path("authorize")
+            .appendQueryParameter("client_id", SpotifyConfig.CLIENT_ID)
+            .appendQueryParameter("response_type", "code")
+            .appendQueryParameter("redirect_uri", LIB_REDIRECT)
+            .appendQueryParameter("scope", "user-read-playback-state user-read-currently-playing")
+            .appendQueryParameter("code_challenge_method", "S256")
+            .appendQueryParameter("code_challenge", challenge)
+            .appendQueryParameter("state", state)
+            .build()
+        runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, uri)) }.onFailure {
+            queueVerifier = null
+            queueAuthState = null
+            setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT, error = S.couldNotConnectToSpotify) }
+        }
+    }
+
+    private fun onQueueRedirect(data: Uri) {
+        val verifier = queueVerifier
+        queueVerifier = null
+        queueAuthState = null
+        val code = data.getQueryParameter("code")
+        if (verifier == null || code.isNullOrBlank()) {
+            setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT, error = S.spotifyDidNotConfirmAccess) }
+            return
+        }
+        setQueue { it.copy(status = QueueStatus.LOADING, error = null) }
+        queueJob?.cancel()
+        queueJob = libScope.launch {
+            try {
+                val rt = queueWeb.exchangeCode(code, verifier)
+                if (rt != null) queueVault.save(rt)
+                loadQueue(rt.orEmpty())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.d("SpotifyQueue", "consent failed: ${e.message}")
+                queueWeb.clear()
+                setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT, error = spotifyLibraryErrorText(e)) }
+            }
+        }
+    }
+
+    /** "Turn off": the stored queue token and everything read from the queue. */
+    override fun forgetQueue() {
+        queueJob?.cancel()
+        queueWeb.clear()
+        queueVault.clear()
+        setQueue { SpotifyQueue(status = QueueStatus.NEEDS_CONSENT) }
     }
 
     /** Called when the activity is closed. If the app was closed completely (not a screen rotation), we pause Spotify. */
