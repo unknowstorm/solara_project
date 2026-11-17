@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
@@ -64,7 +64,7 @@ private fun sqWaiting() = tr("Finish the sign-in in the browser, then come back.
 private fun sqRefresh() = tr("Refresh", "Оновити")
 private fun sqOff() = tr("Turn off", "Вимкнути")
 private fun sqClose() = tr("Close", "Закрити")
-private fun sqOpen() = tr("Open in Spotify", "Відкрити в Spotify")
+private fun sqOpen() = tr("Open Spotify", "Відкрити Spotify")
 
 /** "Show the queue" icon: three lines and a play mark, drawn on a 24x24 grid. */
 @Composable
@@ -137,7 +137,7 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                                     )
                                 }
                             } else {
-                                items(q.next) { t -> SqRow(t, remote) }
+                                itemsIndexed(q.next) { i, t -> SqRow(t, remote, onPlay = { repeat(i + 1) { remote.next() } }) }
                             }
                         }
                     }
@@ -174,9 +174,9 @@ private fun SqLabel(text: String) {
 
 /** A queue row: cover without cropping tricks or overlays (4 dp corners), metadata unchanged, link back to Spotify. */
 @Composable
-private fun SqRow(t: SpotifyLibTrack, remote: SpotifyRemote) {
+private fun SqRow(t: SpotifyLibTrack, remote: SpotifyRemote, onPlay: (() -> Unit)? = null) {
     ListItem(
-        modifier = Modifier.clickable { remote.openInSpotify(t.uri) },
+        modifier = if (onPlay != null) Modifier.clickable { onPlay() } else Modifier,
         leadingContent = {
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
                 if (t.imageUrl != null) CoverImage(t.imageUrl, Modifier.fillMaxSize(), RoundedCornerShape(4.dp))
