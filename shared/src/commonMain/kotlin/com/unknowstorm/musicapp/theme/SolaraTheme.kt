@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.Color
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SolaraTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = PaletteSettings.mode.isDark(isSystemInDarkTheme()),
     palette: PaletteChoice = PaletteSettings.choice,
     content: @Composable () -> Unit,
 ) {

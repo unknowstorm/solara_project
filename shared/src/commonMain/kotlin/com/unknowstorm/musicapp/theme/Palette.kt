@@ -14,6 +14,26 @@ import kotlin.math.min
 /** Ключ в текстовом хранилище, под которым лежит выбранная палитра. */
 const val PALETTE_KEY = "palette"
 
+/** Ключ в текстовом хранилище для режима темы (системная / светлая / тёмная). */
+const val THEME_MODE_KEY = "theme_mode"
+
+/** Режим темы: по умолчанию следует за системой, пока пользователь явно не выбрал светлую или тёмную. */
+enum class ThemeMode {
+    System, Light, Dark;
+
+    fun isDark(systemDark: Boolean): Boolean = when (this) {
+        System -> systemDark
+        Light -> false
+        Dark -> true
+    }
+
+    fun encode(): String = name.lowercase()
+
+    companion object {
+        fun decode(raw: String?): ThemeMode? = entries.firstOrNull { it.name.lowercase() == raw }
+    }
+}
+
 /** Выбор палитры: цвета системы (Material You, только Android 12+) или свой основной цвет. */
 sealed interface PaletteChoice {
     data object Dynamic : PaletteChoice
@@ -51,6 +71,10 @@ object PaletteSettings {
     var choice: PaletteChoice by mutableStateOf(PaletteChoice.Dynamic)
         private set
 
+    /** Режим темы. Тема читает его при каждой перерисовке, как и [choice]. */
+    var mode: ThemeMode by mutableStateOf(ThemeMode.System)
+        private set
+
     /** Вызывается один раз при старте с сохранённой строкой (или null). */
     fun restore(saved: String?) {
         choice = PaletteChoice.decode(saved) ?: PaletteChoice.Dynamic
@@ -59,6 +83,17 @@ object PaletteSettings {
     /** Применяет выбор сразу и сохраняет его через [persist]. */
     fun update(new: PaletteChoice, persist: (String) -> Unit) {
         choice = new
+        persist(new.encode())
+    }
+
+    /** Вызывается один раз при старте с сохранённым режимом темы (или null). */
+    fun restoreMode(saved: String?) {
+        mode = ThemeMode.decode(saved) ?: ThemeMode.System
+    }
+
+    /** Применяет режим темы сразу и сохраняет его через [persist]. */
+    fun updateMode(new: ThemeMode, persist: (String) -> Unit) {
+        mode = new
         persist(new.encode())
     }
 }
@@ -164,4 +199,25 @@ fun schemeFromSeed(seed: Color, dark: Boolean): ColorScheme {
             surfaceContainerHighest = neu(0.20f),
         )
     }
+}
+
+// ---------- Рекомендуемые и свои основные цвета ----------
+
+/** Оттенок основного цвета, 0..360. */
+fun seedHue(color: Color): Float = hslOf(color).h
+
+/** Насыщенность основного цвета, 0..1. */
+fun seedSaturation(color: Color): Float = hslOf(color).s
+
+/** Основной цвет из оттенка и насыщенности: яркость фиксирована, чтобы цвета были сопоставимы. */
+fun seedColor(hue: Float, saturation: Float): Color = hsl(hue, saturation, 0.5f)
+
+/**
+ * Рекомендуемые основные цвета рядом с [base]: тот же цветовой охват, оттенок смещён в обе стороны.
+ * Результат зависит только от [base], поэтому выбранный цвет можно узнать по значению ARGB.
+ */
+fun recommendedSeeds(base: Color): List<Color> {
+    val b = hslOf(base)
+    val s = b.s.coerceIn(0.55f, 0.85f)
+    return listOf(-60f, -30f, 30f, 60f).map { shift -> hsl(b.h + shift, s, 0.5f) }
 }
