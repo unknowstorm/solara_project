@@ -1,6 +1,5 @@
 package com.unknowstorm.musicapp.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -31,6 +28,7 @@ import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.i18n.tr
 import com.unknowstorm.musicapp.theme.PALETTE_KEY
 import com.unknowstorm.musicapp.theme.PaletteSettings
+import com.unknowstorm.musicapp.theme.THEME_MODE_KEY
 
 /**
  * Содержимое раздела General, как на эскизе: палитра, язык, документация.
@@ -69,9 +67,11 @@ internal fun GeneralSettings(extraEntries: List<@Composable (Shape) -> Unit> = e
     if (showPalette) {
         PaletteSheet(
             current = PaletteSettings.choice,
-            onApply = { choice ->
+            currentMode = PaletteSettings.mode,
+            onApply = { choice, mode ->
                 // Тема меняется сразу, выбор запоминается на устройстве
                 PaletteSettings.update(choice) { saved -> store.set(PALETTE_KEY, saved) }
+                PaletteSettings.updateMode(mode) { saved -> store.set(THEME_MODE_KEY, saved) }
             },
             onDismiss = { showPalette = false },
         )
@@ -148,15 +148,8 @@ private fun IslandTileIcon() {
     }
 }
 
-/** Иконка палитры для плитки: круг с тремя точками. */
+/** Иконка палитры для плитки: круг из четырёх секторов в цветах текущей палитры. */
 @Composable
 private fun PaletteIcon() {
-    val color = MaterialTheme.colorScheme.onSurface
-    Canvas(Modifier.size(28.dp)) {
-        val w = size.width
-        drawCircle(color, radius = w * 0.45f, style = Stroke(w * 0.08f))
-        listOf(0.34f to 0.40f, 0.62f to 0.34f, 0.68f to 0.60f).forEach { (x, y) ->
-            drawCircle(color, radius = w * 0.07f, center = Offset(x * w, y * w))
-        }
-    }
+    PalettePie(MaterialTheme.colorScheme, MaterialTheme.colorScheme.background, Modifier.size(32.dp))
 }
