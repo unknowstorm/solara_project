@@ -8,7 +8,10 @@ import com.unknowstorm.musicapp.model.ProviderId
 import com.unknowstorm.musicapp.model.Track
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.storage.storage
+import io.ktor.http.ContentType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,14 +23,23 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.random.Random
 
-data class Playlist(val id: String, val name: String)
+/** [cover] is null (no own cover) or a version tag of the uploaded photo like "u1a2b3c". */
+data class Playlist(val id: String, val name: String, val cover: String? = null)
 
 /** A track in a playlist together with its position (it can be removed by it). */
 data class PlaylistEntry(val position: Int, val track: Track)
 
 @Serializable
-private data class PlaylistRow(val id: String, val name: String)
+private data class PlaylistRow(val id: String, val name: String, val cover: String? = null)
+
+/** No default value on purpose: null must be sent to the server to clear the cover. */
+@Serializable
+private data class CoverUpdate(val cover: String?)
+
+@Serializable
+private data class ArtworkRow(@SerialName("artwork_url") val artworkUrl: String? = null)
 
 @Serializable
 private data class PlaylistInsert(val name: String)
@@ -46,6 +58,12 @@ private data class ItemRow(
 
 private fun ProviderId.canBeSaved() = this == ProviderId.JAMENDO || this == ProviderId.AUDIUS
 
+private const val COVER_BUCKET = "playlist-covers"
+private const val PREVIEW_COUNT = 4
+
+/** The version is in the file name, so a changed cover is never served from a CDN cache. */
+private fun coverPath(uid: String, playlistId: String, marker: String) = "$uid/$playlistId-$marker.jpg"
+
 /** User playlists in the cloud (tables `playlists` and `playlist_items`, RLS: own rows only). */
 class PlaylistsRepository(
     auth: AuthRepository,
@@ -53,6 +71,12 @@ class PlaylistsRepository(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var userId: String? = null
+
+    /** Downloaded covers: the key is "<playlist id>/<version tag>". */
+    private val coverCache = mutableMapOf<String, ByteArray>()
+
+    /** Cover URLs of the first tracks (for the collage), by playlist id. */
+    private val previewCache = mutableMapOf<String, List<String>>()
 
     private val _playlists = MutableStateFlow<List<Playlist>>(emptyList())
     /** Playlists, newest first. */
@@ -89,7 +113,7 @@ class PlaylistsRepository(
                 val rows = client.from("playlists")
                     .select { order("created_at", Order.DESCENDING); limit(100) }
                     .decodeList<PlaylistRow>()
-                if (userId == owner) _playlists.value = rows.map { Playlist(it.id, it.name) }
+                if (userId == owner) _playlists.value = rows.map { Playlist(it.id, it.name, it.cover) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -115,7 +139,8 @@ class PlaylistsRepository(
                     ItemRow(row.id, i, t.provider.name, t.id, t.title, t.artist, t.artworkUrl, t.durationMs)
                 }
             )
-            _playlists.update { listOf(Playlist(row.id, row.name)) + it }
+            previewCache.remove(row.id)
+            _playlists.update { listOf(Playlist(row.id, row.name, row.cover)) + it }
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -176,6 +201,7 @@ class PlaylistsRepository(
                 eq("position", position)
             }
         }
+        previewCache.remove(playlistId)
         true
     } catch (e: CancellationException) {
         throw e
@@ -215,6 +241,7 @@ class PlaylistsRepository(
                     ItemRow(playlistId, start + i, t.provider.name, t.id, t.title, t.artist, t.artworkUrl, t.durationMs)
                 }
             )
+            previewCache.remove(playlistId)
             Result.success(fresh.size)
         } catch (e: CancellationException) {
             throw e
@@ -224,11 +251,112 @@ class PlaylistsRepository(
         }
     }
 
+    /** The cover photo of the playlist by its version tag; null if there is none or it could not be downloaded. */
+    suspend fun loadCover(playlist: Playlist): ByteArray? {
+        val marker = playlist.cover ?: return null
+        val uid = userId ?: return null
+        val key = "${playlist.id}/$marker"
+        coverCache[key]?.let { return it }
+        val bytes = try {
+            client.storage.from(COVER_BUCKET).downloadPublic(coverPath(uid, playlist.id, marker))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Solara: playlist cover load failed: ${e.message}")
+            null
+        } ?: return null
+        coverCache[key] = bytes
+        return bytes
+    }
+
+    /** Uploads a new cover (JPEG, already a square). The previous file is removed. */
+    suspend fun setCover(playlistId: String, jpeg: ByteArray): Result<Unit> {
+        val uid = userId ?: return Result.failure(Exception(S.noActiveSession))
+        val old = _playlists.value.firstOrNull { it.id == playlistId }?.cover
+        val marker = "u" + Random.nextInt(0, Int.MAX_VALUE).toString(36)
+        val bucket = client.storage.from(COVER_BUCKET)
+        var uploaded = false
+        return try {
+            bucket.upload(coverPath(uid, playlistId, marker), jpeg) {
+                upsert = true
+                contentType = ContentType.Image.JPEG
+            }
+            uploaded = true
+            client.from("playlists").update(CoverUpdate(marker)) { filter { eq("id", playlistId) } }
+            coverCache["$playlistId/$marker"] = jpeg
+            _playlists.update { list -> list.map { if (it.id == playlistId) it.copy(cover = marker) else it } }
+            if (old != null) runCatching { bucket.delete(coverPath(uid, playlistId, old)) }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Solara: playlist cover save failed: ${e.message}")
+            // The database did not accept the new tag: we do not leave an orphan file
+            if (uploaded) runCatching { bucket.delete(coverPath(uid, playlistId, marker)) }
+            val m = e.message.orEmpty()
+            Result.failure(
+                Exception(
+                    if ("exceeded the maximum allowed size" in m || "too large" in m.lowercase()) S.thePhotoIsTooLarge
+                    else S.failed(m.take(120))
+                )
+            )
+        }
+    }
+
+    /** Removes the own cover: the collage of track covers returns. */
+    suspend fun removeCover(playlistId: String): Result<Unit> {
+        val uid = userId ?: return Result.failure(Exception(S.noActiveSession))
+        val old = _playlists.value.firstOrNull { it.id == playlistId }?.cover ?: return Result.success(Unit)
+        return try {
+            client.from("playlists").update(CoverUpdate(null)) { filter { eq("id", playlistId) } }
+            _playlists.update { list -> list.map { if (it.id == playlistId) it.copy(cover = null) else it } }
+            coverCache.remove("$playlistId/$old")
+            runCatching { client.storage.from(COVER_BUCKET).delete(coverPath(uid, playlistId, old)) }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Solara: playlist cover remove failed: ${e.message}")
+            Result.failure(Exception(S.failed(e.message.orEmpty().take(120))))
+        }
+    }
+
+    /** Cover URLs of the first tracks (up to 4 different ones) for the collage; cached. */
+    suspend fun loadPreview(playlistId: String): List<String> {
+        previewCache[playlistId]?.let { return it }
+        return try {
+            val urls = client.from("playlist_items")
+                .select(Columns.list("artwork_url")) {
+                    filter { eq("playlist_id", playlistId) }
+                    order("position", Order.ASCENDING)
+                    limit(12)
+                }
+                .decodeList<ArtworkRow>()
+                .mapNotNull { it.artworkUrl?.takeIf { u -> u.isNotBlank() } }
+                .distinct()
+                .take(PREVIEW_COUNT)
+            previewCache[playlistId] = urls
+            urls
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            println("Solara: playlist preview load failed: ${e.message}")
+            emptyList()
+        }
+    }
+
     fun delete(playlistId: String) {
+        val gone = _playlists.value.firstOrNull { it.id == playlistId }
         _playlists.update { list -> list.filterNot { it.id == playlistId } }
+        previewCache.remove(playlistId)
         scope.launch {
             try {
                 client.from("playlists").delete { filter { eq("id", playlistId) } }
+                val uid = userId
+                val marker = gone?.cover
+                if (uid != null && marker != null) {
+                    runCatching { client.storage.from(COVER_BUCKET).delete(coverPath(uid, playlistId, marker)) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
