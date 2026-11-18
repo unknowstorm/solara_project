@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
@@ -39,6 +40,10 @@ class MediaControllerBackend(context: Context) : AudioBackend {
     private var released = false
     private var lastError: String? = null
     private var errorStreak = 0
+    // Right after a drag-move the controller may briefly name the dragged item as "current":
+    // for a short time we keep showing the item that was really playing
+    private var moveGuardId: String? = null
+    private var moveGuardUntil = 0L
     private var retriedMediaId: String? = null
     private val clearError = Runnable {
         lastError = null
@@ -49,6 +54,11 @@ class MediaControllerBackend(context: Context) : AudioBackend {
         override fun onEvents(player: Player, events: Player.Events) {
             if (events.containsAny(Player.EVENT_TIMELINE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION)) updateQueue()
             publish()
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // A real change of the playing track (auto, seek, repeat) ends the protection
+            if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) moveGuardId = null
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -234,7 +244,13 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
     override fun moveItem(from: Int, to: Int) {
         controller?.let {
-            if (from in 0 until it.mediaItemCount && to in 0 until it.mediaItemCount && from != to) it.moveMediaItem(from, to)
+            if (from in 0 until it.mediaItemCount && to in 0 until it.mediaItemCount && from != to) {
+                val now = SystemClock.uptimeMillis()
+                // Moves in a row keep the id of the track that was playing before the first one
+                if (moveGuardId == null || now >= moveGuardUntil) moveGuardId = it.currentMediaItem?.mediaId
+                moveGuardUntil = now + 600
+                it.moveMediaItem(from, to)
+            }
         }
     }
 
@@ -267,7 +283,16 @@ class MediaControllerBackend(context: Context) : AudioBackend {
 
     private fun publish() {
         val c = controller ?: return
-        val item = c.currentMediaItem
+        var item = c.currentMediaItem
+        var index = c.currentMediaItemIndex
+        val guardId = moveGuardId
+        if (guardId != null && SystemClock.uptimeMillis() < moveGuardUntil && item?.mediaId != guardId) {
+            val real = (0 until c.mediaItemCount).firstOrNull { c.getMediaItemAt(it).mediaId == guardId }
+            if (real != null) {
+                item = c.getMediaItemAt(real)
+                index = real
+            }
+        }
         val duration = c.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
         _state.value = PlaybackState(
             mediaId = item?.mediaId?.takeIf { it.isNotEmpty() },
@@ -287,7 +312,7 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 else -> RepeatMode.OFF
             },
             shuffle = c.shuffleModeEnabled,
-            currentIndex = c.currentMediaItemIndex,
+            currentIndex = index,
             provider = item?.mediaMetadata?.extras?.getString("provider")
                 ?.let { name -> ProviderId.entries.firstOrNull { it.name == name } },
         )
