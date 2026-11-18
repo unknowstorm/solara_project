@@ -145,15 +145,7 @@ private fun PlaylistsTab(
             Button(onClick = onOpenAuth) { Text(S.signIn) }
         }
         list.isEmpty() -> Message(S.noPlaylistsYet)
-        else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
-            items(list, key = { it.id }) { pl ->
-                ListItem(
-                    headlineContent = { Text(pl.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    modifier = Modifier.clickable { onOpenPlaylist(pl) },
-                )
-            }
-        }
+        else -> PlaylistTilesGrid(playlists, list, onOpen = onOpenPlaylist)
     }
 }
 
