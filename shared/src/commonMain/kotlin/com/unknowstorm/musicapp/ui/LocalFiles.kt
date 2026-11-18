@@ -17,6 +17,7 @@ data class LocalFileEntry(
     val title: String,
     val artist: String = "",
     val durationMs: Long = 0L,
+    val artworkUrl: String? = null,
 )
 
 /** The address of the file doubles as the track id and as the stream address (the player opens content:// itself). */
@@ -25,7 +26,7 @@ fun LocalFileEntry.toTrack() = Track(
     provider = ProviderId.LOCAL,
     title = title,
     artist = artist,
-    artworkUrl = null,
+    artworkUrl = artworkUrl,
     durationMs = durationMs,
     streamUrl = uri,
 )
