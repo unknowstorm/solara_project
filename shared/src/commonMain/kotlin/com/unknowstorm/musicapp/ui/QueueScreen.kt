@@ -35,6 +35,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -46,9 +47,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,6 +74,9 @@ import kotlin.math.roundToInt
 
 /** Высота строки очереди постоянная: на ней построено перетаскивание. */
 private val RowHeight = 64.dp
+
+// Share of the row width the user must swipe before releasing the finger removes the track
+private const val SwipeRemoveFraction = 0.5f
 
 /** Строка очереди с устойчивым номером: по нему Compose отличает строки при перестановке и удалении. */
 private class QRow(val uid: Long, val item: QueueItem)
@@ -342,23 +349,36 @@ fun QueueScreen(
                 val index = rows.indexOfFirst { it.uid == row.uid }
                 val current = index == state.currentIndex
                 val dragging = row.uid == dragUid
-                val dismissState = rememberSwipeToDismissBoxState(
-                    confirmValueChange = { value ->
-                        if (value == SwipeToDismissBoxValue.Settled) {
-                            false
-                        } else {
-                            val i = rows.indexOfFirst { it.uid == row.uid }
-                            if (i >= 0) {
-                                rows.removeAt(i)
-                                audio.removeAt(i)
-                            }
-                            true
-                        }
-                    },
-                )
+                // While a finger is down the row only follows it; the track is removed after release
+                val touching = remember(row.uid) { booleanArrayOf(false) }
+                val rowWidthPx = remember(row.uid) { floatArrayOf(0f) }
+                val scheme = MaterialTheme.colorScheme
+                // The library never decides anything: the removal is our own check when the finger is lifted
+                val dismissState = rememberSwipeToDismissBoxState(confirmValueChange = { false })
                 SwipeToDismissBox(
                     state = dismissState,
                     modifier = (if (dragging) Modifier else Modifier.animateItem())
+                        .onSizeChanged { rowWidthPx[0] = it.width.toFloat() }
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val down = event.changes.any { it.pressed }
+                                    if (touching[0] && !down) {
+                                        // Finger lifted: remove the track only if the row was pulled past the removal point
+                                        val off = runCatching { kotlin.math.abs(dismissState.requireOffset()) }.getOrDefault(0f)
+                                        if (rowWidthPx[0] > 0f && off >= rowWidthPx[0] * SwipeRemoveFraction) {
+                                            val i = rows.indexOfFirst { it.uid == row.uid }
+                                            if (i >= 0) {
+                                                rows.removeAt(i)
+                                                audio.removeAt(i)
+                                            }
+                                        }
+                                    }
+                                    touching[0] = down
+                                }
+                            }
+                        }
                         .zIndex(if (dragging) 1f else 0f)
                         .graphicsLayer {
                             if (dragging) {
@@ -370,7 +390,19 @@ fun QueueScreen(
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.errorContainer)
+                                .drawBehind {
+                                    val off = runCatching { kotlin.math.abs(dismissState.requireOffset()) }.getOrDefault(0f)
+                                    val removalPx = (rowWidthPx[0] * SwipeRemoveFraction).coerceAtLeast(1f)
+                                    val ramp = (off / removalPx).coerceIn(0f, 1f)
+                                    val soft = androidx.compose.ui.graphics.lerp(
+                                        scheme.surfaceVariant, scheme.errorContainer, (ramp / 0.7f).coerceIn(0f, 1f),
+                                    )
+                                    drawRect(
+                                        androidx.compose.ui.graphics.lerp(
+                                            soft, androidx.compose.ui.graphics.Color(0xFFE53935), ((ramp - 0.7f) / 0.3f).coerceIn(0f, 1f),
+                                        )
+                                    )
+                                }
                                 .padding(horizontal = 24.dp),
                             contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
                                 Alignment.CenterStart
@@ -378,7 +410,15 @@ fun QueueScreen(
                                 Alignment.CenterEnd
                             },
                         ) {
-                            CrossIcon(Modifier.size(20.dp), MaterialTheme.colorScheme.onErrorContainer)
+                            val crossColor by remember {
+                                derivedStateOf {
+                                    val off = runCatching { kotlin.math.abs(dismissState.requireOffset()) }.getOrDefault(0f)
+                                    val removalPx = (rowWidthPx[0] * SwipeRemoveFraction).coerceAtLeast(1f)
+                                    val k = ((off / removalPx - 0.7f) / 0.3f).coerceIn(0f, 1f)
+                                    androidx.compose.ui.graphics.lerp(scheme.onErrorContainer, androidx.compose.ui.graphics.Color.White, k)
+                                }
+                            }
+                            CrossIcon(Modifier.size(20.dp), crossColor)
                         }
                     },
                 ) {
