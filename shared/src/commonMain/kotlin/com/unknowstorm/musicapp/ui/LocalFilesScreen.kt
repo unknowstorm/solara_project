@@ -76,7 +76,7 @@ fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifi
                     modifier = Modifier.clickable { audio.playQueue(tracks, index) },
                     leadingContent = {
                         Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))) {
-                            CoverImage(null, Modifier.fillMaxSize())
+                            CoverImage(track.artworkUrl, Modifier.fillMaxSize())
                         }
                     },
                     headlineContent = { Text(track.title, maxLines = 1) },
