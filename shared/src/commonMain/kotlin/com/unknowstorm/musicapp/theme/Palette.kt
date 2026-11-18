@@ -14,6 +14,15 @@ import kotlin.math.min
 /** Ключ в текстовом хранилище, под которым лежит выбранная палитра. */
 const val PALETTE_KEY = "palette"
 
+/** Ключ в текстовом хранилище для сохранённых своих палитр (основные цвета через запятую). */
+const val PALETTE_CUSTOM_KEY = "palette_custom"
+
+fun encodeCustomSeeds(list: List<Int>): String =
+    list.joinToString(",") { (it.toLong() and 0xFFFFFFFFL).toString(16) }
+
+fun decodeCustomSeeds(raw: String?): List<Int> =
+    raw.orEmpty().split(",").mapNotNull { it.trim().toLongOrNull(16)?.toInt() }.distinct()
+
 /** Ключ в текстовом хранилище для режима темы (системная / светлая / тёмная). */
 const val THEME_MODE_KEY = "theme_mode"
 
@@ -147,10 +156,13 @@ private fun hsl(h: Float, s: Float, l: Float): Color {
 fun schemeFromSeed(seed: Color, dark: Boolean): ColorScheme {
     val base = hslOf(seed)
     val h = base.h
-    val s = base.s.coerceIn(0.45f, 0.9f)
-    val sSec = (s * 0.4f).coerceIn(0.2f, 0.4f)
+    val s = base.s.coerceIn(0.1f, 1f)
+    val sSec = (s * 0.4f).coerceIn(0.05f, 0.4f)
     val hTer = h + 60f
-    val sTer = (s * 0.6f).coerceIn(0.3f, 0.55f)
+    val sTer = (s * 0.6f).coerceIn(0.1f, 0.55f)
+    // Яркость основного цвета сдвигает главные тона: тёмный цвет даёт более тёмную схему.
+    // Для яркости 0.5 (рекомендуемые цвета) сдвиг равен нулю.
+    val d = ((base.l - 0.5f) * 0.6f).coerceIn(-0.15f, 0.06f)
 
     fun pri(l: Float) = hsl(h, s, l)
     fun sec(l: Float) = hsl(h, sSec, l)
@@ -160,17 +172,17 @@ fun schemeFromSeed(seed: Color, dark: Boolean): ColorScheme {
 
     return if (!dark) {
         lightColorScheme().copy(
-            primary = pri(0.40f), onPrimary = Color.White,
+            primary = pri(0.40f + d), onPrimary = Color.White,
             primaryContainer = pri(0.90f), onPrimaryContainer = pri(0.12f),
             inversePrimary = pri(0.80f),
-            secondary = sec(0.40f), onSecondary = Color.White,
+            secondary = sec(0.40f + d), onSecondary = Color.White,
             secondaryContainer = sec(0.90f), onSecondaryContainer = sec(0.12f),
-            tertiary = ter(0.40f), onTertiary = Color.White,
+            tertiary = ter(0.40f + d), onTertiary = Color.White,
             tertiaryContainer = ter(0.90f), onTertiaryContainer = ter(0.12f),
             background = neu(0.98f), onBackground = neu(0.10f),
             surface = neu(0.98f), onSurface = neu(0.10f),
             surfaceVariant = nvar(0.90f), onSurfaceVariant = nvar(0.30f),
-            surfaceTint = pri(0.40f),
+            surfaceTint = pri(0.40f + d),
             inverseSurface = neu(0.20f), inverseOnSurface = neu(0.95f),
             outline = nvar(0.50f), outlineVariant = nvar(0.80f),
             surfaceBright = neu(0.98f), surfaceDim = neu(0.87f),
@@ -180,17 +192,17 @@ fun schemeFromSeed(seed: Color, dark: Boolean): ColorScheme {
         )
     } else {
         darkColorScheme().copy(
-            primary = pri(0.80f), onPrimary = pri(0.20f),
+            primary = pri(0.80f + d), onPrimary = pri(0.20f),
             primaryContainer = pri(0.30f), onPrimaryContainer = pri(0.90f),
             inversePrimary = pri(0.40f),
-            secondary = sec(0.80f), onSecondary = sec(0.20f),
+            secondary = sec(0.80f + d), onSecondary = sec(0.20f),
             secondaryContainer = sec(0.30f), onSecondaryContainer = sec(0.90f),
-            tertiary = ter(0.80f), onTertiary = ter(0.20f),
+            tertiary = ter(0.80f + d), onTertiary = ter(0.20f),
             tertiaryContainer = ter(0.30f), onTertiaryContainer = ter(0.90f),
             background = neu(0.07f), onBackground = neu(0.90f),
             surface = neu(0.07f), onSurface = neu(0.90f),
             surfaceVariant = nvar(0.25f), onSurfaceVariant = nvar(0.80f),
-            surfaceTint = pri(0.80f),
+            surfaceTint = pri(0.80f + d),
             inverseSurface = neu(0.90f), inverseOnSurface = neu(0.20f),
             outline = nvar(0.60f), outlineVariant = nvar(0.30f),
             surfaceBright = neu(0.22f), surfaceDim = neu(0.07f),
@@ -209,8 +221,11 @@ fun seedHue(color: Color): Float = hslOf(color).h
 /** Насыщенность основного цвета, 0..1. */
 fun seedSaturation(color: Color): Float = hslOf(color).s
 
-/** Основной цвет из оттенка и насыщенности: яркость фиксирована, чтобы цвета были сопоставимы. */
-fun seedColor(hue: Float, saturation: Float): Color = hsl(hue, saturation, 0.5f)
+/** Яркость основного цвета, 0..1. */
+fun seedLightness(color: Color): Float = hslOf(color).l
+
+/** Основной цвет из оттенка, насыщенности и яркости (по умолчанию 0.5, как у рекомендуемых). */
+fun seedColor(hue: Float, saturation: Float, lightness: Float = 0.5f): Color = hsl(hue, saturation, lightness)
 
 /**
  * Рекомендуемые основные цвета рядом с [base]: тот же цветовой охват, оттенок смещён в обе стороны.
