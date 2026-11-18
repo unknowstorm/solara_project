@@ -391,18 +391,16 @@ fun HomeScreen(
                 ) {
                     items(myPlaylists.size) { index ->
                         val pl = myPlaylists.getOrNull(index) ?: return@items
-                        val colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.secondaryContainer,
-                            MaterialTheme.colorScheme.tertiaryContainer,
-                            MaterialTheme.colorScheme.surfaceVariant
-                        )
-                        PlaylistCard(
-                            pl.name,
-                            colors[index % colors.size],
-                            onClick = { onOpenPlaylist(pl) },
-                            onLongClick = { deleting = pl },
-                        )
+                        playlists?.let { repo ->
+                            PlaylistTile(
+                                repo = repo,
+                                playlist = pl,
+                                onClick = { onOpenPlaylist(pl) },
+                                onLongClick = { deleting = pl },
+                                modifier = Modifier.size(120.dp),
+                                compact = true,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
