@@ -4,6 +4,7 @@ import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,9 +121,55 @@ fun QueueScreen(
     var nextUid by remember { mutableLongStateOf(queue.size.toLong()) }
     var dragUid by remember { mutableStateOf<Long?>(null) }
     var dragShift by remember { mutableFloatStateOf(0f) }
+    // Y пальца внутри списка: по нему работает автопрокрутка у краёв
+    var dragFingerY by remember { mutableFloatStateOf(0f) }
     val listState = rememberLazyListState()
     val rowPx = with(LocalDensity.current) { RowHeight.toPx() }
     val haptic = LocalHapticFeedback.current
+
+    // Ставит перетаскиваемую строку в слот под её текущим положением (вызывается и жестом, и автопрокруткой)
+    fun reorderStep() {
+        val uid = dragUid ?: return
+        val cur = rows.indexOfFirst { it.uid == uid }
+        if (cur < 0) return
+        val target = (cur + (dragShift / rowPx).roundToInt()).coerceIn(0, rows.lastIndex)
+        if (target == cur) return
+        // LazyColumn держит позицию по КЛЮЧУ первой видимой строки: без этого весь список уезжает за верхней строкой
+        val firstIndex = listState.firstVisibleItemIndex
+        val firstOffset = listState.firstVisibleItemScrollOffset
+        rows.add(target, rows.removeAt(cur))
+        listState.requestScrollToItem(firstIndex, firstOffset)
+        audio.moveItem(cur, target)
+        dragShift -= (target - cur) * rowPx
+    }
+
+    // Автопрокрутка: палец у верхнего или нижнего края листает список, чем ближе к краю, тем быстрее
+    LaunchedEffect(dragUid) {
+        if (dragUid == null) return@LaunchedEffect
+        var last = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val dt = (now - last) / 1_000_000_000f
+            last = now
+            val info = listState.layoutInfo
+            val height = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
+            val edge = rowPx * 1.2f
+            val y = dragFingerY
+            val k = when {
+                y < edge -> -((edge - y) / edge).coerceIn(0f, 1f)
+                y > height - edge -> ((y - (height - edge)) / edge).coerceIn(0f, 1f)
+                else -> 0f
+            }
+            if (k != 0f) {
+                val used = listState.scrollBy(k * rowPx * 10f * dt)
+                if (used != 0f) {
+                    // Список уехал на used: строка должна остаться под пальцем
+                    dragShift += used
+                    reorderStep()
+                }
+            }
+        }
+    }
 
     // Синхронизация с плеером; во время перетаскивания не трогаем список
     LaunchedEffect(queue, dragUid) {
@@ -322,22 +370,17 @@ fun QueueScreen(
                                 ((offset.y + listState.firstVisibleItemScrollOffset) / rowPx).toInt()
                             rows.getOrNull(idx)?.let {
                                 dragUid = it.uid
+                                dragFingerY = offset.y
                                 dragShift = 0f
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }
                         },
                         onDrag = { change, amount ->
-                            val uid = dragUid ?: return@detectDragGesturesAfterLongPress
+                            if (dragUid == null) return@detectDragGesturesAfterLongPress
                             change.consume()
+                            dragFingerY = change.position.y
                             dragShift += amount.y
-                            val cur = rows.indexOfFirst { it.uid == uid }
-                            if (cur < 0) return@detectDragGesturesAfterLongPress
-                            val target = (cur + (dragShift / rowPx).roundToInt()).coerceIn(0, rows.lastIndex)
-                            if (target != cur) {
-                                rows.add(target, rows.removeAt(cur))
-                                audio.moveItem(cur, target)
-                                dragShift -= (target - cur) * rowPx
-                            }
+                            reorderStep()
                         },
                         onDragEnd = { dragUid = null; dragShift = 0f },
                         onDragCancel = { dragUid = null; dragShift = 0f },
