@@ -127,6 +127,16 @@ fun QueueScreen(
     val rowPx = with(LocalDensity.current) { RowHeight.toPx() }
     val haptic = LocalHapticFeedback.current
 
+    // Подсветка идёт за самой строкой, а не за номером позиции: пока плеер применяет перенос, currentIndex отстаёт
+    var holdUid by remember { mutableStateOf<Long?>(null) }
+    val currentIndexNow by androidx.compose.runtime.rememberUpdatedState(state.currentIndex)
+    LaunchedEffect(dragUid) {
+        if (dragUid == null && holdUid != null) {
+            delay(300) // плеер применяет последний перенос
+            holdUid = null
+        }
+    }
+
     // Ставит перетаскиваемую строку в слот под её текущим положением (вызывается и жестом, и автопрокруткой)
     fun reorderStep() {
         val uid = dragUid ?: return
@@ -371,6 +381,7 @@ fun QueueScreen(
                             rows.getOrNull(idx)?.let {
                                 dragUid = it.uid
                                 dragFingerY = offset.y
+                                holdUid = rows.getOrNull(currentIndexNow)?.uid
                                 dragShift = 0f
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }
@@ -390,7 +401,7 @@ fun QueueScreen(
             items(rows, key = { it.uid }) { row ->
                 val item = row.item
                 val index = rows.indexOfFirst { it.uid == row.uid }
-                val current = index == state.currentIndex
+                val current = holdUid?.let { it == row.uid } ?: (index == state.currentIndex)
                 val dragging = row.uid == dragUid
                 // While a finger is down the row only follows it; the track is removed after release
                 val touching = remember(row.uid) { booleanArrayOf(false) }
