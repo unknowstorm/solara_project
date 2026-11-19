@@ -439,7 +439,9 @@ internal fun SettingsRow(
     subtitle: String? = null,
     tile: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    selected: Boolean = false,
 ) {
+    val container = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     val body: @Composable () -> Unit = {
         Row(
             Modifier.fillMaxWidth().heightIn(min = 88.dp).padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
@@ -461,9 +463,9 @@ internal fun SettingsRow(
         }
     }
     if (onClick != null) {
-        Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { body() }
+        Surface(onClick = onClick, shape = shape, color = container, modifier = Modifier.fillMaxWidth()) { body() }
     } else {
-        Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) { body() }
+        Surface(shape = shape, color = container, modifier = Modifier.fillMaxWidth()) { body() }
     }
 }
 
