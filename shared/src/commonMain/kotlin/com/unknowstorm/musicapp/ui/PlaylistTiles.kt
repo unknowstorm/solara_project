@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -106,6 +106,7 @@ fun PlaylistTilesGrid(
     onLongClick: ((Playlist) -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(16.dp),
 ) {
+    val played = remember { mutableSetOf<Int>() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
         modifier = modifier.fillMaxSize(),
@@ -113,13 +114,17 @@ fun PlaylistTilesGrid(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(playlists, key = { it.id }) { pl ->
+        itemsIndexed(playlists, key = { _, pl -> pl.id }) { index, pl ->
             PlaylistTile(
                 repo = repo,
                 playlist = pl,
                 onClick = { onOpen(pl) },
                 onLongClick = onLongClick?.let { cb -> { cb(pl) } },
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                modifier = Modifier
+                    .animateItem()
+                    .staggeredEntrance(index, played, maxIndex = 11)
+                    .fillMaxWidth()
+                    .aspectRatio(1f),
             )
         }
     }

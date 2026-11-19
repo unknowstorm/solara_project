@@ -59,15 +59,21 @@ import com.unknowstorm.musicapp.i18n.S
  * (the same order as LibraryTab in LikedScreen.kt).
  */
 @Composable
-fun LibraryTiles(likesCount: Int?, onOpen: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun LibraryTiles(
+    likesCount: Int?,
+    onOpen: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    // Индексы плиток, которые уже сыграли каскад: при возврате из раздела они не анимируются повторно
+    played: MutableSet<Int> = remember { mutableSetOf() },
+) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         // Низкое окно (телефон в альбомной ориентации): широкая плитка и сетка не помещаются, всё идёт одним рядом
-        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen) else LibraryTilesGrid(likesCount, onOpen)
+        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen, played) else LibraryTilesGrid(likesCount, onOpen, played)
     }
 }
 
 @Composable
-private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit) {
+private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit, played: MutableSet<Int>) {
     val cs = MaterialTheme.colorScheme
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
@@ -81,7 +87,7 @@ private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit) {
                 container = cs.primaryContainer,
                 content = cs.onPrimaryContainer,
                 onClick = { onOpen(0) },
-                modifier = Modifier.fillMaxWidth().height(112.dp),
+                modifier = Modifier.fillMaxWidth().height(112.dp).staggeredEntrance(0, played),
             ) {
                 Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconDisc(56.dp, cs.onPrimaryContainer) { HeartIcon(true, Modifier.size(30.dp), cs.onPrimaryContainer) }
@@ -100,23 +106,35 @@ private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit) {
             }
         }
         item {
-            SquareTile(S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) }) { PlaylistGlyph(Modifier.size(28.dp), it) }
+            SquareTile(
+                S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) },
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).staggeredEntrance(1, played),
+            ) { PlaylistGlyph(Modifier.size(28.dp), it) }
         }
         item {
-            SquareTile(S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) }) { HistoryGlyph(Modifier.size(28.dp), it) }
+            SquareTile(
+                S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) },
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).staggeredEntrance(2, played),
+            ) { HistoryGlyph(Modifier.size(28.dp), it) }
         }
         item {
-            SquareTile(S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) }) { FolderGlyph(Modifier.size(28.dp), it) }
+            SquareTile(
+                S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) },
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).staggeredEntrance(3, played),
+            ) { FolderGlyph(Modifier.size(28.dp), it) }
         }
         item {
-            SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }) { DownloadTrayGlyph(Modifier.size(28.dp), it) }
+            SquareTile(
+                S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) },
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).staggeredEntrance(4, played),
+            ) { DownloadTrayGlyph(Modifier.size(28.dp), it) }
         }
     }
 }
 
 /** Все пять плиток одного размера в один ряд: для низкого окна, где сетка не помещается без прокрутки. */
 @Composable
-private fun LibraryTilesRow(likesCount: Int?, onOpen: (Int) -> Unit) {
+private fun LibraryTilesRow(likesCount: Int?, onOpen: (Int) -> Unit, played: MutableSet<Int>) {
     val cs = MaterialTheme.colorScheme
     Row(
         Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -126,18 +144,18 @@ private fun LibraryTilesRow(likesCount: Int?, onOpen: (Int) -> Unit) {
         val tile = Modifier.weight(1f).fillMaxHeight().heightIn(max = 190.dp)
         SquareTile(
             S.libLikes, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(0) },
-            modifier = tile, compact = true, subtitle = likesCount?.let { S.tracks(it) },
+            modifier = tile.staggeredEntrance(0, played), compact = true, subtitle = likesCount?.let { S.tracks(it) },
         ) { HeartIcon(true, Modifier.size(24.dp), it) }
-        SquareTile(S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) }, modifier = tile, compact = true) {
+        SquareTile(S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) }, modifier = tile.staggeredEntrance(1, played), compact = true) {
             PlaylistGlyph(Modifier.size(24.dp), it)
         }
-        SquareTile(S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) }, modifier = tile, compact = true) {
+        SquareTile(S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) }, modifier = tile.staggeredEntrance(2, played), compact = true) {
             HistoryGlyph(Modifier.size(24.dp), it)
         }
-        SquareTile(S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) }, modifier = tile, compact = true) {
+        SquareTile(S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) }, modifier = tile.staggeredEntrance(3, played), compact = true) {
             FolderGlyph(Modifier.size(24.dp), it)
         }
-        SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }, modifier = tile, compact = true) {
+        SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }, modifier = tile.staggeredEntrance(4, played), compact = true) {
             DownloadTrayGlyph(Modifier.size(24.dp), it)
         }
     }

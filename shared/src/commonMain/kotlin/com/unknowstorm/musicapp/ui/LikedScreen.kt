@@ -2,7 +2,6 @@ package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenu
@@ -22,7 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
@@ -54,6 +54,22 @@ import com.unknowstorm.musicapp.player.DeadTracks
 import com.unknowstorm.musicapp.playlists.Playlist
 import com.unknowstorm.musicapp.playlists.PlaylistsRepository
 import com.unknowstorm.musicapp.provider.MusicProvider
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab {
@@ -69,6 +85,47 @@ private enum class LibraryTab {
             CACHE -> S.libCache
         }
 }
+
+/**
+ * Элемент выезжает снизу с лёгким масштабом на пружине. [played] хранит уже показанные индексы:
+ * при прокрутке и возвращении они не анимируются повторно. Индексы больше [maxIndex] не анимируются
+ * (в длинных списках каскад нужен только для первых строк).
+ */
+@Composable
+internal fun Modifier.staggeredEntrance(
+    index: Int,
+    played: MutableSet<Int>,
+    maxIndex: Int = Int.MAX_VALUE,
+    stepMs: Long = 55L,
+    shift: Dp = 40.dp,
+    fromScale: Float = 0.9f,
+): Modifier {
+    if (index > maxIndex) return this
+    val progress = remember { Animatable(if (index in played) 1f else 0f) }
+    LaunchedEffect(Unit) {
+        if (index !in played) {
+            played.add(index)
+            delay(index * stepMs)
+            progress.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
+        }
+    }
+    val shiftPx = with(LocalDensity.current) { shift.toPx() }
+    return graphicsLayer {
+        val p = progress.value
+        alpha = (p * 1.4f).coerceIn(0f, 1f)
+        translationY = (1f - p) * shiftPx
+        val s = fromScale + (1f - fromScale) * p
+        scaleX = s
+        scaleY = s
+    }
+}
+
+/** Строка списка: плавно появляется, исчезает и сдвигается на место удалённой. */
+internal fun LazyItemScope.animatedRow(): Modifier = Modifier.animateItem(
+    fadeInSpec = tween(250),
+    placementSpec = spring<IntOffset>(0.8f, Spring.StiffnessMediumLow),
+    fadeOutSpec = tween(150),
+)
 
 /**
  * «Моя библиотека»: первая страница верхней панели Главной. Список разделов
@@ -90,38 +147,64 @@ fun LibraryContent(
     var selected by rememberSaveable { mutableIntStateOf(-1) }
     val sections = LibraryTab.entries
 
-    if (selected !in sections.indices) {
-        val liked by likes.tracks.collectAsState()
-        val signedIn by likes.signedIn.collectAsState()
-        LibraryTiles(
-            likesCount = if (signedIn) liked.count { !DeadTracks.isDead(it) } else null,
-            onOpen = { selected = it },
-        )
-        return
-    }
-
-    val section = sections[selected]
-    PlatformBackHandler(onBack = { selected = -1 })
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { selected = -1 }) { Text("←", style = MaterialTheme.typography.titleLarge) }
-            Text(
-                section.label,
-                style = MaterialTheme.typography.headlineSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    AnimatedContent(
+        targetState = selected,
+        transitionSpec = {
+            val opening = targetState >= 0 && initialState < 0
+            val closing = targetState < 0 && initialState >= 0
+            val slide = spring<IntOffset>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+            val transition = when {
+                opening ->
+                    (slideInHorizontally(slide) { it / 3 } + fadeIn(tween(240, delayMillis = 80))) togetherWith
+                        (slideOutHorizontally(slide) { -it / 8 } + fadeOut(tween(120)))
+                closing ->
+                    (slideInHorizontally(slide) { -it / 8 } + fadeIn(tween(240, delayMillis = 80))) togetherWith
+                        (slideOutHorizontally(slide) { it / 3 } + fadeOut(tween(120)))
+                else -> fadeIn(tween(200)) togetherWith fadeOut(tween(120))
+            }
+            // При закрытии уходящий раздел остаётся поверх плиток
+            transition.targetContentZIndex = if (closing) -1f else 0f
+            transition.using(SizeTransform(clip = false))
+        },
+        label = "library",
+        modifier = Modifier.fillMaxSize(),
+    ) { sel ->
+        if (sel !in sections.indices) {
+            val liked by likes.tracks.collectAsState()
+            val signedIn by likes.signedIn.collectAsState()
+            LibraryTiles(
+                likesCount = if (signedIn) liked.count { !DeadTracks.isDead(it) } else null,
+                onOpen = { selected = it },
             )
-        }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (section) {
-                LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth, downloads)
-                LibraryTab.PLAYLISTS -> PlaylistsTab(playlists, onOpenAuth, onOpenPlaylist)
-                LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
-                LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio) else Message(S.noLocalFiles)
-                LibraryTab.CACHE -> if (downloads != null) DownloadsContent(downloads, audio) else Message(S.cacheSoon)
+        } else {
+            val section = sections[sel]
+            PlatformBackHandler(onBack = { selected = -1 })
+            val headerPlayed = remember { mutableSetOf<Int>() }
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    Modifier
+                        .staggeredEntrance(0, headerPlayed, shift = 16.dp, fromScale = 0.98f)
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { selected = -1 }) { Text("←", style = MaterialTheme.typography.titleLarge) }
+                    Text(
+                        section.label,
+                        style = MaterialTheme.typography.headlineSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when (section) {
+                        LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth, downloads)
+                        LibraryTab.PLAYLISTS -> PlaylistsTab(playlists, onOpenAuth, onOpenPlaylist)
+                        LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
+                        LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio) else Message(S.noLocalFiles)
+                        LibraryTab.CACHE -> if (downloads != null) DownloadsContent(downloads, audio) else Message(S.cacheSoon)
+                    }
+                }
             }
         }
     }
@@ -158,6 +241,7 @@ private fun HistoryTab(
     onOpenAuth: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val played = remember { mutableSetOf<Int>() }
     val signedIn by likes.signedIn.collectAsState()
     var tracks by remember { mutableStateOf<List<Track>?>(null) }
     LaunchedEffect(signedIn, history) {
@@ -186,9 +270,11 @@ private fun HistoryTab(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(shown, key = { "${it.provider}:${it.id}" }) { track ->
+            itemsIndexed(shown, key = { _, t -> "${t.provider}:${t.id}" }) { index, track ->
                 Row(
                     Modifier
+                        .then(animatedRow())
+                        .staggeredEntrance(index, played, maxIndex = 10, stepMs = 35L, shift = 24.dp, fromScale = 0.96f)
                         .fillMaxWidth()
                         .clickable { scope.launch { playLiked(shown, track, providers, audio) } }
                         .padding(vertical = 4.dp),
@@ -231,6 +317,7 @@ fun LikedContent(
     downloads: DownloadManager? = null,
 ) {
     val scope = rememberCoroutineScope()
+    val played = remember { mutableSetOf<Int>() }
     val liked by likes.tracks.collectAsState()
     val signedIn by likes.signedIn.collectAsState()
     val error by likes.error.collectAsState()
@@ -274,9 +361,11 @@ fun LikedContent(
                         }
                     }
                 }
-                items(shown, key = { "${it.provider}:${it.id}" }) { track ->
+                itemsIndexed(shown, key = { _, t -> "${t.provider}:${t.id}" }) { index, track ->
                     Row(
                         Modifier
+                            .then(animatedRow())
+                            .staggeredEntrance(index, played, maxIndex = 10, stepMs = 35L, shift = 24.dp, fromScale = 0.96f)
                             .fillMaxWidth()
                             .clickable { scope.launch { playLiked(shown, track, providers, audio) } }
                             .padding(vertical = 4.dp),
@@ -313,7 +402,17 @@ fun LikedContent(
 
 @Composable
 private fun Message(text: String, action: @Composable (() -> Unit)? = null) {
-    Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, spring(0.8f, Spring.StiffnessLow)) }
+    Box(
+        Modifier.fillMaxSize().padding(32.dp).graphicsLayer {
+            alpha = appear.value
+            val s = 0.94f + 0.06f * appear.value
+            scaleX = s
+            scaleY = s
+        },
+        contentAlignment = Alignment.Center,
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(
                 text,

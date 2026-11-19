@@ -89,6 +89,7 @@ fun DownloadsContent(downloads: DownloadManager, audio: AudioBackend, modifier: 
     val playback by audio.state.collectAsState()
     val tracks = remember(items) { items.map { it.toPlayable() } }
     val totalBytes = items.sumOf { it.sizeBytes }
+    val played = remember { mutableSetOf<Int>() }
 
     Column(modifier.fillMaxSize()) {
         if (items.isNotEmpty()) {
@@ -126,7 +127,9 @@ fun DownloadsContent(downloads: DownloadManager, audio: AudioBackend, modifier: 
             itemsIndexed(items, key = { _, d -> downloads.keyOf(d) }) { index, d ->
                 val current = playback.provider == ProviderId.JAMENDO && playback.mediaId == d.id
                 ListItem(
-                    modifier = Modifier.clickable { audio.playQueue(tracks, index) },
+                    modifier = animatedRow()
+                        .staggeredEntrance(index, played, maxIndex = 10, stepMs = 35L, shift = 24.dp, fromScale = 0.96f)
+                        .clickable { audio.playQueue(tracks, index) },
                     leadingContent = {
                         Box(Modifier.size(52.dp).clip(RoundedCornerShape(8.dp))) {
                             // The cover from the file works without internet
