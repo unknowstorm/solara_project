@@ -68,12 +68,17 @@ fun LibraryTiles(
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         // Низкое окно (телефон в альбомной ориентации): широкая плитка и сетка не помещаются, всё идёт одним рядом
-        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen, played) else LibraryTilesGrid(likesCount, onOpen, played)
+        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen, played) else LibraryTilesGrid(likesCount, onOpen, played, maxWidth)
     }
 }
 
 @Composable
-private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit, played: MutableSet<Int>) {
+private fun LibraryTilesGrid(
+    likesCount: Int?,
+    onOpen: (Int) -> Unit,
+    played: MutableSet<Int>,
+    width: androidx.compose.ui.unit.Dp,
+) {
     val cs = MaterialTheme.colorScheme
     // Планшет: ровно 4 колонки на всю ширину (Adaptive оставлял бы пустые колонки справа).
     // На очень широком окне плитки ниже квадрата, чтобы не вырастали до 300 dp.
