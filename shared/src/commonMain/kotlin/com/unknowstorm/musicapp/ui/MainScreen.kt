@@ -298,11 +298,6 @@ private fun InfoScreen(title: String, body: String) {
     }
 }
 
-// TODO: move these captions to S (i18n) together with translations; for now they match the sketch.
-private const val SETTINGS_GENERAL = "General"
-private const val SETTINGS_SOUNDS = "Sounds"
-private const val SETTINGS_STORAGE = "Storage cache"
-private const val SETTINGS_STATUS = "System status"
 private const val SETTINGS_SPOTIFY = "Spotify"
 
 @Composable
@@ -338,7 +333,7 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
         }
         Spacer(Modifier.height(20.dp))
 
-        SettingsSection(SETTINGS_GENERAL, IconTune) {
+        SettingsSection(S.settingsGeneral, IconTune) {
             GeneralSettings()
         }
         Spacer(Modifier.height(4.dp))
@@ -350,7 +345,7 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
         Spacer(Modifier.height(4.dp))
 
 
-        SettingsSection(SETTINGS_SOUNDS, IconVolume) {
+        SettingsSection(S.settingsSounds, IconVolume) {
             var showEqualizer by remember { mutableStateOf(false) }
             val eq = audio.equalizer
             SettingsGroup(
@@ -369,12 +364,12 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
         Spacer(Modifier.height(4.dp))
 
         // Placeholder: no cache settings in the code yet
-        SettingsSection(SETTINGS_STORAGE, IconStorage) {
+        SettingsSection(S.settingsStorage, IconStorage) {
             SettingsGroup(listOf { shape -> SettingsRow(shape, "Coming soon") })
         }
         Spacer(Modifier.height(4.dp))
 
-        SettingsSection(SETTINGS_STATUS, IconInfo) {
+        SettingsSection(S.settingsStatus, IconInfo) {
             SettingsGroup(
                 Service.entries.filter { it != Service.ALL }.map { service ->
                     val row: @Composable (Shape) -> Unit = { shape ->
@@ -584,7 +579,8 @@ private fun EqualizerSheet(controller: EqualizerController, onDismiss: () -> Uni
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                current.presets.forEachIndexed { index, name ->
+                current.presets.forEachIndexed { index, rawName ->
+                    val name = S.equalizerPreset(rawName)
                     AssistChip(
                         onClick = {
                             val preset = controller.presetLevels(index)
