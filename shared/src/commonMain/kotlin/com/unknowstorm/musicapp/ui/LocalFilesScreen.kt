@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.model.ProviderId
@@ -39,7 +41,7 @@ private fun localDuration(ms: Long): String {
 
 /** The list of music files from this phone. Tap a file to play the whole list starting from it. */
 @Composable
-fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifier = Modifier) {
+fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifier = Modifier, showTitle: Boolean = true) {
     val files by local.files.collectAsState()
     val playback by audio.state.collectAsState()
     val pick = rememberAudioFilesPicker { local.add(it) }
@@ -48,11 +50,22 @@ fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifi
     Column(modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(S.libLocal, style = MaterialTheme.typography.titleLarge)
-            Button(onClick = pick) { Text(S.addFiles) }
+            // The title takes the rest of the row and is ellipsized; the button keeps its natural width on one line
+            if (showTitle) {
+                Text(
+                    S.libLocal,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+            Button(onClick = pick) { Text(S.addFiles, maxLines = 1) }
         }
         Text(
             S.localFilesNote,

@@ -120,7 +120,7 @@ fun LibraryContent(
                 LibraryTab.LIKES -> LikedContent(likes, providers, audio, onOpenAuth, downloads)
                 LibraryTab.PLAYLISTS -> PlaylistsTab(playlists, onOpenAuth, onOpenPlaylist)
                 LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
-                LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio) else Message(S.noLocalFiles)
+                LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio, showTitle = false) else Message(S.noLocalFiles)
                 LibraryTab.CACHE -> if (downloads != null) DownloadsContent(downloads, audio) else Message(S.cacheSoon)
             }
         }
