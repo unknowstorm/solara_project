@@ -69,6 +69,8 @@ data class SpotifyQueue(
     val error: String? = null,
     val nowPlaying: SpotifyLibTrack? = null,
     val next: List<SpotifyLibTrack> = emptyList(),
+    /** Tracks jumped over by tapping a later track in the queue: kept while the queue page is open, never in "Recent". */
+    val skipped: List<SpotifyLibTrack> = emptyList(),
 )
 
 /** Spotify state lives only in memory. Nothing from it is saved. */
@@ -120,6 +122,10 @@ interface SpotifyRemote {
     fun seekTo(ms: Long)
     /** Appends a track to the end of the Spotify queue (App Remote can only append: no reordering, no removing). */
     fun queueUri(uri: String) {}
+    /** Tapping the track at [index] of the queue: skips to it. The tracks jumped over go to the "Skipped" list of the queue page, not to history. */
+    fun jumpInQueue(index: Int) { repeat(index + 1) { next() } }
+    /** Removes a track from the "Skipped" list of the queue page. */
+    fun dismissSkipped(uri: String) {}
     fun setShuffle(on: Boolean) {}
     fun setRepeat(mode: SpotifyRepeat) {}
     fun toggleSaved()
