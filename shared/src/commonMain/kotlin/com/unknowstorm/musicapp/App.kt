@@ -35,6 +35,7 @@ import com.unknowstorm.musicapp.theme.SolaraTheme
 import com.unknowstorm.musicapp.ui.ISLAND_KEY
 import com.unknowstorm.musicapp.ui.IslandSettings
 import com.unknowstorm.musicapp.ui.LocalSpotifyMini
+import com.unknowstorm.musicapp.ui.SpotifyQueuePage
 import com.unknowstorm.musicapp.ui.SpotifyExpandablePlayer
 import com.unknowstorm.musicapp.ui.SpotifyMiniState
 import com.unknowstorm.musicapp.ui.AuthScreen
@@ -218,6 +219,11 @@ private fun AppContent(boot: AppBoot) {
                     showAuth = true
                 },
             )
+
+            // Spotify queue page: below the Spotify mini player, which stays on top of it
+            if (spotify != null && spotifyMini.queueOpen) {
+                SpotifyQueuePage(remote = spotify, onClose = { spotifyMini.queueOpen = false })
+            }
 
             // Spotify mini player, separate from the app's AudioBackend player.
             if (spotify != null) {

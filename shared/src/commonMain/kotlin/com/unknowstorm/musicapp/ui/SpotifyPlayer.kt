@@ -118,6 +118,8 @@ class SpotifyMiniState {
     var expanded by mutableStateOf(false)
     /** The track the user closed with the cross or a swipe. */
     var dismissedUri by mutableStateOf<String?>(null)
+    /** The Spotify queue page is open: the mini player stays on it (it is the same component, not a copy). */
+    var queueOpen by mutableStateOf(false)
     val anchor = MiniPlayerAnchor()
 }
 
@@ -382,7 +384,10 @@ fun SpotifyExpandablePlayer(remote: SpotifyRemote, audio: AudioBackend, modifier
                                         if (abs(miniOffsetX) > m.width * 0.35f) {
                                             animateMiniX(if (miniOffsetX > 0f) fullW else -fullW) {
                                                 dismissMini()
-                                                miniOffsetX = 0f
+                                                // Stay off-screen until Spotify really pauses and the player hides itself;
+                                                // resetting at once showed the mini player again for a moment. The delay is
+                                                // only a fallback in case the pause never arrives.
+                                                scope.launch { delay(1500); miniOffsetX = 0f }
                                             }
                                         } else {
                                             animateMiniX(0f)
@@ -556,7 +561,7 @@ private fun SpFullContent(
     val s by stateHolder
     var dragValue by remember { mutableStateOf<Float?>(null) }
     var showDetails by remember { mutableStateOf(false) }
-    var showQueue by remember { mutableStateOf(false) }
+    val ui = LocalSpotifyMini.current
     // A message on like per Spotify rules; disappears by itself
     var likeNote by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(likeNote) { if (likeNote != null) { delay(2000); likeNote = null } }
@@ -634,7 +639,7 @@ private fun SpFullContent(
                     Row(Modifier.width(96.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { showDetails = true }) { MoreIcon() }
                         if (SPOTIFY_QUEUE_ENABLED) {
-                            IconButton(onClick = { showQueue = true }) {
+                            IconButton(onClick = { ui.queueOpen = true; ui.expanded = false }) {
                                 SpotifyQueueViewIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -708,8 +713,6 @@ private fun SpFullContent(
             }
         }
     }
-
-    if (showQueue) SpotifyQueueDialog(remote, s, onDismiss = { showQueue = false })
 
     if (showDetails) {
         AlertDialog(
