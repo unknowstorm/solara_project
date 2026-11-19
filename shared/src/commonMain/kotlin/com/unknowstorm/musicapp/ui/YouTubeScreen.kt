@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -433,29 +434,39 @@ private fun MyYouTubeBlock(onPlay: (YouTubeVideo, List<YouTubeVideo>) -> Unit) {
     val repo = remember { YouTubeLinkRepository() }
     val scope = rememberCoroutineScope()
     val openLink = rememberExternalLinkOpener()
-    var linked by remember { mutableStateOf(false) }
+    // Start from the in-memory copy so the library shows at once when you come back to the screen
+    var linked by remember { mutableStateOf(YouTubeLibraryCache.overview != null) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
-    var playlists by remember { mutableStateOf<List<YtPlaylist>>(emptyList()) }
-    var liked by remember { mutableStateOf<List<YouTubeVideo>>(emptyList()) }
+    var reloadKey by remember { mutableIntStateOf(0) }
+    var playlists by remember { mutableStateOf<List<YtPlaylist>>(YouTubeLibraryCache.overview?.playlists ?: emptyList()) }
+    var liked by remember { mutableStateOf<List<YouTubeVideo>>(YouTubeLibraryCache.overview?.liked ?: emptyList()) }
     var opened by remember { mutableStateOf<Pair<YtPlaylist, List<YouTubeVideo>>?>(null) }
 
-    LaunchedEffect(linked) {
+    LaunchedEffect(linked, reloadKey) {
         if (!linked) {
+            YouTubeLibraryCache.clear()
             playlists = emptyList(); liked = emptyList(); opened = null
             return@LaunchedEffect
         }
-        busy = true
+        val cached = YouTubeLibraryCache.overview
+        val force = reloadKey > 0
+        // A fresh in-memory copy is already on screen: no request. Otherwise refresh quietly if there is something to show.
+        if (cached != null && !force && YouTubeLibraryCache.overviewFresh()) return@LaunchedEffect
+        busy = cached == null || force
         message = null
         try {
             val o = repo.overview()
+            YouTubeLibraryCache.putOverview(o)
             playlists = o.playlists
             liked = o.liked
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            message = ytLinkMessage(e)
-            if ((e as? YtLinkException)?.code == "revoked") linked = false
+            val revoked = (e as? YtLinkException)?.code == "revoked"
+            if (revoked) linked = false
+            // A failed quiet refresh keeps the copy on screen and says nothing
+            if (cached == null || force || revoked) message = ytLinkMessage(e)
         } finally {
             busy = false
         }
@@ -481,6 +492,9 @@ private fun MyYouTubeBlock(onPlay: (YouTubeVideo, List<YouTubeVideo>) -> Unit) {
         }
         YouTubeLinkRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), onLinked = { linked = it })
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        if (linked && !busy) {
+            TextButton(onClick = { reloadKey++ }, modifier = Modifier.padding(horizontal = 8.dp)) { Text(tr("Refresh", "Оновити")) }
+        }
         message?.let {
             Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
         }
@@ -506,7 +520,9 @@ private fun MyYouTubeBlock(onPlay: (YouTubeVideo, List<YouTubeVideo>) -> Unit) {
                         TextButton(onClick = {
                             scope.launch {
                                 try {
-                                    opened = p to repo.playlist(p.id)
+                                    val videos = YouTubeLibraryCache.playlist(p.id, p.count)
+                                        ?: repo.playlist(p.id).also { YouTubeLibraryCache.putPlaylist(p.id, p.count, it) }
+                                    opened = p to videos
                                     message = null
                                 } catch (e: CancellationException) {
                                     throw e
