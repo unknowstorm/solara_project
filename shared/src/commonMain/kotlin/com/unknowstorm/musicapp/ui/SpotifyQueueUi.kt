@@ -64,6 +64,7 @@ import com.unknowstorm.musicapp.spotify.SpotifyState
 private fun sqTitle() = tr("Spotify queue", "Черга Spotify")
 private fun sqNow() = tr("Now playing", "Зараз грає")
 private fun sqNext() = tr("Next up", "Далі в черзі")
+private fun sqSkipped() = tr("Skipped · tap to add back to the queue", "Пропущені · торкніться, щоб додати в чергу")
 private fun sqEmpty() = tr("Nothing is queued after this track.", "Після цього треку нічого немає в черзі.")
 private fun sqIntro() = tr(
     "To show the queue, Solara needs read-only access to your playback state on Spotify. You sign in on Spotify's own page. " +
@@ -150,6 +151,12 @@ fun SpotifyQueuePage(remote: SpotifyRemote, onClose: () -> Unit) {
                             TextButton(onClick = { remote.refreshQueue() }) { Text(sqRefresh()) }
                         }
                         QueueStatus.READY -> LazyColumn(Modifier.fillMaxSize()) {
+                            if (q.skipped.isNotEmpty()) {
+                                item(key = "skipped-label") { SqLabel(sqSkipped()) }
+                                itemsIndexed(q.skipped, key = { _, t -> "skipped:${t.uri}" }) { _, t ->
+                                    SqRow(t, remote, onPlay = { remote.queueUri(t.uri); remote.dismissSkipped(t.uri) })
+                                }
+                            }
                             q.nowPlaying?.let { now ->
                                 item(key = "now-label") { SqLabel(sqNow()) }
                                 item(key = "now") { SqRow(now, remote) }
@@ -165,7 +172,7 @@ fun SpotifyQueuePage(remote: SpotifyRemote, onClose: () -> Unit) {
                                     )
                                 }
                             } else {
-                                itemsIndexed(q.next) { i, t -> SqRow(t, remote, onPlay = { repeat(i + 1) { remote.next() } }) }
+                                itemsIndexed(q.next) { i, t -> SqRow(t, remote, onPlay = { remote.jumpInQueue(i) }) }
                             }
                         }
                     }

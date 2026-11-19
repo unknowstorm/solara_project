@@ -222,7 +222,10 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 val keepCover = optimisticKey != null && optimisticKey == track.imageUri?.raw
                 optimisticKey = null
                 val exp = expectedUri
-                val skipHistory = exp != null && track.uri != exp && track.name != expectedName
+                // Tracks flashed through while jumping to a track of the queue were not listened to: no history entry for them
+                val jumped = track.uri in jumpSkip
+                if (track.uri == jumpTarget) { jumpSkip = emptySet(); jumpTarget = null; handler.removeCallbacks(clearJump) }
+                val skipHistory = jumped || (exp != null && track.uri != exp && track.name != expectedName)
                 if (exp != null && !skipHistory) expectedUri = null
                 requestCover(track.imageUri)
                 _state.update { st ->
@@ -523,7 +526,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 if (keep != refresh) queueVault.save(keep)
                 queueWeb.queue()
             }
-            setQueue { SpotifyQueue(status = QueueStatus.READY, nowPlaying = now, next = next) }
+            setQueue { it.copy(status = QueueStatus.READY, error = null, nowPlaying = now, next = next) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -655,6 +658,30 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun pause() { remote?.playerApi?.pause() }
     override fun resume() { remote?.playerApi?.resume() }
     override fun next() { remote?.playerApi?.skipNext() }
+
+    // ---------- Jump to a track of the queue ----------
+    @Volatile private var jumpSkip: Set<String> = emptySet()
+    @Volatile private var jumpTarget: String? = null
+    private val clearJump = Runnable { jumpSkip = emptySet(); jumpTarget = null }
+
+    override fun jumpInQueue(index: Int) {
+        val q = _state.value.queue
+        val target = q.next.getOrNull(index) ?: return
+        val jumped = q.next.take(index)
+        jumpSkip = jumped.map { it.uri }.toSet()
+        jumpTarget = target.uri
+        handler.removeCallbacks(clearJump)
+        handler.postDelayed(clearJump, 15_000)
+        setQueue { cur ->
+            val known = cur.skipped.map { it.uri }.toSet()
+            cur.copy(skipped = cur.skipped.filterNot { it.uri == target.uri } + jumped.filter { it.uri !in known })
+        }
+        repeat(index + 1) { next() }
+    }
+
+    override fun dismissSkipped(uri: String) {
+        setQueue { cur -> cur.copy(skipped = cur.skipped.filterNot { it.uri == uri }) }
+    }
     override fun previous() { remote?.playerApi?.skipPrevious() }
     override fun seekTo(ms: Long) { remote?.playerApi?.seekTo(ms) }
 
