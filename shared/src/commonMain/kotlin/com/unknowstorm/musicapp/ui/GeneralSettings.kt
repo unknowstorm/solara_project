@@ -93,7 +93,7 @@ internal fun GeneralSettings(extraEntries: List<@Composable (Shape) -> Unit> = e
     }
     if (showLanguage) {
         SettingsSheet(tr("Language", "Мова"), onDismiss = { showLanguage = false }) {
-            LanguageSetting()
+            LanguageSetting(onSelected = { showLanguage = false })
         }
     }
     if (showDocs) {
