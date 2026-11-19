@@ -1,5 +1,7 @@
 package com.unknowstorm.musicapp.ui
 
+import com.unknowstorm.musicapp.spotify.LibraryStatus
+import com.unknowstorm.musicapp.i18n.tr
 import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,6 +61,7 @@ fun SpotifyScreen(
             when {
                 s?.library?.openPlaylist != null -> remote.closeLibraryPlaylist()
                 s?.library?.savedOpen == true -> remote.closeSavedTracks()
+                LibraryPanels.spotify -> LibraryPanels.spotify = false
                 s?.browse != null -> remote.closeBrowse()
                 else -> onBack()
             }
@@ -74,6 +77,7 @@ fun SpotifyScreen(
                 when {
                     s?.library?.openPlaylist != null -> remote.closeLibraryPlaylist()
                     s?.library?.savedOpen == true -> remote.closeSavedTracks()
+                    LibraryPanels.spotify -> LibraryPanels.spotify = false
                     s?.browse != null -> remote.closeBrowse()
                     else -> onBack()
                 }
@@ -223,6 +227,14 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
         return
     }
 
+    // The personal library is its own sub-screen: the card at the top of Home opens it, "Back" closes it
+    if (LibraryPanels.spotify && !s.library.savedOpen && s.library.openPlaylist == null) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            spotifyLibraryItems(remote, s, onBeforePlay)
+        }
+        return
+    }
+
     if (s.library.savedOpen) {
         SpotifySavedTracksView(remote, s, onBeforePlay)
         return
@@ -239,7 +251,22 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
             }
         }
 
-        if (s.browse == null) spotifyLibraryItems(remote, s, onBeforePlay)
+        if (s.browse == null) item(key = "library-entry") {
+            val lib = s.library
+            val subtitle = when (lib.status) {
+                LibraryStatus.READY -> {
+                    val n = lib.savedTotal ?: lib.saved.size
+                    listOfNotNull(lib.accountName, tr("$n liked tracks", "$n улюблених треків")).joinToString(" · ")
+                }
+                LibraryStatus.LOADING, LibraryStatus.AUTHORIZING -> tr("Loading…", "Завантаження…")
+                else -> tr("Playlists and liked tracks", "Плейлисти та улюблені треки")
+            }
+            LibraryEntryCard(
+                title = tr("Your Spotify library", "Ваша бібліотека Spotify"),
+                subtitle = subtitle,
+                onClick = { LibraryPanels.spotify = true },
+            )
+        }
 
         val browse = s.browse
         if (browse != null) {
