@@ -277,16 +277,14 @@ fun HomeScreen(
             return@Column
         }
 
-        if (service == Service.DEEZER) {
-            HintCard(S.deezer30SecondPreviewsOnly)
-        }
-
         if (!service.ready) {
             HintCard(S.isComingSoon(service.title, service.note))
             return@Column
         }
 
         LazyColumn(swipe.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            // The Deezer note scrolls away with the content instead of staying fixed above the list
+            if (service == Service.DEEZER) item(key = "deezer-hint") { HintCard(S.deezer30SecondPreviewsOnly) }
             // The "You liked" section with a filter button
             if (!isDeezer) item {
                 Row(

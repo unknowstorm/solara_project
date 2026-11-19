@@ -222,7 +222,10 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 val keepCover = optimisticKey != null && optimisticKey == track.imageUri?.raw
                 optimisticKey = null
                 val exp = expectedUri
-                val skipHistory = exp != null && track.uri != exp && track.name != expectedName
+                // Tracks flashed through while jumping to a track of the queue were not listened to: no history entry for them
+                val jumped = track.uri in jumpSkip
+                if (track.uri == jumpTarget) { jumpSkip = emptySet(); jumpTarget = null; handler.removeCallbacks(clearJump) }
+                val skipHistory = jumped || (exp != null && track.uri != exp && track.name != expectedName)
                 if (exp != null && !skipHistory) expectedUri = null
                 requestCover(track.imageUri)
                 _state.update { st ->
@@ -455,6 +458,8 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     private fun wipeLibraryMemory() {
         libraryJob?.cancel()
         playlistJob?.cancel()
+        savedSyncJob?.cancel()
+        pendingLikes = emptyMap()
         libVerifier = null
         libState = null
         web.clear()
@@ -521,7 +526,7 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
                 if (keep != refresh) queueVault.save(keep)
                 queueWeb.queue()
             }
-            setQueue { SpotifyQueue(status = QueueStatus.READY, nowPlaying = now, next = next) }
+            setQueue { it.copy(status = QueueStatus.READY, error = null, nowPlaying = now, next = next) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -653,6 +658,30 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
     override fun pause() { remote?.playerApi?.pause() }
     override fun resume() { remote?.playerApi?.resume() }
     override fun next() { remote?.playerApi?.skipNext() }
+
+    // ---------- Jump to a track of the queue ----------
+    @Volatile private var jumpSkip: Set<String> = emptySet()
+    @Volatile private var jumpTarget: String? = null
+    private val clearJump = Runnable { jumpSkip = emptySet(); jumpTarget = null }
+
+    override fun jumpInQueue(index: Int) {
+        val q = _state.value.queue
+        val target = q.next.getOrNull(index) ?: return
+        val jumped = q.next.take(index)
+        jumpSkip = jumped.map { it.uri }.toSet()
+        jumpTarget = target.uri
+        handler.removeCallbacks(clearJump)
+        handler.postDelayed(clearJump, 15_000)
+        setQueue { cur ->
+            val known = cur.skipped.map { it.uri }.toSet()
+            cur.copy(skipped = cur.skipped.filterNot { it.uri == target.uri } + jumped.filter { it.uri !in known })
+        }
+        repeat(index + 1) { next() }
+    }
+
+    override fun dismissSkipped(uri: String) {
+        setQueue { cur -> cur.copy(skipped = cur.skipped.filterNot { it.uri == uri }) }
+    }
     override fun previous() { remote?.playerApi?.skipPrevious() }
     override fun seekTo(ms: Long) { remote?.playerApi?.seekTo(ms) }
 
@@ -689,10 +718,74 @@ class SpotifyRemoteImpl(private val activity: Activity) : SpotifyRemote {
         val r = remote ?: return
         val uri = _state.value.uri ?: return
         val add = !_state.value.saved
+        val st = _state.value
         _state.update { it.copy(saved = add) }
         // The like goes to Spotify and is not stored anywhere on our side
         if (add) r.userApi.addToLibrary(uri) else r.userApi.removeFromLibrary(uri)
+        onLikeToggled(uri, st.title.orEmpty(), st.artist.orEmpty(), add)
     }
+
+    // ---------- Liked Songs stay in step with the heart of the player (memory only) ----------
+    private var savedSyncJob: Job? = null
+    /** Likes changed here that Spotify may not show yet: uri -> added. Laid over the fetched list. */
+    @Volatile private var pendingLikes: Map<String, SpotifyLibTrack?> = emptyMap()
+
+    private fun overlayPending(list: List<SpotifyLibTrack>, total: Int?): Pair<List<SpotifyLibTrack>, Int?> {
+        var out = list
+        var t = total
+        for ((uri, added) in pendingLikes) {
+            val has = out.any { it.uri == uri }
+            if (added != null && !has) { out = listOf(added) + out; t = t?.plus(1) }
+            if (added == null && has) { out = out.filterNot { it.uri == uri }; t = t?.minus(1) }
+        }
+        return out to t
+    }
+
+    /** The heart in the player: the list shows the change at once, then it is re-read from Spotify. */
+    private fun onLikeToggled(uri: String, title: String, artist: String, add: Boolean) {
+        if (_state.value.library.status != LibraryStatus.READY) return
+        pendingLikes = pendingLikes + (uri to (if (add) SpotifyLibTrack(uri, title, artist, null, 0) else null))
+        setLibrary { lib ->
+            val had = lib.saved.any { it.uri == uri }
+            val base = lib.saved.filterNot { it.uri == uri }
+            val baseTotal = lib.savedTotal?.let { if (had) it - 1 else it }
+            val (list, total) = overlayPending(base, baseTotal)
+            lib.copy(saved = list, savedTotal = total)
+        }
+        savedSyncJob?.cancel()
+        savedSyncJob = libScope.launch {
+            try {
+                // Spotify applies the change with a small delay: read twice, the second time to be sure
+                for (pause in longArrayOf(2_000, 4_000)) {
+                    kotlinx.coroutines.delay(pause)
+                    refreshSaved()
+                }
+                pendingLikes = emptyMap()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.d("SpotifyLibrary", "liked resync failed: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun refreshSaved() {
+        val fresh = try {
+            if (!web.hasToken()) throw SpotifyHttpError(401)
+            web.savedTracks()
+        } catch (e: SpotifyHttpError) {
+            if (e.code != 401) throw e
+            val rt = vault.load() ?: return // no stored token: the list keeps the local change
+            val keep = web.refreshAccess(rt)
+            if (keep != rt) vault.save(keep)
+            web.savedTracks()
+        }
+        val (list, total) = overlayPending(fresh.first, fresh.second)
+        setLibrary { if (it.status == LibraryStatus.READY) it.copy(saved = list, savedTotal = total) else it }
+    }
+
+    override fun openSavedTracks() { setLibrary { it.copy(savedOpen = true) } }
+    override fun closeSavedTracks() { setLibrary { it.copy(savedOpen = false) } }
 
     private val coverRequested = HashSet<String>()
 

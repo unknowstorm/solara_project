@@ -66,6 +66,11 @@ private fun tRevoke() = tr("Revoke access on Spotify's site", "Відклика�
 private fun tOpenInSpotify() = tr("Open in Spotify", "Відкрити в Spotify")
 private fun tTracks(n: Int?) = if (n == null) "" else tr("$n tracks", "треків: $n")
 private fun tEmpty() = tr("No tracks to show.", "Немає треків для показу.")
+private fun tShowAll(total: Int) = tr("Show all ($total)", "Показати всі ($total)")
+private fun tMoreInSpotify() = tr("The rest is in the Spotify app", "Решта треків у застосунку Spotify")
+
+/** The library block shows only the latest likes: the full list opens on its own screen, so the page below stays reachable. */
+private const val SAVED_PREVIEW = 5
 
 /** The library block on the Spotify page: it is only shown there and is never mixed with other sources. */
 fun LazyListScope.spotifyLibraryItems(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: () -> Unit) {
@@ -108,13 +113,20 @@ fun LazyListScope.spotifyLibraryItems(remote: SpotifyRemote, s: SpotifyState, on
             }
             if (lib.saved.isNotEmpty()) {
                 item(key = "lib-saved-label") { LibLabel(tSaved(lib.savedTotal)) }
-                itemsIndexed(lib.saved, key = { i, _ -> "libsaved:$i" }) { _, t ->
+                itemsIndexed(lib.saved.take(SAVED_PREVIEW), key = { _, t -> "libsaved:${t.uri}" }) { _, t ->
                     val ui = LocalSpotifyMini.current
                     LibTrackRow(
                         t,
                         onPlay = { onBeforePlay(); ui.dismissedUri = null; remote.playUri(t.uri) },
                         onOpenSpotify = { remote.openInSpotify(t.uri) },
                     )
+                }
+                val all = maxOf(lib.savedTotal ?: 0, lib.saved.size)
+                if (all > SAVED_PREVIEW) item(key = "lib-saved-all") {
+                    TextButton(
+                        onClick = { remote.openSavedTracks() },
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) { Text(tShowAll(all)) }
                 }
             }
             if (lib.autoImport) item(key = "lib-auto") {
@@ -194,6 +206,39 @@ private fun LibTrackRow(t: SpotifyLibTrack, onPlay: () -> Unit, onOpenSpotify: (
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
+}
+
+/** All liked songs read into memory (up to the import limit) on their own screen: it follows the heart of the player live. */
+@Composable
+fun SpotifySavedTracksView(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: () -> Unit) {
+    val ui = LocalSpotifyMini.current
+    val lib = s.library
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+        item(key = "saved-head") {
+            Text(
+                tSaved(lib.savedTotal),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 16.dp),
+            )
+        }
+        if (lib.saved.isEmpty()) item(key = "saved-empty") { Text(tEmpty(), Modifier.padding(16.dp)) }
+        itemsIndexed(lib.saved, key = { _, t -> "savedall:${t.uri}" }) { _, t ->
+            LibTrackRow(
+                t,
+                onPlay = { onBeforePlay(); ui.dismissedUri = null; remote.playUri(t.uri) },
+                onOpenSpotify = { remote.openInSpotify(t.uri) },
+            )
+        }
+        val total = lib.savedTotal
+        if (total != null && total > lib.saved.size) item(key = "saved-more") {
+            Text(
+                tMoreInSpotify(),
+                Modifier.padding(16.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 /** An opened playlist of the user: tracks play in the playlist's own context through the Spotify app. */

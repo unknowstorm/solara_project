@@ -75,8 +75,12 @@ fun LibraryTiles(
 @Composable
 private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit, played: MutableSet<Int>) {
     val cs = MaterialTheme.colorScheme
+    // Планшет: ровно 4 колонки на всю ширину (Adaptive оставлял бы пустые колонки справа).
+    // На очень широком окне плитки ниже квадрата, чтобы не вырастали до 300 dp.
+    val wide = width >= 600.dp
+    val tile = Modifier.fillMaxWidth().aspectRatio(if (width >= 900.dp) 1.4f else 1f)
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(150.dp),
+        columns = if (wide) GridCells.Fixed(4) else GridCells.Adaptive(150.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),

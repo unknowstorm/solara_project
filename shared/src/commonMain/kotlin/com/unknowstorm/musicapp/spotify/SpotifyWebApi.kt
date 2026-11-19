@@ -136,6 +136,9 @@ class SpotifyWebApi(private val clientId: String, private val redirectUri: Strin
         return out to total
     }
 
+    /** True if a token is held in memory (it lasts about an hour after the last refresh). */
+    fun hasToken(): Boolean = token != null
+
     /** The user's queue: the track that is playing and the tracks queued after it (tracks only). Read-only. */
     suspend fun queue(): Pair<SpotifyLibTrack?, List<SpotifyLibTrack>> {
         val o = get("/me/player/queue")

@@ -1,6 +1,18 @@
 package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +24,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -41,8 +55,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.unknowstorm.musicapp.i18n.tr
 import com.unknowstorm.musicapp.spotify.QueueStatus
 import com.unknowstorm.musicapp.spotify.SpotifyLibTrack
@@ -52,6 +64,7 @@ import com.unknowstorm.musicapp.spotify.SpotifyState
 private fun sqTitle() = tr("Spotify queue", "Черга Spotify")
 private fun sqNow() = tr("Now playing", "Зараз грає")
 private fun sqNext() = tr("Next up", "Далі в черзі")
+private fun sqSkipped() = tr("Skipped · tap to add back to the queue", "Пропущені · торкніться, щоб додати в чергу")
 private fun sqEmpty() = tr("Nothing is queued after this track.", "Після цього треку нічого немає в черзі.")
 private fun sqIntro() = tr(
     "To show the queue, Solara needs read-only access to your playback state on Spotify. You sign in on Spotify's own page. " +
@@ -88,19 +101,35 @@ internal fun SpotifyQueueViewIcon(modifier: Modifier = Modifier, tint: Color) {
 }
 
 /**
- * Read-only queue of the Spotify player (Web API). It lives inside the Spotify player, never in Solara's own Queue tab.
- * Every row links back to the track in Spotify. Nothing is stored; the data is erased when the panel closes.
+ * Read-only queue of the Spotify player (Web API), as a page inside the app window (not a separate dialog window),
+ * so the real mini player stays visible at the bottom with all its behaviour (tap to expand, swipe away, pause).
+ * The page ends where the mini player begins; the area below it (the bottom bar) closes the page when tapped.
+ * Every row links back to the track in Spotify. Nothing is stored; the data is erased when the page closes.
  */
 @Composable
-fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> Unit) {
+fun SpotifyQueuePage(remote: SpotifyRemote, onClose: () -> Unit) {
+    val s by remote.state.collectAsState()
+    val ui = LocalSpotifyMini.current
+    val anchor = ui.anchor
     LaunchedEffect(Unit) { remote.openQueue() }
     DisposableEffect(Unit) { onDispose { remote.closeQueue() } }
+    LaunchedEffect(s.connected) { if (!s.connected) onClose() }
+    // While the full player is open it handles Back itself and returns here
+    PlatformBackHandler(enabled = !ui.expanded, onBack = onClose)
     val q = s.queue
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
+    var originY by remember { mutableFloatStateOf(0f) }
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { originY = it.positionInRoot().y }) {
+        val density = LocalDensity.current
+        val rootH = constraints.maxHeight.toFloat()
+        val miniTop = anchor.bounds?.top?.minus(originY)
+        val reserved = if (ui.shown && miniTop != null) with(density) { (rootH - miniTop).coerceAtLeast(0f).toDp() } else 0.dp
+        Surface(
+            Modifier.fillMaxSize().padding(bottom = reserved),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            Column(Modifier.statusBarsPadding().then(if (reserved == 0.dp) Modifier.navigationBarsPadding() else Modifier).padding(16.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text(sqClose()) }
+                    TextButton(onClick = onClose) { Text(sqClose()) }
                     Spacer(Modifier.weight(1f))
                     SpotifyLogoBar()
                 }
@@ -122,6 +151,12 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                             TextButton(onClick = { remote.refreshQueue() }) { Text(sqRefresh()) }
                         }
                         QueueStatus.READY -> LazyColumn(Modifier.fillMaxSize()) {
+                            if (q.skipped.isNotEmpty()) {
+                                item(key = "skipped-label") { SqLabel(sqSkipped()) }
+                                itemsIndexed(q.skipped, key = { _, t -> "skipped:${t.uri}" }) { _, t ->
+                                    SqRow(t, remote, onPlay = { remote.queueUri(t.uri); remote.dismissSkipped(t.uri) })
+                                }
+                            }
                             q.nowPlaying?.let { now ->
                                 item(key = "now-label") { SqLabel(sqNow()) }
                                 item(key = "now") { SqRow(now, remote) }
@@ -137,7 +172,7 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                                     )
                                 }
                             } else {
-                                itemsIndexed(q.next) { i, t -> SqRow(t, remote, onPlay = { repeat(i + 1) { remote.next() } }) }
+                                itemsIndexed(q.next) { i, t -> SqRow(t, remote, onPlay = { remote.jumpInQueue(i) }) }
                             }
                         }
                     }
@@ -158,6 +193,13 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                     }
                 }
             }
+        }
+        // The bottom bar stays visible below the mini player: a tap there closes the page instead of switching tabs under it
+        if (reserved > 0.dp) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(reserved)
+                    .pointerInput(Unit) { detectTapGestures { onClose() } }
+            )
         }
     }
 }

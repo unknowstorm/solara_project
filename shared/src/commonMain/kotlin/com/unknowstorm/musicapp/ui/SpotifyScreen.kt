@@ -58,6 +58,7 @@ fun SpotifyScreen(
         onBack = {
             when {
                 s?.library?.openPlaylist != null -> remote.closeLibraryPlaylist()
+                s?.library?.savedOpen == true -> remote.closeSavedTracks()
                 s?.browse != null -> remote.closeBrowse()
                 else -> onBack()
             }
@@ -72,6 +73,7 @@ fun SpotifyScreen(
             TextButton(onClick = {
                 when {
                     s?.library?.openPlaylist != null -> remote.closeLibraryPlaylist()
+                    s?.library?.savedOpen == true -> remote.closeSavedTracks()
                     s?.browse != null -> remote.closeBrowse()
                     else -> onBack()
                 }
@@ -218,6 +220,11 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
 
     s.library.openPlaylist?.let { pl ->
         SpotifyLibraryPlaylistView(remote, s, pl, onBeforePlay)
+        return
+    }
+
+    if (s.library.savedOpen) {
+        SpotifySavedTracksView(remote, s, onBeforePlay)
         return
     }
 

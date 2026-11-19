@@ -48,6 +48,8 @@ data class SpotifyLibrary(
     val playlists: List<SpotifyLibPlaylist> = emptyList(),
     val saved: List<SpotifyLibTrack> = emptyList(),
     val savedTotal: Int? = null,
+    /** The full-screen list of Liked Songs is open (the library block shows only the latest few). */
+    val savedOpen: Boolean = false,
     val openPlaylist: SpotifyLibPlaylist? = null,
     val playlistTracks: List<SpotifyLibTrack>? = null,
     /** An encrypted refresh token is stored on this device, so the import repeats by itself. */
@@ -67,6 +69,8 @@ data class SpotifyQueue(
     val error: String? = null,
     val nowPlaying: SpotifyLibTrack? = null,
     val next: List<SpotifyLibTrack> = emptyList(),
+    /** Tracks jumped over by tapping a later track in the queue: kept while the queue page is open, never in "Recent". */
+    val skipped: List<SpotifyLibTrack> = emptyList(),
 )
 
 /** Spotify state lives only in memory. Nothing from it is saved. */
@@ -118,6 +122,10 @@ interface SpotifyRemote {
     fun seekTo(ms: Long)
     /** Appends a track to the end of the Spotify queue (App Remote can only append: no reordering, no removing). */
     fun queueUri(uri: String) {}
+    /** Tapping the track at [index] of the queue: skips to it. The tracks jumped over go to the "Skipped" list of the queue page, not to history. */
+    fun jumpInQueue(index: Int) { repeat(index + 1) { next() } }
+    /** Removes a track from the "Skipped" list of the queue page. */
+    fun dismissSkipped(uri: String) {}
     fun setShuffle(on: Boolean) {}
     fun setRepeat(mode: SpotifyRepeat) {}
     fun toggleSaved()
@@ -143,6 +151,8 @@ interface SpotifyRemote {
     /** Deletes the stored token (the library already on screen stays until the app is closed). */
     fun disableAutoImport() {}
     fun openLibraryPlaylist(playlist: SpotifyLibPlaylist) {}
+    fun openSavedTracks() {}
+    fun closeSavedTracks() {}
     fun closeLibraryPlaylist() {}
     /** Erases the token and everything imported from memory. */
     fun forgetLibrary() {}
