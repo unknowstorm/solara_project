@@ -1,6 +1,18 @@
 package com.unknowstorm.musicapp.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,8 +55,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.unknowstorm.musicapp.i18n.tr
 import com.unknowstorm.musicapp.spotify.QueueStatus
 import com.unknowstorm.musicapp.spotify.SpotifyLibTrack
@@ -90,19 +100,35 @@ internal fun SpotifyQueueViewIcon(modifier: Modifier = Modifier, tint: Color) {
 }
 
 /**
- * Read-only queue of the Spotify player (Web API). It lives inside the Spotify player, never in Solara's own Queue tab.
- * Every row links back to the track in Spotify. Nothing is stored; the data is erased when the panel closes.
+ * Read-only queue of the Spotify player (Web API), as a page inside the app window (not a separate dialog window),
+ * so the real mini player stays visible at the bottom with all its behaviour (tap to expand, swipe away, pause).
+ * The page ends where the mini player begins; the area below it (the bottom bar) closes the page when tapped.
+ * Every row links back to the track in Spotify. Nothing is stored; the data is erased when the page closes.
  */
 @Composable
-fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> Unit) {
+fun SpotifyQueuePage(remote: SpotifyRemote, onClose: () -> Unit) {
+    val s by remote.state.collectAsState()
+    val ui = LocalSpotifyMini.current
+    val anchor = ui.anchor
     LaunchedEffect(Unit) { remote.openQueue() }
     DisposableEffect(Unit) { onDispose { remote.closeQueue() } }
+    LaunchedEffect(s.connected) { if (!s.connected) onClose() }
+    // While the full player is open it handles Back itself and returns here
+    PlatformBackHandler(enabled = !ui.expanded, onBack = onClose)
     val q = s.queue
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
+    var originY by remember { mutableFloatStateOf(0f) }
+    BoxWithConstraints(Modifier.fillMaxSize().onGloballyPositioned { originY = it.positionInRoot().y }) {
+        val density = LocalDensity.current
+        val rootH = constraints.maxHeight.toFloat()
+        val miniTop = anchor.bounds?.top?.minus(originY)
+        val reserved = if (ui.shown && miniTop != null) with(density) { (rootH - miniTop).coerceAtLeast(0f).toDp() } else 0.dp
+        Surface(
+            Modifier.fillMaxSize().padding(bottom = reserved),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            Column(Modifier.statusBarsPadding().then(if (reserved == 0.dp) Modifier.navigationBarsPadding() else Modifier).padding(16.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text(sqClose()) }
+                    TextButton(onClick = onClose) { Text(sqClose()) }
                     Spacer(Modifier.weight(1f))
                     SpotifyLogoBar()
                 }
@@ -144,8 +170,6 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                         }
                     }
                 }
-                // The mini player stays on the queue page too: it is drawn here because the dialog covers the real one
-                SqMiniBar(remote, s, onOpenPlayer = onDismiss)
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -163,45 +187,12 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                 }
             }
         }
-    }
-}
-
-/** The mini player inside the queue dialog: cover (4 dp corners, unchanged), title, artist and play/pause. A tap on it returns to the player. */
-@Composable
-private fun SqMiniBar(remote: SpotifyRemote, s: SpotifyState, onOpenPlayer: () -> Unit) {
-    val title = s.title ?: return
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).clickable(onClick = onOpenPlayer), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                    s.cover?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    s.artist?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-            }
-            Spacer(Modifier.width(10.dp))
-            Image(
-                spotifyMonoIcon(MaterialTheme.colorScheme.secondaryContainer),
-                contentDescription = "Spotify",
-                modifier = Modifier.size(24.dp),
+        // The bottom bar stays visible below the mini player: a tap there closes the page instead of switching tabs under it
+        if (reserved > 0.dp) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(reserved)
+                    .pointerInput(Unit) { detectTapGestures { onClose() } }
             )
-            Spacer(Modifier.width(16.dp))
-            IconButton(
-                onClick = { if (s.isPaused) remote.resume() else remote.pause() },
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
-            ) {
-                PlayPauseIcon(!s.isPaused, Modifier.size(22.dp), MaterialTheme.colorScheme.onPrimary)
-            }
         }
     }
 }
