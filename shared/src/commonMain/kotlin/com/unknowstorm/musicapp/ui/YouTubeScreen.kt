@@ -1,5 +1,7 @@
 package com.unknowstorm.musicapp.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import com.unknowstorm.musicapp.i18n.S
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -127,7 +129,7 @@ fun YouTubeScreen(
 @Composable
 private fun YouTubeHome(audio: AudioBackend, session: YouTubeSession) {
     // Left the YouTube screen: the playing video moves to the floating window
-    DisposableEffect(Unit) { onDispose { session.minimize() } }
+    DisposableEffect(Unit) { onDispose { session.minimize(); LibraryPanels.youtube = false } }
 
     val showPlayer by remember {
         derivedStateOf { session.video != null && (session.docked || session.progress > 0.01f) }
@@ -213,6 +215,12 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
 
     val missing = GENRES.any { !genres.containsKey(it.first) }
 
+    // The personal library is its own sub-screen: the card at the top of the feed opens it
+    if (LibraryPanels.youtube) {
+        YouTubeLibraryPanel(onPlay = { v, l -> play(v, l) }, modifier = modifier.fillMaxSize())
+        return
+    }
+
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refresh() }, modifier = modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             item(key = "head") {
@@ -229,6 +237,13 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
                         modifier = Modifier.weight(1f),
                     )
                 }
+            }
+            item(key = "library-entry") {
+                LibraryEntryCard(
+                    title = tr("My YouTube", "Мій YouTube"),
+                    subtitle = tr("Playlists and liked videos", "Плейлисти та вподобані відео"),
+                    onClick = { LibraryPanels.youtube = true },
+                )
             }
             if (loading) {
                 item(key = "progress") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) }
@@ -271,7 +286,6 @@ private fun YouTubeFeed(audio: AudioBackend, session: YouTubeSession, modifier: 
                     }
                 }
             }
-            item(key = "mine") { MyYouTubeBlock(onPlay = { v, l -> play(v, l) }) }
             item(key = "legal") { LegalFooter() }
         }
     }
@@ -401,6 +415,17 @@ internal fun formatYtDuration(ms: Long): String {
 }
 
 // ---------- My YouTube (own account, read-only) ----------
+
+/** The library as its own sub-screen (opened from the card at the top of the feed). */
+@Composable
+private fun YouTubeLibraryPanel(onPlay: (YouTubeVideo, List<YouTubeVideo>) -> Unit, modifier: Modifier = Modifier) {
+    PlatformBackHandler(enabled = true, onBack = { LibraryPanels.youtube = false })
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        TextButton(onClick = { LibraryPanels.youtube = false }, modifier = Modifier.padding(horizontal = 8.dp)) { Text(S.back) }
+        MyYouTubeBlock(onPlay)
+        LegalFooter()
+    }
+}
 
 /** Playlists and liked videos of the connected YouTube account. Memory only, not mixed with anything else. */
 @Composable
