@@ -48,6 +48,8 @@ data class SpotifyLibrary(
     val playlists: List<SpotifyLibPlaylist> = emptyList(),
     val saved: List<SpotifyLibTrack> = emptyList(),
     val savedTotal: Int? = null,
+    /** The full-screen list of Liked Songs is open (the library block shows only the latest few). */
+    val savedOpen: Boolean = false,
     val openPlaylist: SpotifyLibPlaylist? = null,
     val playlistTracks: List<SpotifyLibTrack>? = null,
     /** An encrypted refresh token is stored on this device, so the import repeats by itself. */
@@ -143,6 +145,8 @@ interface SpotifyRemote {
     /** Deletes the stored token (the library already on screen stays until the app is closed). */
     fun disableAutoImport() {}
     fun openLibraryPlaylist(playlist: SpotifyLibPlaylist) {}
+    fun openSavedTracks() {}
+    fun closeSavedTracks() {}
     fun closeLibraryPlaylist() {}
     /** Erases the token and everything imported from memory. */
     fun forgetLibrary() {}
