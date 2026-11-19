@@ -286,6 +286,27 @@ object S {
     val spotifyAddToQueue: String get() = tr("Add to queue", "Додати до черги")
     val spotifyAddedToQueue: String get() = tr("Added to queue", "Додано до черги")
     val spotifyQueueFailed: String get() = tr("Could not add to the queue", "Не вдалося додати до черги")
+    val settingsGeneral: String get() = tr("General", "Загальні")
+    val settingsSounds: String get() = tr("Sounds", "Звук")
+    val settingsStorage: String get() = tr("Storage cache", "Кеш і сховище")
+    val settingsStatus: String get() = tr("System status", "Стан системи")
+
+    /** Android returns equalizer preset names in English: translate the known ones, show unknown ones as they are. */
+    fun equalizerPreset(name: String): String = when (name.trim().lowercase()) {
+        "normal" -> tr("Normal", "Звичайний")
+        "classical" -> tr("Classical", "Класика")
+        "dance" -> tr("Dance", "Танцювальний")
+        "flat" -> tr("Flat", "Рівний")
+        "folk" -> tr("Folk", "Фолк")
+        "heavy metal" -> tr("Heavy Metal", "Хеві-метал")
+        "hip hop" -> tr("Hip Hop", "Хіп-хоп")
+        "jazz" -> tr("Jazz", "Джаз")
+        "pop" -> tr("Pop", "Поп")
+        "rock" -> tr("Rock", "Рок")
+        "fx booster" -> tr("FX Booster", "Підсилення ефектів")
+        "custom" -> tr("Custom", "Власний")
+        else -> name
+    }
     // <<< ENTRIES >>>
 
     val notConnected: String get() = tr("Not connected", "Не підключено")
