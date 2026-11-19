@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.unknowstorm.musicapp.i18n.AppLanguage
+import com.unknowstorm.musicapp.i18n.I18n
 import com.unknowstorm.musicapp.i18n.S
 import com.unknowstorm.musicapp.i18n.tr
 import com.unknowstorm.musicapp.theme.PALETTE_KEY
@@ -53,7 +55,12 @@ internal fun GeneralSettings(extraEntries: List<@Composable (Shape) -> Unit> = e
             SettingsRow(
                 shape,
                 tr("Language", "Мова"),
-                tile = { Text("Aи", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+                tile = { Text(
+                    // UA, а не UK: «UK» читается как United Kingdom
+                    if (I18n.language == AppLanguage.UK) "UA" else "EN",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                ) },
                 onClick = { showLanguage = true },
             )
         }
