@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -142,6 +144,8 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                         }
                     }
                 }
+                // The mini player stays on the queue page too: it is drawn here because the dialog covers the real one
+                SqMiniBar(remote, s, onOpenPlayer = onDismiss)
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -157,6 +161,46 @@ fun SpotifyQueueDialog(remote: SpotifyRemote, s: SpotifyState, onDismiss: () -> 
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** The mini player inside the queue dialog: cover (4 dp corners, unchanged), title, artist and play/pause. A tap on it returns to the player. */
+@Composable
+private fun SqMiniBar(remote: SpotifyRemote, s: SpotifyState, onOpenPlayer: () -> Unit) {
+    val title = s.title ?: return
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).clickable(onClick = onOpenPlayer), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                    s.cover?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize()) }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    s.artist?.let {
+                        Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+            Image(
+                spotifyMonoIcon(MaterialTheme.colorScheme.secondaryContainer),
+                contentDescription = "Spotify",
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(16.dp))
+            IconButton(
+                onClick = { if (s.isPaused) remote.resume() else remote.pause() },
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+            ) {
+                PlayPauseIcon(!s.isPaused, Modifier.size(22.dp), MaterialTheme.colorScheme.onPrimary)
             }
         }
     }
