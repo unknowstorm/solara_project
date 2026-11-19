@@ -62,15 +62,19 @@ import com.unknowstorm.musicapp.i18n.S
 fun LibraryTiles(likesCount: Int?, onOpen: (Int) -> Unit, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         // Низкое окно (телефон в альбомной ориентации): широкая плитка и сетка не помещаются, всё идёт одним рядом
-        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen) else LibraryTilesGrid(likesCount, onOpen)
+        if (maxHeight < 300.dp) LibraryTilesRow(likesCount, onOpen) else LibraryTilesGrid(likesCount, onOpen, maxWidth)
     }
 }
 
 @Composable
-private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit) {
+private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit, width: Dp) {
     val cs = MaterialTheme.colorScheme
+    // Планшет: ровно 4 колонки на всю ширину (Adaptive оставлял бы пустые колонки справа).
+    // На очень широком окне плитки ниже квадрата, чтобы не вырастали до 300 dp.
+    val wide = width >= 600.dp
+    val tile = Modifier.fillMaxWidth().aspectRatio(if (width >= 900.dp) 1.4f else 1f)
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(150.dp),
+        columns = if (wide) GridCells.Fixed(4) else GridCells.Adaptive(150.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -100,16 +104,16 @@ private fun LibraryTilesGrid(likesCount: Int?, onOpen: (Int) -> Unit) {
             }
         }
         item {
-            SquareTile(S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) }) { PlaylistGlyph(Modifier.size(28.dp), it) }
+            SquareTile(S.libPlaylists, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(1) }, modifier = tile) { PlaylistGlyph(Modifier.size(28.dp), it) }
         }
         item {
-            SquareTile(S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) }) { HistoryGlyph(Modifier.size(28.dp), it) }
+            SquareTile(S.libHistory, cs.tertiaryContainer, cs.onTertiaryContainer, { onOpen(2) }, modifier = tile) { HistoryGlyph(Modifier.size(28.dp), it) }
         }
         item {
-            SquareTile(S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) }) { FolderGlyph(Modifier.size(28.dp), it) }
+            SquareTile(S.libLocal, cs.surfaceVariant, cs.onSurfaceVariant, { onOpen(3) }, modifier = tile) { FolderGlyph(Modifier.size(28.dp), it) }
         }
         item {
-            SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }) { DownloadTrayGlyph(Modifier.size(28.dp), it) }
+            SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }, modifier = tile) { DownloadTrayGlyph(Modifier.size(28.dp), it) }
         }
     }
 }
