@@ -46,6 +46,7 @@ fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifi
     val playback by audio.state.collectAsState()
     val pick = rememberAudioFilesPicker { local.add(it) }
     val tracks = remember(files) { files.map { it.toTrack() } }
+    val played = remember { mutableSetOf<Int>() }
 
     Column(modifier.fillMaxSize()) {
         Row(
@@ -86,7 +87,9 @@ fun LocalFilesContent(local: LocalLibrary, audio: AudioBackend, modifier: Modifi
             itemsIndexed(tracks, key = { _, t -> t.id }) { index, track ->
                 val current = playback.provider == ProviderId.LOCAL && playback.mediaId == track.id
                 ListItem(
-                    modifier = Modifier.clickable { audio.playQueue(tracks, index) },
+                    modifier = animatedRow()
+                        .staggeredEntrance(index, played, maxIndex = 10, stepMs = 35L, shift = 24.dp, fromScale = 0.96f)
+                        .clickable { audio.playQueue(tracks, index) },
                     leadingContent = {
                         Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp))) {
                             CoverImage(track.artworkUrl, Modifier.fillMaxSize())
