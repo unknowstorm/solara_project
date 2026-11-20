@@ -52,7 +52,12 @@ import kotlinx.coroutines.launch
 
 /** "Accounts and import": one rounded card per service, one column, in the style of the Library tiles. */
 @Composable
-fun AccountsSection(repo: ImportRepository?, onOpenSpotify: () -> Unit = {}, modifier: Modifier = Modifier) {
+fun AccountsSection(
+    repo: ImportRepository?,
+    onOpenSpotify: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    onOpenAuth: () -> Unit = {},
+) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             S.importPublicOnly,
@@ -64,7 +69,8 @@ fun AccountsSection(repo: ImportRepository?, onOpenSpotify: () -> Unit = {}, mod
             val linked by repo.linked.collectAsState()
             val busy by repo.busy.collectAsState()
             if (!signedIn) {
-                Text(S.signInToImport, style = MaterialTheme.typography.bodyMedium)
+                // Signed out: the cards are still shown, so it is clear what can be imported; a tap leads to sign-in
+                IMPORT_PROVIDERS.forEach { p -> SignedOutImportCard(p, onOpenAuth) }
             } else {
                 IMPORT_PROVIDERS.forEach { p ->
                     ImportCard(repo, p, linked[p], busy == p, busy != null)
@@ -112,6 +118,25 @@ private fun AccountCardFrame(
             }
             body()
         }
+    }
+}
+
+/** Jamendo / Audius card for a user who is not signed in: imported tracks live in the account, so it asks to sign in first. */
+@Composable
+private fun SignedOutImportCard(provider: ProviderId, onOpenAuth: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val service = Service.entries.firstOrNull { it.name == provider.name }
+    val container = if (provider == ProviderId.JAMENDO) colors.primaryContainer else colors.secondaryContainer
+    val content = if (provider == ProviderId.JAMENDO) colors.onPrimaryContainer else colors.onSecondaryContainer
+    AccountCardFrame(
+        container = container,
+        content = content,
+        title = service?.title ?: provider.name.lowercase().replaceFirstChar { it.uppercase() },
+        subtitle = S.signInToImport,
+        logo = { if (service != null) ServiceLogo(service, Modifier.size(28.dp), content) },
+        onClick = onOpenAuth,
+    ) {
+        Button(onClick = onOpenAuth, modifier = Modifier.padding(top = 12.dp)) { Text(S.signInOrSignUp) }
     }
 }
 

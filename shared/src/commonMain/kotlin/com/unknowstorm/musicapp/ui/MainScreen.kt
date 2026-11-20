@@ -340,7 +340,10 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
 
         // Jamendo and Audius import (public profile) and the YouTube link: all accounts in one place
         SettingsSection(S.accountsAndImport, IconLink) {
-            AccountsSection(com.unknowstorm.musicapp.imports.ImportHolder.repo, onOpenSpotify, Modifier.padding(horizontal = 4.dp))
+            AccountsSection(
+                com.unknowstorm.musicapp.imports.ImportHolder.repo, onOpenSpotify, Modifier.padding(horizontal = 4.dp),
+                onOpenAuth = onOpenAuth,
+            )
         }
         Spacer(Modifier.height(4.dp))
 
