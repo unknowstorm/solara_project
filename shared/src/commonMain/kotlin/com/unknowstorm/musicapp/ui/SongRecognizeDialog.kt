@@ -43,6 +43,7 @@ fun SongRecognizeDialog(onDismiss: () -> Unit, onSearch: (String) -> Unit) {
     val recorder = rememberSongRecorder()
     val recognizer = remember { SongRecognizer() }
     val uriHandler = LocalUriHandler.current
+    val spotifyRemote = com.unknowstorm.musicapp.spotify.LocalSpotifyRemote.current
     var attempt by remember { mutableStateOf(0) }
     var state by remember { mutableStateOf<RecState>(RecState.Listening) }
     var started by remember { mutableStateOf(false) }
@@ -118,7 +119,16 @@ fun SongRecognizeDialog(onDismiss: () -> Unit, onSearch: (String) -> Unit) {
         dismissButton = {
             // The Spotify link is a separate text-only button, never next to another brand's mark
             if (found?.song?.spotifyUrl != null) {
-                TextButton(onClick = { runCatching { uriHandler.openUri(found.song.spotifyUrl) } }) {
+                TextButton(onClick = {
+                    // Inside Solara: the Spotify section plays the track (Spotify app and Premium needed); otherwise the link opens
+                    val track = spotifyTrackUri(found.song.spotifyUrl)
+                    if (track != null && spotifyRemote != null) {
+                        PendingSpotify.uri = track
+                        onDismiss()
+                    } else {
+                        runCatching { uriHandler.openUri(found.song.spotifyUrl) }
+                    }
+                }) {
                     Text("Open Spotify")
                 }
             }
@@ -126,3 +136,7 @@ fun SongRecognizeDialog(onDismiss: () -> Unit, onSearch: (String) -> Unit) {
         },
     )
 }
+
+/** spotify:track:ID from a link like https://open.spotify.com/track/ID?si=... (null for other kinds of links). */
+private fun spotifyTrackUri(url: String): String? =
+    Regex("""open\.spotify\.com/(?:intl-[a-z-]+/)?track/([A-Za-z0-9]+)""").find(url)?.groupValues?.get(1)?.let { "spotify:track:$it" }

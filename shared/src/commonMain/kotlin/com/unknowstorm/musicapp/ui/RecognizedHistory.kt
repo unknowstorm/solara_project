@@ -148,3 +148,11 @@ internal fun RecognizedContent() {
 internal object PendingSearch {
     var query by mutableStateOf<String?>(null)
 }
+
+/**
+ * "Open Spotify" in the recognition dialog: the Spotify track URI that MainScreen should open and play in the Spotify
+ * section (the Spotify app and Premium are needed). Memory only; dropped when the user leaves the Spotify page.
+ */
+internal object PendingSpotify {
+    var uri by mutableStateOf<String?>(null)
+}
