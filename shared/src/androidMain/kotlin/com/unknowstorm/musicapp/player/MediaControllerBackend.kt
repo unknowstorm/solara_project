@@ -92,6 +92,13 @@ class MediaControllerBackend(context: Context) : AudioBackend {
                 c.play()
                 return
             }
+            // Failed again after the quiet retry (or the error is permanent): the file is broken, not the network.
+            // Network errors (2xxx without an HTTP answer) are not counted: offline must not hide tracks.
+            val code = error.errorCode
+            val fileProblem = httpCode != null || code in 3000..4999
+            if (id != null && fileProblem) {
+                providerName?.let { n -> ProviderId.entries.firstOrNull { it.name == n } }?.let { DeadTracks.mark(it, id) }
+            }
             errorStreak++
             // When repeating a single track, "next" is the same track, so repeat is turned off
             if (c.repeatMode == Player.REPEAT_MODE_ONE) c.repeatMode = Player.REPEAT_MODE_OFF
