@@ -422,7 +422,7 @@ internal fun formatYtDuration(ms: Long): String {
 private fun YouTubeLibraryPanel(onPlay: (YouTubeVideo, List<YouTubeVideo>) -> Unit, modifier: Modifier = Modifier) {
     PlatformBackHandler(enabled = true, onBack = { LibraryPanels.youtube = false })
     Column(modifier.verticalScroll(rememberScrollState())) {
-        TextButton(onClick = { LibraryPanels.youtube = false }, modifier = Modifier.padding(horizontal = 8.dp)) { Text(S.back) }
+        TextButton(onClick = { LibraryPanels.youtube = false }, modifier = Modifier.padding(horizontal = 8.dp)) { BackLabel(S.back) }
         MyYouTubeBlock(onPlay)
         LegalFooter()
     }

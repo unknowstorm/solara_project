@@ -81,7 +81,7 @@ fun SpotifyScreen(
                     s?.browse != null -> remote.closeBrowse()
                     else -> onBack()
                 }
-            }) { Text(S.back) }
+            }) { BackLabel(S.back) }
         }
         if (remote == null || s == null) {
             StatusColumn {
@@ -281,7 +281,7 @@ private fun SpotifyHome(remote: SpotifyRemote, s: SpotifyState, onBeforePlay: ()
                         Spacer(Modifier.width(12.dp))
                     }
                     Text(s.browseTitle ?: S.collection, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = remote::closeBrowse) { Text(S.backToCollections) }
+                    TextButton(onClick = remote::closeBrowse) { BackLabel(S.backToCollections) }
                 }
             }
             item(key = "browse-row") {

@@ -77,7 +77,7 @@ internal fun SpotifyLinkBrowse(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onClose) { Text(S.back) }
+            TextButton(onClick = onClose) { BackLabel(S.back) }
             Spacer(Modifier.weight(1f))
             SpotifyLogoBar()
         }
@@ -126,7 +126,7 @@ internal fun SpotifyTrackList(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (showBack) TextButton(onClick = onClose) { Text(S.back) }
+            if (showBack) TextButton(onClick = onClose) { BackLabel(S.back) }
             Spacer(Modifier.weight(1f))
             SpotifyLogoBar(Modifier.padding(end = 8.dp))
         }
