@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,6 +61,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -263,9 +266,8 @@ fun MainScreen(
                     Tab.QUEUE -> QueueScreen(audio, playlists, onOpenAuth, providers, queueStore, downloads)
                     Tab.SETTINGS -> SettingsScreen(authRepo, audio, onOpenAuth, onOpenSpotify = { tab = Tab.HOME; service = Service.SPOTIFY })
                 }
-                openPlaylist?.let { pl ->
-                    PlaylistScreen(pl, playlists, providers, audio, onBack = { openPlaylist = null })
-                }
+                // A playlist expands out of the tapped tile the same way the mini player expands into the full player
+                PlaylistExpandable(openPlaylist, playlists, providers, audio, onBack = { openPlaylist = null })
             }
 
             // The place for the Spotify mini player (it is drawn by SpotifyExpandablePlayer)
