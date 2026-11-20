@@ -630,34 +630,34 @@ private fun SpFullContent(
                     Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Both sides are 96 dp wide, so OPEN SPOTIFY stays in the middle
-                    Row(Modifier.width(96.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { showDetails = true }) { MoreIcon() }
+                // OPEN SPOTIFY is centered in the row by itself: the side buttons sit over the row's edges and cannot push it
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+                        CompactIconButton(onClick = { showDetails = true }) { MoreIcon() }
                         if (SPOTIFY_QUEUE_ENABLED) {
-                            IconButton(onClick = { ui.queueOpen = true; ui.expanded = false }) {
+                            CompactIconButton(onClick = { ui.queueOpen = true; ui.expanded = false }) {
                                 SpotifyQueueViewIcon(Modifier.size(24.dp), MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
                     // The link leads to the current track in Spotify
-                    SpotifyOpenButton({ s.uri?.let { remote.openInSpotify(it) } ?: remote.openSpotifyApp() })
+                    SpotifyOpenButton(
+                        { s.uri?.let { remote.openInSpotify(it) } ?: remote.openSpotifyApp() },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                    )
                     // "+" puts the track into Spotify's own Liked Songs, nothing is stored on our side
-                    Box(Modifier.width(96.dp), contentAlignment = Alignment.CenterEnd) {
-                    IconButton(onClick = {
-                        likeNote = if (!s.saved) "Added to Liked Songs" else "Removed from Liked Songs"
-                        remote.toggleSaved()
-                    }) {
+                    IconButton(
+                        onClick = {
+                            likeNote = if (!s.saved) "Added to Liked Songs" else "Removed from Liked Songs"
+                            remote.toggleSaved()
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                    ) {
                         Image(
                             painterResource(if (s.saved) Res.drawable.spotify_liked else Res.drawable.spotify_like),
                             contentDescription = if (s.saved) "Liked" else "Like",
                             modifier = Modifier.size(32.dp).clip(CircleShape).background(if (!s.saved && MaterialTheme.colorScheme.surface.luminance() >= 0.179f) Color.Black else Color.Transparent),
                         )
-                    }
                     }
                 }
 

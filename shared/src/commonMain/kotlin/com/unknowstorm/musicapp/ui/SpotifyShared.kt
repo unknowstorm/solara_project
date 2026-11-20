@@ -262,8 +262,12 @@ internal fun spotifyMonoIcon(background: Color): Painter =
 
 /** “OPEN SPOTIFY” button with an icon, as in the guideline examples. */
 @Composable
-internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(onClick = onClick, modifier = modifier) {
+internal fun SpotifyOpenButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.material3.ButtonDefaults.ContentPadding,
+) {
+    OutlinedButton(onClick = onClick, modifier = modifier, contentPadding = contentPadding) {
         Image(spotifyMonoIcon(MaterialTheme.colorScheme.background), contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(8.dp))
         Text("OPEN SPOTIFY")
@@ -274,3 +278,15 @@ internal fun SpotifyOpenButton(onClick: () -> Unit, modifier: Modifier = Modifie
 @Composable
 internal fun spotifyMonoLogo(background: Color): Painter =
     painterResource(if (background.luminance() < 0.179f) Res.drawable.spotify_logo_white else Res.drawable.spotify_logo_black)
+
+/** A round 40 dp icon button: two of them plus the OPEN SPOTIFY pill must fit side by side on narrow screens. */
+@Composable
+internal fun CompactIconButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
