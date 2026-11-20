@@ -49,9 +49,11 @@ object LegalTexts {
 
         5. Import from Jamendo and Audius is optional and one-way. Solara reads only the public profile (favorites and playlists) of the account you specify and does not ask for your password or access token. Specify only your own account or one you have the right to use. Imported items are marked as imported; to remove them, tap “Disconnect” in Settings and tick “Also delete imported tracks and playlists”. Solara sends nothing back to Jamendo or Audius.
 
-        6. Solara is not affiliated with Google, YouTube, Spotify, Deezer, Jamendo or Audius. Their names and logos belong to their owners.
+        6. Song recognition is optional and starts only when you tap the microphone button in the search field. The app then records a short clip (about 10 seconds) and sends it, through our server, to the AudD recognition service. You can use it only for music that you have the right to listen to, and the result is for personal information only. Recognition is limited to 20 attempts per day for each account. Solara is not responsible for the accuracy of the result.
 
-        7. Questions: $CONTACT_EMAIL.
+        7. Solara is not affiliated with Google, YouTube, Spotify, Deezer, Jamendo, Audius or AudD. Their names and logos belong to their owners.
+
+        8. Questions: $CONTACT_EMAIL.
     """.trimIndent()
 
     private val PRIVACY_EN = """
@@ -61,7 +63,7 @@ object LegalTexts {
         • Account: email address, nickname, avatar and settings. When you sign in with Google, we receive your Google profile name, email address and photo. We request access to your YouTube account data only if you connect it yourself (see section 3).
         • Library: likes, playlists and listening history for music from Jamendo, Audius, Deezer and local files. They are used for recommendations. Spotify and YouTube data does not enter the library.
         • Imports: if you connect a Jamendo or Audius account, we store its public ID and name, the date of the last import, and the likes and playlists read from the public profile (track titles, artists, artwork links and order). Imported items are marked as imported.
-        • Technical data: your IP address and device information are passed to the services the app contacts (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
+        • Technical data: your IP address and device information are passed to the services the app contacts (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify, AudD).
 
         3. YouTube API Services. The YouTube section uses YouTube API Services. By using it, you agree to be bound by the YouTube Terms of Service ($YOUTUBE_TERMS_URL). Google Privacy Policy: $GOOGLE_PRIVACY_URL.
         • Your search query is sent to the YouTube Data API.
@@ -92,15 +94,21 @@ object LegalTexts {
         • The import is one-way: Solara does not change anything in your Jamendo or Audius account. Later changes there appear in Solara only after you tap “Import again”, and items removed there are not removed here.
         • Jamendo and Audius process data under their own policies. Tracks that an artist has closed for third-party apps may be skipped during playback.
 
-        6. Who receives data: Supabase (accounts and library), Google (sign-in and YouTube), Spotify (controlling the Spotify app on your device), Jamendo, Audius, Deezer (catalog requests).
+        6. Song recognition (optional). It starts only when you tap the microphone button in the search field; only then does the app ask for access to the microphone.
+        • The app records a clip of about 10 seconds. The clip is kept in a temporary file only until it is sent and is deleted right after; Solara does not save recordings on the device or on our server.
+        • The clip is sent to our server (a Supabase function), which forwards it to the AudD recognition service (https://audd.io) and returns the title, artist and links to the song. Solara does not store the result and does not add it to likes, playlists, history or recommendations. AudD processes the clip under its own terms and privacy policy.
+        • To limit abuse, we store the number of recognitions per day for your account (no audio and no results).
+        • You can revoke the microphone permission at any time in the system settings.
 
-        7. Cookies and on-device data. The embedded YouTube player may store cookies. The app stores local settings, for example your agreement to the terms.
+        7. Who receives data: Supabase (accounts and library), Google (sign-in and YouTube), Spotify (controlling the Spotify app on your device), Jamendo, Audius, Deezer (catalog requests), AudD (song recognition, only if you use it).
 
-        8. Your rights. You can request deletion of your data and account by writing to $CONTACT_EMAIL. Imported data can also be deleted in the app: Settings → “Disconnect” with the option “Also delete imported tracks and playlists”. The YouTube connection is removed with “Disconnect” (it revokes the token and deletes it from our server).
+        8. Cookies and on-device data. The embedded YouTube player may store cookies. The app stores local settings, for example your agreement to the terms.
 
-        9. Google access. If you signed in with Google, you can revoke access at: $GOOGLE_PERMISSIONS_URL.
+        9. Your rights. You can request deletion of your data and account by writing to $CONTACT_EMAIL. Imported data can also be deleted in the app: Settings → “Disconnect” with the option “Also delete imported tracks and playlists”. The YouTube connection is removed with “Disconnect” (it revokes the token and deletes it from our server).
 
-        10. Contact. Questions and complaints about privacy: $CONTACT_EMAIL.
+        10. Google access. If you signed in with Google, you can revoke access at: $GOOGLE_PERMISSIONS_URL.
+
+        11. Contact. Questions and complaints about privacy: $CONTACT_EMAIL.
     """.trimIndent()
 
     // ---------- Українська ----------
@@ -126,9 +134,11 @@ object LegalTexts {
 
         5. Імпорт з Jamendo і Audius є добровільним і односторонньому. Solara читає лише публічний профіль (вподобання та плейлисти) вказаного вами акаунта й не запитує ваш пароль чи токен доступу. Вказуйте лише власний акаунт або той, який ви маєте право використовувати. Імпортовані елементи позначаються як імпортовані; щоб їх видалити, натисніть у «Налаштуваннях» «Відключити» й позначте «Також видалити імпортовані треки й плейлисти». Solara нічого не надсилає назад до Jamendo чи Audius.
 
-        6. Solara не пов’язана з Google, YouTube, Spotify, Deezer, Jamendo і Audius. Їхні назви та логотипи належать їхнім власникам.
+        6. Розпізнавання пісень є добровільним і запускається лише тоді, коли ви натискаєте кнопку мікрофона в полі пошуку. Тоді застосунок записує короткий фрагмент (близько 10 секунд) і надсилає його через наш сервер до сервісу розпізнавання AudD. Користуватися цим можна лише для музики, яку ви маєте право слухати, а результат призначений лише для особистої інформації. Розпізнавання обмежене 20 спробами на добу для кожного облікового запису. Solara не відповідає за точність результату.
 
-        7. Запитання: $CONTACT_EMAIL.
+        7. Solara не пов’язана з Google, YouTube, Spotify, Deezer, Jamendo, Audius і AudD. Їхні назви та логотипи належать їхнім власникам.
+
+        8. Запитання: $CONTACT_EMAIL.
     """.trimIndent()
 
     private val PRIVACY_UK = """
@@ -138,7 +148,7 @@ object LegalTexts {
         • Акаунт: адреса електронної пошти, нікнейм, аватар і налаштування. Під час входу через Google ми отримуємо ім’я, адресу пошти та фото вашого профілю Google. Ми запитуємо доступ до даних вашого акаунта YouTube лише якщо ви підключите його самі (див. розділ 3).
         • Бібліотека: вподобання, плейлисти та історія прослуховування музики з Jamendo, Audius, Deezer і локальних файлів. Вони використовуються для рекомендацій. Дані Spotify і YouTube до бібліотеки не потрапляють.
         • Імпорт: якщо ви підключаєте акаунт Jamendo або Audius, ми зберігаємо його публічний id та ім’я, дату останнього імпорту й вподобання та плейлисти, прочитані з публічного профілю (назви треків, виконавці, посилання на обкладинки та порядок). Імпортовані елементи позначаються як імпортовані.
-        • Технічні дані: IP-адреса та відомості про пристрій передаються сервісам, до яких звертається застосунок (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify).
+        • Технічні дані: IP-адреса та відомості про пристрій передаються сервісам, до яких звертається застосунок (Supabase, Jamendo, Audius, Deezer, YouTube, Spotify, AudD).
 
         3. YouTube API Services. Розділ YouTube використовує YouTube API Services. Користуючись ним, ви погоджуєтеся дотримуватися Умов використання YouTube ($YOUTUBE_TERMS_URL). Політика конфіденційності Google: $GOOGLE_PRIVACY_URL.
         • Ваш пошуковий запит надсилається до YouTube Data API.
@@ -169,14 +179,20 @@ object LegalTexts {
         • Імпорт односторонній: Solara нічого не змінює у вашому акаунті Jamendo чи Audius. Пізніші зміни там з’являються в Solara лише після натискання «Імпортувати знову», а елементи, видалені там, тут не видаляються.
         • Jamendo і Audius обробляють дані за власними політиками. Треки, які виконавець закрив для сторонніх застосунків, можуть пропускатися під час відтворення.
 
-        6. Кому передаються дані: Supabase (акаунти та бібліотека), Google (вхід і YouTube), Spotify (керування застосунком Spotify на вашому пристрої), Jamendo, Audius, Deezer (запити до каталогів).
+        6. Розпізнавання пісень (за бажанням). Воно запускається лише коли ви натискаєте кнопку мікрофона в полі пошуку; тільки тоді застосунок просить доступ до мікрофона.
+        • Застосунок записує фрагмент близько 10 секунд. Фрагмент зберігається в тимчасовому файлі лише до відправлення й одразу видаляється; Solara не зберігає записи ні на пристрої, ні на нашому сервері.
+        • Фрагмент надсилається на наш сервер (функція Supabase), який передає його сервісу розпізнавання AudD (https://audd.io) і повертає назву, виконавця та посилання на пісню. Solara не зберігає результат і не додає його до вподобань, плейлистів, історії чи рекомендацій. AudD обробляє фрагмент за власними умовами та політикою конфіденційності.
+        • Щоб обмежити зловживання, ми зберігаємо кількість розпізнавань за добу для вашого облікового запису (без аудіо та без результатів).
+        • Ви можете в будь-який момент скасувати дозвіл на мікрофон у налаштуваннях системи.
 
-        7. Cookies і дані на пристрої. Вбудований плеєр YouTube може зберігати cookies. Застосунок зберігає локальні налаштування, наприклад вашу згоду з умовами.
+        7. Кому передаються дані: Supabase (акаунти та бібліотека), Google (вхід і YouTube), Spotify (керування застосунком Spotify на вашому пристрої), Jamendo, Audius, Deezer (запити до каталогів), AudD (розпізнавання пісень, лише якщо ви ним користуєтесь).
 
-        8. Ваші права. Ви можете запросити видалення своїх даних і акаунта, написавши на $CONTACT_EMAIL. Імпортовані дані можна також видалити в застосунку: «Налаштування» → «Відключити» з позначкою «Також видалити імпортовані треки й плейлисти». Підключення YouTube знімається кнопкою «Відключити» (вона відкликає токен і видаляє його з нашого сервера).
+        8. Cookies і дані на пристрої. Вбудований плеєр YouTube може зберігати cookies. Застосунок зберігає локальні налаштування, наприклад вашу згоду з умовами.
 
-        9. Доступ Google. Якщо ви входили через Google, ви можете відкликати доступ на сторінці: $GOOGLE_PERMISSIONS_URL.
+        9. Ваші права. Ви можете запросити видалення своїх даних і акаунта, написавши на $CONTACT_EMAIL. Імпортовані дані можна також видалити в застосунку: «Налаштування» → «Відключити» з позначкою «Також видалити імпортовані треки й плейлисти». Підключення YouTube знімається кнопкою «Відключити» (вона відкликає токен і видаляє його з нашого сервера).
 
-        10. Контакти. Запитання та скарги щодо конфіденційності: $CONTACT_EMAIL.
+        10. Доступ Google. Якщо ви входили через Google, ви можете відкликати доступ на сторінці: $GOOGLE_PERMISSIONS_URL.
+
+        11. Контакти. Запитання та скарги щодо конфіденційності: $CONTACT_EMAIL.
     """.trimIndent()
 }

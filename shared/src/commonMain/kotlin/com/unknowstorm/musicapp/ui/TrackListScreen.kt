@@ -1,6 +1,9 @@
 package com.unknowstorm.musicapp.ui
 
 import com.unknowstorm.musicapp.i18n.S
+import com.unknowstorm.musicapp.i18n.tr
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,6 +65,7 @@ fun TrackListScreen(
     var selected by remember { mutableStateOf(Service.ALL) }
     var likesSelected by remember { mutableStateOf(false) }
     var ytQuery by remember { mutableStateOf("") }
+    var recognizing by remember { mutableStateOf(false) }
     var retry by remember { mutableStateOf(0) }
     var pagerPos by remember {
         mutableFloatStateOf(pagerOrder(likes != null).indexOf(if (likesSelected) null else selected).coerceAtLeast(0).toFloat())
@@ -135,6 +139,11 @@ fun TrackListScreen(
                 value = query,
                 onValueChange = { query = it },
                 label = { Text(S.search) },
+                trailingIcon = {
+                    IconButton(onClick = { recognizing = true }) {
+                        Icon(MicVector, contentDescription = tr("Recognize a song", "Розпізнати пісню"))
+                    }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(
@@ -142,6 +151,12 @@ fun TrackListScreen(
                 ),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
             )
+            if (recognizing) {
+                SongRecognizeDialog(
+                    onDismiss = { recognizing = false },
+                    onSearch = { query = it; if (selected == Service.YOUTUBE) ytQuery = it.trim() },
+                )
+            }
         }
 
         playback.error?.let {
