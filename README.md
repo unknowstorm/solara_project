@@ -4,7 +4,7 @@
 <table>
   <tr>
     <td width="180" align="center" valign="middle">
-      <img src="docs/images/solara-logo.png" width="140" alt="Solara Logo"/>
+      <img src="designs/logo.png" width="140" alt="Solara Logo"/>
     </td>
     <td valign="middle">
       <h1>SOLARA</h1>
@@ -61,9 +61,9 @@
 ## About Solara
 
 <p align="center">
-  <img src="docs/images/screenshot-1.png" width="32%" />
-  <img src="docs/images/screenshot-2.png" width="32%" />
-  <img src="docs/images/screenshot-3.png" width="32%" />
+  <img src="disigns/Screenshot-1.png" width="32%" />
+  <img src="disigns/Screenshot-2.png" width="32%" />
+  <img src="disigns/Screenshot-3.png" width="32%" />
 </p>
 
 <p align="center">
