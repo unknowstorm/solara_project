@@ -18,5 +18,7 @@ internal data class JamendoTrackDto(
     val audio: String? = null,
     @SerialName("license_ccurl") val licenseUrl: String? = null,
     val audiodownload: String? = null,
-    @SerialName("audiodownload_allowed") val audiodownloadAllowed: Boolean? = null
+    @SerialName("audiodownload_allowed") val audiodownloadAllowed: Boolean? = null,
+    // Only present when the request has include=lyrics
+    val lyrics: String? = null
 )

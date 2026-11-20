@@ -666,6 +666,7 @@ private fun FullContent(
     val currentTrack = state.asTrack()
     val liked = likedTracks.containsTrack(currentTrack)
     var showDetails by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
 
     // The "⋮" menu and the "add to playlist" flow
     val scope = rememberCoroutineScope()
@@ -847,6 +848,16 @@ private fun FullContent(
                                     )
                                 }
                             }
+                            if (currentTrack?.provider == ProviderId.JAMENDO) {
+                                DropdownMenuItem(
+                                    text = { Text(LyricsText.title) },
+                                    leadingIcon = { Icon(PlayerMenuLyricsIcon, contentDescription = null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        showLyrics = true
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(S.trackDetails) },
                                 leadingIcon = { Icon(PlayerMenuInfoIcon, contentDescription = null) },
@@ -947,6 +958,10 @@ private fun FullContent(
             title = { Text(state.title ?: "") },
             text = { Text(S.artistSource(state.artist ?: "—", state.provider?.toService()?.title ?: "—")) },
         )
+    }
+
+    if (showLyrics && currentTrack != null) {
+        LyricsDialog(currentTrack, onDismiss = { showLyrics = false })
     }
 
     if (showPicker) {
