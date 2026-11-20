@@ -3,8 +3,9 @@ package com.unknowstorm.musicapp.ui
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -14,13 +15,11 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
- * Records a short AAC clip from the microphone after the user tapped the button. The permission is asked only now.
- * The clip lives in a temporary file that is deleted right after it is read into memory.
+ * Records a short WAV clip from the microphone after the user tapped the button. The permission is asked only now.
+ * The clip lives only in memory.
  */
 @Composable
 actual fun rememberSongRecorder(): SongRecorder {
@@ -47,36 +46,52 @@ actual fun rememberSongRecorder(): SongRecorder {
     }
 }
 
-@Suppress("DEPRECATION")
-private fun newRecorder(context: Context): MediaRecorder =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else MediaRecorder()
+private const val SAMPLE_RATE = 44100
 
+/** Records raw 16-bit mono PCM and wraps it into a WAV file: the format that recognition services read most reliably. */
+@android.annotation.SuppressLint("MissingPermission")
 private suspend fun recordClip(context: Context, seconds: Int, onStarted: () -> Unit): RecordResult {
-    val file = File.createTempFile("clip", ".m4a", context.cacheDir)
-    var recorder: MediaRecorder? = null
+    val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+    if (minBuf <= 0) return RecordResult.Failed
+    var rec: AudioRecord? = null
     return try {
-        val r = newRecorder(context)
-        recorder = r
-        r.setAudioSource(MediaRecorder.AudioSource.MIC)
-        r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-        r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-        r.setAudioChannels(1)
-        r.setAudioSamplingRate(44100)
-        r.setAudioEncodingBitRate(96_000)
-        r.setOutputFile(file.absolutePath)
-        r.prepare()
-        r.start()
+        val r = AudioRecord(
+            MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, SAMPLE_RATE),
+        )
+        rec = r
+        if (r.state != AudioRecord.STATE_INITIALIZED) return RecordResult.Failed
+        val total = SAMPLE_RATE * 2 * seconds
+        val pcm = ByteArray(total)
+        r.startRecording()
         onStarted()
-        delay(seconds * 1000L)
+        var filled = 0
+        while (filled < total) {
+            val n = r.read(pcm, filled, minOf(4096, total - filled))
+            if (n <= 0) break
+            filled += n
+            kotlinx.coroutines.yield()
+        }
         r.stop()
-        RecordResult.Ok(file.readBytes(), "audio/mp4")
+        if (filled < SAMPLE_RATE) return RecordResult.Failed
+        RecordResult.Ok(wav(pcm, filled), "audio/wav")
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         println("Solara: recording failed: ${e.message}")
         RecordResult.Failed
     } finally {
-        runCatching { recorder?.release() }
-        file.delete()
+        runCatching { rec?.release() }
     }
+}
+
+private fun wav(pcm: ByteArray, len: Int): ByteArray {
+    val out = java.io.ByteArrayOutputStream(44 + len)
+    fun le32(v: Int) { out.write(v and 255); out.write(v shr 8 and 255); out.write(v shr 16 and 255); out.write(v shr 24 and 255) }
+    fun le16(v: Int) { out.write(v and 255); out.write(v shr 8 and 255) }
+    out.write("RIFF".toByteArray()); le32(36 + len); out.write("WAVE".toByteArray())
+    out.write("fmt ".toByteArray()); le32(16); le16(1); le16(1); le32(SAMPLE_RATE); le32(SAMPLE_RATE * 2); le16(2); le16(16)
+    out.write("data".toByteArray()); le32(len)
+    out.write(pcm, 0, len)
+    return out.toByteArray()
 }
