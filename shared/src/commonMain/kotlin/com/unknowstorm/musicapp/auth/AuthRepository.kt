@@ -17,6 +17,8 @@ import io.ktor.http.ContentType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -142,6 +144,35 @@ class AuthRepository(private val client: SupabaseClient = supabase) {
         }
         val fresh = profile?.username?.takeIf { it.isNotBlank() }
         if (fresh != null && fresh != cached) cacheUsername(fresh)
+        // No network at start: the profile did not load, so keep trying until the network is back
+        if (profile == null && (_state.value as? AuthState.SignedIn)?.profile == null) startProfileRetry(user.id)
+    }
+
+    private var profileRetry: Job? = null
+
+    /** Retries loading the profile every few seconds (3 s, then longer, at most 15 s) until it arrives or the user changes. */
+    private fun startProfileRetry(userId: String) {
+        if (profileRetry?.isActive == true) return
+        profileRetry = scope.launch {
+            var pause = 3_000L
+            while (true) {
+                delay(pause)
+                val cur = _state.value as? AuthState.SignedIn
+                if (cur == null || cur.userId != userId || cur.profile != null) return@launch
+                if (reloadProfile()) return@launch
+                pause = (pause * 2).coerceAtMost(15_000L)
+            }
+        }
+    }
+
+    /** One attempt to load the profile now (the "Retry" in the offline message). True if it loaded. */
+    suspend fun reloadProfile(): Boolean {
+        val cur = _state.value as? AuthState.SignedIn ?: return false
+        val profile = runCatching { loadProfile(cur.userId) }.getOrNull() ?: return false
+        (_state.value as? AuthState.SignedIn)?.takeIf { it.userId == cur.userId }?.let {
+            _state.value = it.copy(username = profile.username ?: it.username, profile = profile)
+        }
+        return true
     }
 
     /** Writes the nickname to the session metadata (only for display offline; the source of truth stays the database). */

@@ -314,11 +314,37 @@ private fun SettingsScreen(authRepo: AuthRepository, audio: AudioBackend, onOpen
         Spacer(Modifier.height(16.dp))
 
         var editingProfile by remember { mutableStateOf(false) }
-        AccountBlock(authRepo, onOpenAuth, onEditProfile = { editingProfile = true })
-
+        var profileOffline by remember { mutableStateOf(false) }
         val authState by authRepo.state.collectAsState()
-        var showChangePassword by remember { mutableStateOf(false) }
         val editProfile = (authState as? AuthState.SignedIn)?.profile
+        AccountBlock(authRepo, onOpenAuth, onEditProfile = {
+            // The profile is loaded from the network: without it there is nothing to edit yet, so say so
+            if (editProfile != null) editingProfile = true else profileOffline = true
+        })
+
+        var showChangePassword by remember { mutableStateOf(false) }
+        // The profile arrives by itself when the network is back: close the message and open the editor
+        LaunchedEffect(editProfile != null) {
+            if (profileOffline && editProfile != null) { profileOffline = false; editingProfile = true }
+        }
+        if (profileOffline) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { profileOffline = false },
+                title = { Text(tr("No internet connection", "Немає з'єднання з інтернетом")) },
+                text = {
+                    Text(
+                        tr(
+                            "The profile is not loaded yet, so it cannot be edited. Check the connection: it will load by itself and the editor will open.",
+                            "Профіль ще не завантажено, тому його не можна редагувати. Перевірте з'єднання: він завантажиться сам, і редактор відкриється.",
+                        )
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { scope.launch { authRepo.reloadProfile() } }) { Text(S.retry) }
+                },
+                dismissButton = { TextButton(onClick = { profileOffline = false }) { Text(S.close) } },
+            )
+        }
         if (editingProfile && editProfile != null) {
             androidx.compose.ui.window.Dialog(
                 onDismissRequest = { editingProfile = false },

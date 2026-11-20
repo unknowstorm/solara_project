@@ -165,6 +165,9 @@ private fun AppContent(boot: AppBoot) {
     val providers = boot.providers
     val authRepo = boot.authRepo
     val audio = rememberAudioBackend()
+    // Tracks that do not play are remembered for a week (hidden in the feeds)
+    val deadStore = rememberTextStore()
+    remember(deadStore) { com.unknowstorm.musicapp.player.DeadTracks.attach(deadStore); true }
     val likes = remember { LikesRepository(authRepo) }
     val playlists = remember { PlaylistsRepository(authRepo) }
 

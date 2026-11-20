@@ -114,14 +114,14 @@ fun AccountBlock(
             // A neat pencil in the corner of the block instead of the "edit profile" button
             (state as? AuthState.SignedIn)?.let { s ->
                 IconButton(
+                    // Always tappable: without a loaded profile (no network) the tap explains why nothing opens
                     onClick = onEditProfile,
-                    enabled = s.profile != null,
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(36.dp),
                 ) {
                     Icon(
                         PencilIcon,
                         contentDescription = S.editProfile,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = if (s.profile != null) 1f else 0.5f),
                         modifier = Modifier.size(18.dp),
                     )
                 }
