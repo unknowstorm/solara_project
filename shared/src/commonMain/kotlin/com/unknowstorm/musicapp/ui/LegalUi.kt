@@ -104,7 +104,7 @@ fun YouTubeConsentScreen(onAccept: () -> Unit, onBack: () -> Unit) {
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-        TextButton(onClick = onBack) { Text(S.back) }
+        TextButton(onClick = onBack) { BackLabel(S.back) }
         Text(S.youtubeInSolara, style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
         Text(LegalTexts.YOUTUBE_INTRO, style = MaterialTheme.typography.bodyLarge)

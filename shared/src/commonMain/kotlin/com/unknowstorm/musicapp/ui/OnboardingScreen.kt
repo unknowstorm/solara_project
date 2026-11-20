@@ -128,7 +128,7 @@ fun OnboardingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (onDone != null) {
-                    TextButton(onClick = onDone, enabled = !busy) { Text(S.back) }
+                    TextButton(onClick = onDone, enabled = !busy) { BackLabel(S.back) }
                     Text(S.profile, style = MaterialTheme.typography.headlineLarge)
                 } else {
                     Text(S.emailConfirmed, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)

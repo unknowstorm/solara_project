@@ -8,7 +8,15 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.TextButton
 import com.unknowstorm.musicapp.i18n.S
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,7 +81,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab {
-    LIKES, PLAYLISTS, HISTORY, LOCAL, CACHE, RECOGNIZED;
+    LIKES, PLAYLISTS, HISTORY, LOCAL, CACHE;
 
     // Свойство, а не параметр конструктора: название берётся из текущего языка при каждой отрисовке
     val label: String
@@ -83,8 +91,30 @@ private enum class LibraryTab {
             HISTORY -> S.libHistory
             LOCAL -> S.libLocal
             CACHE -> S.libCache
-            RECOGNIZED -> S.libRecognized
         }
+}
+
+/** Стрелка «назад»: сетка 24x24, скруглённые линии потолще, как у остальных иконок приложения. */
+@Composable
+internal fun BackArrowIcon(modifier: Modifier = Modifier, tint: Color = LocalContentColor.current) {
+    Canvas(modifier) {
+        scale(size.width / 24f, pivot = Offset.Zero) {
+            val arrow = Path().apply {
+                moveTo(20f, 12f); lineTo(4.5f, 12f)
+                moveTo(11.5f, 4.5f); lineTo(4.5f, 12f); lineTo(11.5f, 19.5f)
+            }
+            drawPath(arrow, tint, style = Stroke(3.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+/** Текстовая кнопка «назад»: стрелка и подпись в ряд. Цвет берётся от TextButton. */
+@Composable
+internal fun BackLabel(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        BackArrowIcon(Modifier.size(18.dp))
+        Text(text)
+    }
 }
 
 /**
@@ -189,7 +219,7 @@ fun LibraryContent(
                         .padding(start = 4.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = { selected = -1 }) { Text("←", style = MaterialTheme.typography.titleLarge) }
+                    IconButton(onClick = { selected = -1 }) { BackArrowIcon(Modifier.size(24.dp)) }
                     Text(
                         section.label,
                         style = MaterialTheme.typography.headlineSmall,
@@ -204,7 +234,6 @@ fun LibraryContent(
                         LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
                         LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio) else Message(S.noLocalFiles)
                         LibraryTab.CACHE -> if (downloads != null) DownloadsContent(downloads, audio) else Message(S.cacheSoon)
-                        LibraryTab.RECOGNIZED -> RecognizedContent()
                     }
                 }
             }

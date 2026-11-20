@@ -206,7 +206,7 @@ fun AwaitEmailScreen(
                     Text(if (cooldown > 0) S.sendAgainInS(cooldown) else S.sendTheCodeAgain)
                 }
 
-                TextButton(onClick = onBack, enabled = !busy) { Text(S.changeEmail) }
+                TextButton(onClick = onBack, enabled = !busy) { BackLabel(S.changeEmail) }
             }
         }
     }

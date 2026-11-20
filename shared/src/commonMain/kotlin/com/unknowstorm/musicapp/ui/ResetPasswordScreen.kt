@@ -164,7 +164,7 @@ fun ResetPasswordScreen(
                 if (codeSent) {
                     TextButton(onClick = { sendCode() }, enabled = !busy) { Text(S.sendTheCodeAgain) }
                 }
-                TextButton(onClick = onClose, enabled = !busy) { Text(S.back) }
+                TextButton(onClick = onClose, enabled = !busy) { BackLabel(S.back) }
             }
         }
     }

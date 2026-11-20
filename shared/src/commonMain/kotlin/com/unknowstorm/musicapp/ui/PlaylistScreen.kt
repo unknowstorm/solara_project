@@ -141,7 +141,7 @@ fun PlaylistScreen(
                 Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) { Text("←", style = MaterialTheme.typography.titleLarge) }
+                IconButton(onClick = onBack) { BackArrowIcon(Modifier.size(24.dp)) }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { showDelete = true }) {
                     Text(S.delete, color = MaterialTheme.colorScheme.error)

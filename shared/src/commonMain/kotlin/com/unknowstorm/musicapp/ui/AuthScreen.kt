@@ -69,7 +69,7 @@ fun AuthScreen(
                 .wrapContentWidth(Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            TextButton(onClick = onClose) { Text(S.back) }
+            TextButton(onClick = onClose) { BackLabel(S.back) }
 
             Text(
                 if (register) S.createAccount else S.welcomeBack,

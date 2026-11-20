@@ -133,7 +133,7 @@ fun TrackListScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { selected = Service.ALL }) { Text(S.back) }
+                TextButton(onClick = { selected = Service.ALL }) { BackLabel(S.back) }
             }
         } else {
             TopBar(
