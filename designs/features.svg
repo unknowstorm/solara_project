@@ -1,0 +1,68 @@
+
+<svg width="800" height="340" viewBox="0 0 800 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="798" height="338" rx="16" fill="#0D1117" stroke="#30363D"/>
+
+  <!-- Vertical divider -->
+  <path d="M400 24V316" stroke="#30363D"/>
+
+  <!-- Horizontal divider -->
+  <path d="M24 113H776" stroke="#30363D"/>
+  <path d="M24 226H776" stroke="#30363D"/>
+
+  <!-- Multi-source Music -->
+  <g transform="translate(38 38)" stroke="#E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 10V20"/>
+    <path d="M9 5V25"/>
+    <path d="M15 8V22"/>
+    <path d="M21 3V27"/>
+    <path d="M27 10V20"/>
+  </g>
+  <text x="82" y="52" fill="#E6EDF3" font-family="Arial, sans-serif" font-size="17" font-weight="600">Multi-source Music</text>
+  <text x="82" y="76" fill="#8B949E" font-family="Arial, sans-serif" font-size="12">Access multiple music platforms in one place.</text>
+
+  <!-- Integrated Playback -->
+  <g transform="translate(438 36)" stroke="#E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="14" cy="14" r="12"/>
+    <path d="M12 9L20 14L12 19V9Z" fill="#E6EDF3" stroke="none"/>
+  </g>
+  <text x="480" y="52" fill="#E6EDF3" font-family="Arial, sans-serif" font-size="17" font-weight="600">Integrated Playback</text>
+  <text x="480" y="76" fill="#8B949E" font-family="Arial, sans-serif" font-size="12">Listen through integrated playback experiences.</text>
+
+  <!-- Personal Library -->
+  <g transform="translate(38 151)" stroke="#E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 5H24V27H4Z"/>
+    <path d="M9 5V27"/>
+    <path d="M14 11H20"/>
+    <path d="M14 16H20"/>
+    <path d="M14 21H20"/>
+  </g>
+  <text x="82" y="165" fill="#E6EDF3" font-family="Arial, sans-serif" font-size="17" font-weight="600">Personal Library</text>
+  <text x="82" y="189" fill="#8B949E" font-family="Arial, sans-serif" font-size="12">Manage likes, playlists and listening history.</text>
+
+  <!-- Cloud Integration -->
+  <g transform="translate(438 151)" stroke="#E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 24H23C27 24 29 21 29 17C29 13 26 10 22 10C21 5 17 3 13 5C10 6 9 9 9 11C5 11 3 14 3 18C3 22 5 24 8 24Z"/>
+  </g>
+  <text x="480" y="165" fill="#E6EDF3" font-family="Arial, sans-serif" font-size="17" font-weight="600">Cloud Integration</text>
+  <text x="480" y="189" fill="#8B949E" font-family="Arial, sans-serif" font-size="12">Account and personal data powered by Supabase.</text>
+
+  <!-- Music Cache -->
+  <g transform="translate(38 264)" stroke="#E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 8H25V26H5Z"/>
+    <path d="M5 13H25"/>
+    <path d="M11 18H19"/>
+    <path d="M11 22H17"/>
+    <path d="M9 4H21"/>
+  </g>
+  <text x="82" y="278" fill="#E6EDF3" font-family="Arial, sans-serif" font-size="17" font-weight="600">Music Cache</text>
+  <text x="82" y="302" fill="#8B949E" font-family="Arial, sans-serif" font-size="12">Cached music data for improved playback experience.</text>
+
+  <!-- Native Android Experience -->
+  <g transform="translate(438 264)" stroke="#E6EDF3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="2" width="18" height="28" rx="3"/>
+    <path d="M11 6H17"/>
+    <path d="M12 26H16"/>
+  </g>
+  <text x="480" y="278" fill="#E6EDF3" font-family="Arial, sans-serif" font-size="17" font-weight="600">Native Android Experience</text>
+  <text x="480" y="302" fill="#8B949E" font-family="Arial, sans-serif" font-size="12">A modern interface built with Compose Multiplatform.</text>
+</svg>
