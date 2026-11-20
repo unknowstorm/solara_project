@@ -455,6 +455,7 @@ fun TopBar(
 ) {
     val menuOpen = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val soon = Service.entries.filter { !it.ready }
+    val islandStore = rememberTextStore()
 
     val cs = MaterialTheme.colorScheme
     val base = cs.surfaceVariant.copy(alpha = 0.5f)
@@ -562,26 +563,18 @@ fun TopBar(
                         if (spotifyOn) onPrimary else idle,
                     )
                 }
-                androidx.compose.material3.DropdownMenu(
+                PlusMenu(
                     expanded = menuOpen.value,
-                    onDismissRequest = { menuOpen.value = false },
-                ) {
-                    // Spotify: entry only via "+", as text and without a logo (brand rules)
-                    if (Service.SPOTIFY.ready) androidx.compose.material3.DropdownMenuItem(
-                        text = { Text("Spotify") },
-                        onClick = { menuOpen.value = false; onSelect(Service.SPOTIFY) },
-                    )
-                    soon.forEach { service ->
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(service.title + S.soon) },
-                            leadingIcon = { ServiceLogo(service, Modifier.size(20.dp)) },
-                            onClick = {
-                                menuOpen.value = false
-                                onSelect(service)
-                            },
-                        )
-                    }
-                }
+                    onDismiss = { menuOpen.value = false },
+                    onSpotify = { onSelect(Service.SPOTIFY) },
+                    // A hidden service returns to the island for good, then opens
+                    onReveal = { service ->
+                        IslandSettings.reveal(service) { raw -> islandStore.set(ISLAND_KEY, raw) }
+                        onSelect(service)
+                    },
+                    soon = soon,
+                    onSoon = onSelect,
+                )
             }
         }
     }
