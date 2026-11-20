@@ -116,7 +116,7 @@
       <img src="designs/Screenshot-5.png" width="100%" alt="Solara Screenshot 2"/>
     </td>
     <td valign="top" width="25%">
-      <img src="designs/Screenshot-6png" width="100%" alt="Solara Screenshot 3"/>
+      <img src="designs/Screenshot-6.png" width="100%" alt="Solara Screenshot 3"/>
     </td>
     <td valign="top" width="25%">
       <br><br>
