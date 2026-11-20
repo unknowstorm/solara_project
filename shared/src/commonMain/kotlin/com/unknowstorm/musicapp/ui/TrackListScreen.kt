@@ -83,6 +83,15 @@ fun TrackListScreen(
         else -> s.ready && providers.any { it.id.name == s.name }
     }
 
+    // A recognized song was tapped in the library: run the same search as the "Find in Solara" button
+    val pendingSearch = PendingSearch.query
+    LaunchedEffect(pendingSearch) {
+        val q = pendingSearch ?: return@LaunchedEffect
+        query = q
+        if (selected == Service.YOUTUBE) ytQuery = q.trim()
+        PendingSearch.query = null
+    }
+
     LaunchedEffect(query, selected, likesSelected, retry, hub) {
         if (selected == Service.SPOTIFY) return@LaunchedEffect
         val order = pagerOrder(likes != null)

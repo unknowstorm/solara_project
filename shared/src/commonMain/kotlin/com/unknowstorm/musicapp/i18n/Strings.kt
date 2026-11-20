@@ -307,6 +307,7 @@ object S {
         "custom" -> tr("Custom", "Власний")
         else -> name
     }
+    val libRecognized: String get() = tr("Recognized", "Розпізнані")
     // <<< ENTRIES >>>
 
     val notConnected: String get() = tr("Not connected", "Не підключено")

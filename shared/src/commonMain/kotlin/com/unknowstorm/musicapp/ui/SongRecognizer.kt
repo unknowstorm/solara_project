@@ -60,7 +60,7 @@ class SongRecognizer(private val client: SupabaseClient = supabase) {
                     put("mime", mime)
                 },
             )
-            fromReply(resp.bodyAsText())
+            fromReply(resp.bodyAsText()).also { if (it is RecognizeOutcome.Found) RecognizedHistory.add(it.song) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -108,6 +108,9 @@ fun MainScreen(
     onOpenAuth: () -> Unit,
 ) {
     var tab by remember { mutableStateOf(Tab.HOME) }
+    // A recognized song was tapped in the library: go to Search, where TrackListScreen runs the query
+    val pendingSearch = PendingSearch.query
+    LaunchedEffect(pendingSearch) { if (pendingSearch != null) tab = Tab.SEARCH }
     var service by remember { mutableStateOf(Service.ALL) }
     var showLikes by remember { mutableStateOf(false) }
     var openPlaylist by remember { mutableStateOf<Playlist?>(null) }
@@ -151,6 +154,7 @@ fun MainScreen(
     }
     val playback by audio.state.collectAsState()
     val queueTexts = rememberTextStore()
+    SideEffect { RecognizedHistory.attach(queueTexts) }
     // Сохранённый эквалайзер применяется при старте, а не только когда открыта шторка
     val equalizer = audio.equalizer
     LaunchedEffect(equalizer) { equalizer?.apply(EqualizerSettings.decode(queueTexts.get(EQUALIZER_KEY))) }

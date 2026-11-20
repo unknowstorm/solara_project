@@ -96,13 +96,13 @@ object LegalTexts {
 
         6. Song recognition (optional). It starts only when you tap the microphone button in the search field; only then does the app ask for access to the microphone.
         • The app records a clip of about 10 seconds. The clip is kept in a temporary file only until it is sent and is deleted right after; Solara does not save recordings on the device or on our server.
-        • The clip is sent to our server (a Supabase function), which forwards it to the AudD recognition service (https://audd.io) and returns the title, artist and links to the song. Solara does not store the result and does not add it to likes, playlists, history or recommendations. AudD processes the clip under its own terms and privacy policy.
+        • The clip is sent to our server (a Supabase function), which forwards it to the AudD recognition service (https://audd.io) and returns the title, artist and links to the song. Solara does not add the result to likes, playlists, history or recommendations. The title, artist and album of a recognized song are saved in a list on your device only (the “Recognized” section of the library) so that you can return to it later; this list is not sent to our server, and links to the song are not saved. You can remove a song or clear the whole list at any time. AudD processes the clip under its own terms and privacy policy.
         • To limit abuse, we store the number of recognitions per day for your account (no audio and no results).
         • You can revoke the microphone permission at any time in the system settings.
 
         7. Who receives data: Supabase (accounts and library), Google (sign-in and YouTube), Spotify (controlling the Spotify app on your device), Jamendo, Audius, Deezer (catalog requests), AudD (song recognition, only if you use it).
 
-        8. Cookies and on-device data. The embedded YouTube player may store cookies. The app stores local settings, for example your agreement to the terms.
+        8. Cookies and on-device data. The embedded YouTube player may store cookies. The app stores local settings, for example your agreement to the terms, and the list of songs you recognized (see section 6).
 
         9. Your rights. You can request deletion of your data and account by writing to $CONTACT_EMAIL. Imported data can also be deleted in the app: Settings → “Disconnect” with the option “Also delete imported tracks and playlists”. The YouTube connection is removed with “Disconnect” (it revokes the token and deletes it from our server).
 
@@ -181,13 +181,13 @@ object LegalTexts {
 
         6. Розпізнавання пісень (за бажанням). Воно запускається лише коли ви натискаєте кнопку мікрофона в полі пошуку; тільки тоді застосунок просить доступ до мікрофона.
         • Застосунок записує фрагмент близько 10 секунд. Фрагмент зберігається в тимчасовому файлі лише до відправлення й одразу видаляється; Solara не зберігає записи ні на пристрої, ні на нашому сервері.
-        • Фрагмент надсилається на наш сервер (функція Supabase), який передає його сервісу розпізнавання AudD (https://audd.io) і повертає назву, виконавця та посилання на пісню. Solara не зберігає результат і не додає його до вподобань, плейлистів, історії чи рекомендацій. AudD обробляє фрагмент за власними умовами та політикою конфіденційності.
+        • Фрагмент надсилається на наш сервер (функція Supabase), який передає його сервісу розпізнавання AudD (https://audd.io) і повертає назву, виконавця та посилання на пісню. Solara не додає результат до вподобань, плейлистів, історії чи рекомендацій. Назва, виконавець і альбом розпізнаної пісні зберігаються у списку лише на вашому пристрої (розділ «Розпізнані» в бібліотеці), щоб ви могли повернутися до неї пізніше; цей список не надсилається на наш сервер, а посилання на пісню не зберігаються. Ви можете будь-коли видалити пісню або очистити весь список. AudD обробляє фрагмент за власними умовами та політикою конфіденційності.
         • Щоб обмежити зловживання, ми зберігаємо кількість розпізнавань за добу для вашого облікового запису (без аудіо та без результатів).
         • Ви можете в будь-який момент скасувати дозвіл на мікрофон у налаштуваннях системи.
 
         7. Кому передаються дані: Supabase (акаунти та бібліотека), Google (вхід і YouTube), Spotify (керування застосунком Spotify на вашому пристрої), Jamendo, Audius, Deezer (запити до каталогів), AudD (розпізнавання пісень, лише якщо ви ним користуєтесь).
 
-        8. Cookies і дані на пристрої. Вбудований плеєр YouTube може зберігати cookies. Застосунок зберігає локальні налаштування, наприклад вашу згоду з умовами.
+        8. Cookies і дані на пристрої. Вбудований плеєр YouTube може зберігати cookies. Застосунок зберігає локальні налаштування, наприклад вашу згоду з умовами, а також список розпізнаних вами пісень (див. розділ 6).
 
         9. Ваші права. Ви можете запросити видалення своїх даних і акаунта, написавши на $CONTACT_EMAIL. Імпортовані дані можна також видалити в застосунку: «Налаштування» → «Відключити» з позначкою «Також видалити імпортовані треки й плейлисти». Підключення YouTube знімається кнопкою «Відключити» (вона відкликає токен і видаляє його з нашого сервера).
 
