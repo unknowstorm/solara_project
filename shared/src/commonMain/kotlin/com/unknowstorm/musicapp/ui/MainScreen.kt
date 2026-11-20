@@ -166,6 +166,30 @@ fun MainScreen(
     val downloads = remember(queueTexts, providers) { DownloadManager(queueTexts, downloadPlatform, downloadScope, providers) }
     SideEffect { DownloadsHolder.manager = downloads }
     val spotify = LocalSpotifyRemote.current
+    // "Open Spotify" for a recognized song: go to the Spotify page and play the track there
+    val pendingSpotify = PendingSpotify.uri
+    val spotifyNow = spotify?.state?.collectAsState()?.value
+    LaunchedEffect(pendingSpotify, spotifyNow?.connected, spotifyNow?.premium, spotifyNow?.appInstalled) {
+        val uri = pendingSpotify ?: return@LaunchedEffect
+        tab = Tab.HOME
+        service = Service.SPOTIFY
+        showLikes = false
+        val st = spotifyNow
+        if (spotify == null || st == null || !st.appInstalled || st.premium == false) {
+            PendingSpotify.uri = null
+        } else if (st.connected) {
+            audio.stop()
+            session.close()
+            spotify.playUri(uri)
+            PendingSpotify.uri = null
+        } else if (!st.connecting) {
+            spotify.connect()
+        }
+    }
+    // The user left the Spotify page before the connection finished: the waiting track is dropped
+    LaunchedEffect(tab, service) {
+        if (PendingSpotify.uri != null && !(tab == Tab.HOME && service == Service.SPOTIFY)) PendingSpotify.uri = null
+    }
     // Our music or YouTube started playing: pause Spotify
     LaunchedEffect(playback.isPlaying) { if (playback.isPlaying) spotify?.pause() }
     LaunchedEffect(session.video) { if (session.video != null) spotify?.pause() }
