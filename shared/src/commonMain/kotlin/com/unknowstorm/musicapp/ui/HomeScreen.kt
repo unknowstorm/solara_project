@@ -17,11 +17,24 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -472,6 +485,10 @@ fun TopBar(
     val order = pagerOrder(onLikes != null)
     // The chips are the same list as the pager pages (without ♡): "All" + the services from the "Island" settings
     val active = order.filterNotNull()
+    // Services that were not in the island on the previous composition: they get the entry animation
+    val seen = remember { object { var set: Set<Service> = active.toSet() } }
+    val appeared = active.filter { it !in seen.set }.toSet()
+    androidx.compose.runtime.SideEffect { seen.set = active.toSet() }
     val chipRects = remember { mutableStateMapOf<Int, Rect>() }
     var rowWindow by remember { mutableStateOf(Offset.Zero) }
 
@@ -491,94 +508,124 @@ fun TopBar(
         return if (pos == null) (if (picked) o else i) else lerp(i, o, weight(idx))
     }
 
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .onGloballyPositioned { rowWindow = it.positionInWindow() }
-            .clip(RoundedCornerShape(32.dp))
-            .drawBehind {
-                drawRect(base)
-                val p = position?.invoke() ?: return@drawBehind
-                if (order.isEmpty()) return@drawBehind
-                val last = order.lastIndex
-                val i = floor(p).toInt().coerceIn(0, last)
-                val j = (i + 1).coerceAtMost(last)
-                val f = (p - i).coerceIn(0f, 1f)
-                val a = chipRects[i] ?: return@drawBehind
-                val b = chipRects[j] ?: return@drawBehind
-                // The drop: the center follows the position exactly, mid-way the body stretches and squashes
-                val stretch = sin(PI.toFloat() * f)
-                val cx = androidx.compose.ui.util.lerp(a.center.x, b.center.x, f) - rowWindow.x
-                val cy = androidx.compose.ui.util.lerp(a.center.y, b.center.y, f) - rowWindow.y
-                val dist = abs(b.center.x - a.center.x)
-                val w = androidx.compose.ui.util.lerp(a.width, b.width, f) + dist * 0.7f * stretch
-                val h = androidx.compose.ui.util.lerp(a.height, b.height, f) * (1f - 0.18f * stretch)
-                drawRoundRect(
-                    color = primary,
-                    topLeft = Offset(cx - w / 2f, cy - h / 2f),
-                    size = Size(w, h),
-                    cornerRadius = CornerRadius(h / 2f),
-                )
-            }
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // «Моя библиотека»: самая левая кнопка
-        if (onLikes != null) {
-            IconButton(
-                onClick = onLikes,
-                modifier = track(Modifier.clip(CircleShape).background(pill(likesSelected)), 0)
-                    .semantics { contentDescription = S.myLibrary }
-            ) {
-                LibraryIcon(Modifier.size(24.dp), tint(0, likesSelected))
-            }
-        }
-
-        active.forEach { service ->
-            val isSelected = !likesSelected && selected == service
-            val idx = order.indexOf(service)
-            IconButton(
-                onClick = { onSelect(service) },
-                modifier = track(Modifier.clip(CircleShape).background(pill(isSelected)), idx)
-            ) {
-                ServiceLogo(
-                    service,
-                    Modifier.size(24.dp),
-                    tint(idx, isSelected, soft = service == Service.JAMENDO && !JAMENDO_PURE_TINT),
-                )
-            }
-        }
-
-        if (soon.isNotEmpty() || Service.SPOTIFY.ready) {
-            Box {
-                val spotifyOn = !likesSelected && selected == Service.SPOTIFY
-                IconButton(
-                    onClick = { menuOpen.value = true },
-                    modifier = Modifier.clip(CircleShape)
-                        .background(if (spotifyOn) primary else Color.Transparent),
-                ) {
-                    AddIcon(
-                        Modifier.size(24.dp),
-                        if (spotifyOn) onPrimary else idle,
+    // The island narrows to its content: it is as wide as its buttons need and centered.
+    // If the buttons no longer fit the screen, it stretches to the full width and spreads them evenly, as before.
+    val buttonCount = (if (onLikes != null) 1 else 0) + active.size +
+            (if (soon.isNotEmpty() || Service.SPOTIFY.ready) 1 else 0)
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val needed = ISLAND_BUTTON_SIZE * buttonCount +
+                ISLAND_BUTTON_GAP * (buttonCount - 1).coerceAtLeast(0) +
+                ISLAND_PADDING * 2
+        val fits = needed < maxWidth
+        Row(
+            modifier = Modifier
+                .then(if (fits) Modifier else Modifier.fillMaxWidth())
+                .animateContentSize()
+                .onGloballyPositioned { rowWindow = it.positionInWindow() }
+                .clip(RoundedCornerShape(32.dp))
+                .drawBehind {
+                    drawRect(base)
+                    val p = position?.invoke() ?: return@drawBehind
+                    if (order.isEmpty()) return@drawBehind
+                    val last = order.lastIndex
+                    val i = floor(p).toInt().coerceIn(0, last)
+                    val j = (i + 1).coerceAtMost(last)
+                    val f = (p - i).coerceIn(0f, 1f)
+                    val a = chipRects[i] ?: return@drawBehind
+                    val b = chipRects[j] ?: return@drawBehind
+                    // The drop: the center follows the position exactly, mid-way the body stretches and squashes
+                    val stretch = sin(PI.toFloat() * f)
+                    val cx = androidx.compose.ui.util.lerp(a.center.x, b.center.x, f) - rowWindow.x
+                    val cy = androidx.compose.ui.util.lerp(a.center.y, b.center.y, f) - rowWindow.y
+                    val dist = abs(b.center.x - a.center.x)
+                    val w = androidx.compose.ui.util.lerp(a.width, b.width, f) + dist * 0.7f * stretch
+                    val h = androidx.compose.ui.util.lerp(a.height, b.height, f) * (1f - 0.18f * stretch)
+                    drawRoundRect(
+                        color = primary,
+                        topLeft = Offset(cx - w / 2f, cy - h / 2f),
+                        size = Size(w, h),
+                        cornerRadius = CornerRadius(h / 2f),
                     )
                 }
-                PlusMenu(
-                    expanded = menuOpen.value,
-                    onDismiss = { menuOpen.value = false },
-                    onSpotify = { onSelect(Service.SPOTIFY) },
-                    // A hidden service returns to the island for good, then opens
-                    onReveal = { service ->
-                        IslandSettings.reveal(service) { raw -> islandStore.set(ISLAND_KEY, raw) }
-                        onSelect(service)
-                    },
-                    soon = soon,
-                    onSoon = onSelect,
-                )
+                .padding(horizontal = ISLAND_PADDING, vertical = 8.dp),
+            horizontalArrangement = if (fits) Arrangement.spacedBy(ISLAND_BUTTON_GAP) else Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // «Моя библиотека»: самая левая кнопка
+            if (onLikes != null) {
+                IconButton(
+                    onClick = onLikes,
+                    modifier = track(Modifier.clip(CircleShape).background(pill(likesSelected)), 0)
+                        .semantics { contentDescription = S.myLibrary }
+                ) {
+                    LibraryIcon(Modifier.size(24.dp), tint(0, likesSelected))
+                }
+            }
+
+            active.forEach { service ->
+                // key: the entry state survives recompositions while the chip stays in the island
+                key(service) {
+                    // Only a service that was absent on the previous composition animates in;
+                    // the chips present from the start (and after rotation) just appear
+                    val enter = remember { MutableTransitionState(service !in appeared).apply { targetState = true } }
+                    AnimatedVisibility(
+                        visibleState = enter,
+                        enter = fadeIn(tween(220, delayMillis = 60)) +
+                                scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow), initialScale = 0.3f) +
+                                expandHorizontally(tween(260), expandFrom = Alignment.CenterHorizontally),
+                        exit = fadeOut() + shrinkHorizontally(),
+                    ) {
+                        val isSelected = !likesSelected && selected == service
+                        val idx = order.indexOf(service)
+                        IconButton(
+                            onClick = { onSelect(service) },
+                            modifier = track(Modifier.clip(CircleShape).background(pill(isSelected)), idx)
+                        ) {
+                            ServiceLogo(
+                                service,
+                                Modifier.size(24.dp),
+                                tint(idx, isSelected, soft = service == Service.JAMENDO && !JAMENDO_PURE_TINT),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (soon.isNotEmpty() || Service.SPOTIFY.ready) {
+                Box {
+                    val spotifyOn = !likesSelected && selected == Service.SPOTIFY
+                    IconButton(
+                        onClick = { menuOpen.value = true },
+                        modifier = Modifier.clip(CircleShape)
+                            .background(if (spotifyOn) primary else Color.Transparent),
+                    ) {
+                        AddIcon(
+                            Modifier.size(24.dp),
+                            if (spotifyOn) onPrimary else idle,
+                        )
+                    }
+                    PlusMenu(
+                        expanded = menuOpen.value,
+                        onDismiss = { menuOpen.value = false },
+                        onSpotify = { onSelect(Service.SPOTIFY) },
+                        // A hidden service returns to the island for good, then opens
+                        onReveal = { service ->
+                            IslandSettings.reveal(service) { raw -> islandStore.set(ISLAND_KEY, raw) }
+                            onSelect(service)
+                        },
+                        soon = soon,
+                        onSoon = onSelect,
+                    )
+                }
             }
         }
     }
 }
+
+// Island geometry: IconButton is 48dp
+private val ISLAND_BUTTON_SIZE = 48.dp
+private val ISLAND_BUTTON_GAP = 6.dp
+private val ISLAND_PADDING = 8.dp
 
 @Composable
 private fun HomeTrackCard(track: Track, showBadge: Boolean, onClick: () -> Unit) {
