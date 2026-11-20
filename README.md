@@ -1,24 +1,91 @@
-# Solara
 
-A music player for Android and desktop, built with Kotlin Multiplatform and Compose Multiplatform.
+<!-- ==================== HEADER ==================== -->
 
-## What it does
-- Full tracks from Jamendo and Audius, played inside the app.
-- Deezer: search and 30-second previews (Deezer does not provide full audio through its public API).
-- YouTube: search and an embedded YouTube player (the video stays on screen; no background playback, per YouTube rules).
-- Spotify (Android, Premium): remote control of the Spotify app. Solara stores nothing from Spotify.
-- Accounts, likes, playlists and listening history are stored in Supabase.
-- Interface languages: English (default) and Ukrainian.
+<table>
+  <tr>
+    <td width="180" align="center" valign="middle">
+      <img src="docs/images/solara-logo.png" width="140" alt="Solara Logo"/>
+    </td>
+    <td valign="middle">
+      <h1>SOLARA</h1>
+      <h3>Your music. Your space.</h3>
+      <p>
+        A unified music experience built with Kotlin Multiplatform,
+        designed for Android.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="https://img.shields.io/badge/Kotlin-Multiplatform-7F52FF?style=flat-square&logo=kotlin&logoColor=white"/>
+      <img src="https://img.shields.io/badge/Compose-Multiplatform-4285F4?style=flat-square"/>
+      <img src="https://img.shields.io/badge/Platform-Android-3DDC84?style=flat-square&logo=android&logoColor=white"/>
+      <img src="https://img.shields.io/badge/Backend-Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white"/>
+    </td>
+  </tr>
+</table>
 
-## Build
-Requirements: JDK 21, the Android SDK, and an Android device or emulator for the Android app.
+---
 
-1. Copy `shared/src/commonMain/kotlin/com/unknowstorm/musicapp/Secrets.kt.example` to `Secrets.kt` in the same folder and fill in your own keys. `Secrets.kt` is git-ignored: never commit it.
-2. Android: `./gradlew :androidApp:installDebug`
-3. Desktop compile check: `./gradlew :shared:compileKotlinJvm`
+<!-- ==================== NAVIGATION ==================== -->
 
-## Spotify setup (developers)
-The Spotify section uses the Spotify App Remote SDK. Register your package name and your debug keystore SHA-1 in the Spotify Developer Dashboard, and add your Spotify account to the app's User Management (Development Mode allows up to five users).
+## Navigation
 
-## Third-party services
-Service names and logos belong to their owners. Follow each service's developer terms and brand guidelines when changing the related screens.
+<p align="center">
+  <a href="#about-solara">About</a> &nbsp;·&nbsp;
+  <a href="#features">Features</a> &nbsp;·&nbsp;
+  <a href="#screenshots">Screenshots</a> &nbsp;·&nbsp;
+  <a href="#music-providers">Providers</a> &nbsp;·&nbsp;
+  <a href="#tech-stack">Tech Stack</a> &nbsp;·&nbsp;
+  <a href="#architecture">Architecture</a> &nbsp;·&nbsp;
+  <a href="#getting-started">Setup</a> &nbsp;·&nbsp;
+  <a href="#roadmap">Roadmap</a> &nbsp;·&nbsp;
+  <a href="#contributing">Contributing</a> &nbsp;·&nbsp;
+  <a href="#license">License</a>
+</p>
+
+---
+
+<!-- ==================== AUTHOR'S NOTE ==================== -->
+
+## A Note from the Author
+
+<p align="left">
+  [Author's message goes here.]
+</p>
+
+---
+
+<!-- ==================== ABOUT SOLARA ==================== -->
+
+## About Solara
+
+<p align="center">
+  <img src="docs/images/screenshot-1.png" width="32%" />
+  <img src="docs/images/screenshot-2.png" width="32%" />
+  <img src="docs/images/screenshot-3.png" width="32%" />
+</p>
+
+<p align="center">
+  <strong>Solara</strong> is a music application built with Kotlin Multiplatform and Compose Multiplatform, designed to bring multiple music streaming services together in a unified Android experience. It combines music playback, discovery, and personal library management within a single application.
+</p>
+
+<p align="center">
+  Built around the idea of a connected music experience, Solara aims to simplify how users discover, access, and organize their music — bringing different sources together in one personal space.
+</p>
+
+---
+
+<!-- ==================== FEATURES ==================== -->
+
+## Features
+
+<p align="center">
+  <img
+    src="design/features.svg"
+    width="100%"
+    alt="Solara Features"
+  />
+</p>
+
+---
