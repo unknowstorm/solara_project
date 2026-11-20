@@ -40,6 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +61,10 @@ fun PlaylistScreen(
     providers: List<MusicProvider>,
     audio: AudioBackend,
     onBack: () -> Unit,
+    /** For the expand transition: the cover is hidden while the shared cover flies in. */
+    coverAlpha: () -> Float = { 1f },
+    /** For the expand transition: reports where the cover is laid out. */
+    onCoverLayout: ((LayoutCoordinates) -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val all by repo.playlists.collectAsState()
@@ -156,7 +163,11 @@ fun PlaylistScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box {
+                Box(
+                    Modifier
+                        .onGloballyPositioned { onCoverLayout?.invoke(it) }
+                        .graphicsLayer { alpha = coverAlpha() }
+                ) {
                     PlaylistCover(
                         repo = repo,
                         playlist = current,

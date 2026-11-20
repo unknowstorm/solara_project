@@ -62,6 +62,7 @@ fun PlaylistTile(
     )
     Box(
         modifier
+            .zoomSource()
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(corner))
             .combinedClickable(
