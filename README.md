@@ -102,40 +102,34 @@
 
 ---
 
-<!-- ==================== SCREENSHOTS ==================== -->
-
 ## Screenshots
 
 <table>
   <tr>
-    <td valign="top" width="25%">
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-4.png" width="100%" alt="Solara Screenshot 1"/>
     </td>
-    <td valign="top" width="25%">
-      <br><br>
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-5.png" width="100%" alt="Solara Screenshot 2"/>
     </td>
-    <td valign="top" width="25%">
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-6.png" width="100%" alt="Solara Screenshot 3"/>
     </td>
-    <td valign="top" width="25%">
-      <br><br>
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-7.png" width="100%" alt="Solara Screenshot 4"/>
     </td>
   </tr>
   <tr>
-    <td valign="top" width="25%">
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-8.png" width="100%" alt="Solara Screenshot 5"/>
     </td>
-    <td valign="top" width="25%">
-      <br><br>
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-9.png" width="100%" alt="Solara Screenshot 6"/>
     </td>
-    <td valign="top" width="25%">
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-10.png" width="100%" alt="Solara Screenshot 7"/>
     </td>
-    <td valign="top" width="25%">
-      <br><br>
+    <td align="center" valign="top" width="25%">
       <img src="designs/Screenshot-11.png" width="100%" alt="Solara Screenshot 8"/>
     </td>
   </tr>
