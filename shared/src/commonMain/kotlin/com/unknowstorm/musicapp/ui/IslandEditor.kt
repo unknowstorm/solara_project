@@ -1,27 +1,20 @@
 package com.unknowstorm.musicapp.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -30,23 +23,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,7 +41,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -63,6 +52,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -128,8 +118,9 @@ object IslandSettings {
 }
 
 /**
- * Шторка редактора островка. В центре сам островок: сервисы можно зажать и перетащить.
- * Нажатие на сервис выделяет его и показывает «Скрыть»; «+ Добавить» возвращает скрытые.
+ * Шторка редактора островка. Сверху сам островок (пилюля), под ним зона скрытых сервисов.
+ * Сервис зажимают и перетягивают: внутри пилюли меняется порядок, из пилюли вниз в зону он скрывается,
+ * из зоны вверх на пилюлю добавляется. Кнопок «Скрыть» и «Добавить» нет.
  * Изменения применяются только по «Сохранить».
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,12 +133,6 @@ fun IslandSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val editable = remember { IslandSettings.editableServices }
     var visible by remember { mutableStateOf(IslandSettings.visible()) }
-    var selected by remember { mutableStateOf<Service?>(null) }
-    var showAdd by remember { mutableStateOf(false) }
-    val hidden = editable.filter { it !in visible }
-
-    // Всё вернули в островок: панель добавления больше не нужна
-    LaunchedEffect(hidden.isEmpty()) { if (hidden.isEmpty()) showAdd = false }
 
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
@@ -174,72 +159,23 @@ fun IslandSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            IslandPreview(
-                visible = visible,
-                hidden = hidden,
-                selected = selected,
-                onSelect = { selected = if (selected == it) null else it },
-                onReorder = { from, to ->
-                    visible = visible.toMutableList().apply { add(to, removeAt(from)) }
-                },
+            IslandEditorArea(
+                editable = editable,
+                // Читаем состояние напрямую: во время перетаскивания события приходят чаще, чем перерисовка
+                visibleProvider = { visible },
+                onVisibleChange = { visible = it },
             )
 
             Text(
-                tr("Hold a service and drag to reorder", "Утримуйте сервіс і перетягуйте, щоб змінити порядок"),
+                tr(
+                    "Hold a service and drag: reorder it, drag down to hide, drag up to add",
+                    "Утримуйте сервіс і перетягуйте: змінюйте порядок, вниз — сховати, вгору — додати",
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-
-            // «Скрыть» появляется, когда выбран сервис; «+ Добавить», когда есть скрытые
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                AnimatedVisibility(
-                    visible = selected != null && visible.size > 1,
-                    enter = fadeIn(spring(stiffness = Spring.StiffnessMedium)) + scaleIn(spring(0.6f, Spring.StiffnessMedium)),
-                    exit = fadeOut() + scaleOut(),
-                ) {
-                    OutlinedButton(onClick = {
-                        selected?.let { visible = visible - it }
-                        selected = null
-                    }) { Text(tr("Hide", "Сховати")) }
-                }
-                Spacer(Modifier.weight(1f))
-                AnimatedVisibility(
-                    visible = hidden.isNotEmpty(),
-                    enter = fadeIn(spring(stiffness = Spring.StiffnessMedium)) + scaleIn(spring(0.6f, Spring.StiffnessMedium)),
-                    exit = fadeOut() + scaleOut(),
-                ) {
-                    FilledTonalButton(onClick = { showAdd = !showAdd }) {
-                        Text("+ " + tr("Add", "Додати"))
-                    }
-                }
-            }
-
-            // Скрытые сервисы: нажатие возвращает сервис в конец островка
-            AnimatedVisibility(
-                visible = showAdd && hidden.isNotEmpty(),
-                enter = fadeIn() + expandVertically(spring(0.8f, Spring.StiffnessMediumLow)),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    hidden.forEach { service ->
-                        AssistChip(
-                            onClick = {
-                                visible = visible + service
-                                selected = service
-                            },
-                            label = { Text(service.title) },
-                            leadingIcon = {
-                                ServiceLogo(service, Modifier.size(18.dp), MaterialTheme.colorScheme.onSurface)
-                            },
-                        )
-                    }
-                }
-            }
 
             Button(
                 onClick = { onSave(visible); close() },
@@ -251,143 +187,311 @@ fun IslandSheet(
 }
 
 /**
- * Островок в редакторе. Положение каждой иконки считается из её номера, поэтому остальные плавно
- * съезжают на освободившиеся места, пока одну иконку тащат. Скрытые сервисы не убираются из дерева,
- * а сжимаются и гаснут на краю: так «скрыть» и «добавить» анимируются.
+ * Геометрия области редактора в пикселях. Все сервисы живут в одной системе координат, поэтому
+ * карточку можно тащить между пилюлей и зоной скрытых. Положение считается по центрам.
+ */
+private class IslandGeometry(
+    val widthPx: Float,
+    val itemPx: Float,
+    val gapPx: Float,
+    val pillHeightPx: Float,
+    val trayTopPx: Float,
+    val trayHeightPx: Float,
+    val chipMaxPx: Float,
+    val chipGapPx: Float,
+    val trayPadPx: Float,
+) {
+    private val stepPx get() = itemPx + gapPx
+
+    val heightPx get() = trayTopPx + trayHeightPx
+    val pillCenterY get() = pillHeightPx / 2f
+    val trayCenterY get() = trayTopPx + trayHeightPx / 2f
+
+    /** Ниже этой линии перетаскиваемый сервис считается скрытым, выше — лежащим в пилюле. */
+    val boundaryY get() = (pillHeightPx + trayTopPx) / 2f
+
+    private fun pillStartX(n: Int) =
+        (widthPx - (itemPx * n + gapPx * (n - 1).coerceAtLeast(0))) / 2f
+
+    fun iconCenterX(index: Int, n: Int) = pillStartX(n) + itemPx / 2f + index * stepPx
+
+    /** Номер места в пилюле из [n] иконок, ближайшего к горизонтальной позиции [x]. */
+    fun indexAt(x: Float, n: Int): Int =
+        ((x - pillStartX(n) - itemPx / 2f) / stepPx).roundToInt().coerceIn(0, (n - 1).coerceAtLeast(0))
+
+    fun chipWidth(n: Int): Float {
+        if (n <= 0) return chipMaxPx
+        val room = (widthPx - trayPadPx * 2 - chipGapPx * (n - 1)) / n
+        return minOf(chipMaxPx, room).coerceAtLeast(0f)
+    }
+
+    fun chipCenterX(j: Int, n: Int): Float {
+        val w = chipWidth(n)
+        val start = (widthPx - (w * n + chipGapPx * (n - 1).coerceAtLeast(0))) / 2f
+        return start + w / 2f + j * (w + chipGapPx)
+    }
+}
+
+/**
+ * Островок и зона скрытых сервисов. Сервис в пилюле выглядит иконкой, в зоне скрытых — чипом;
+ * при перетаскивании через границу он на лету меняет вид, а остальные плавно съезжают на свободные места.
+ * Последний видимый сервис скрыть нельзя: островок не должен остаться пустым.
  */
 @Composable
-private fun IslandPreview(
-    visible: List<Service>,
-    hidden: List<Service>,
-    selected: Service?,
-    onSelect: (Service) -> Unit,
-    onReorder: (from: Int, to: Int) -> Unit,
+private fun IslandEditorArea(
+    editable: List<Service>,
+    visibleProvider: () -> List<Service>,
+    onVisibleChange: (List<Service>) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
     val cs = MaterialTheme.colorScheme
+
     val itemSize = 48.dp
     val gap = 14.dp
-    val stepPx = with(LocalDensity.current) { (itemSize + gap).toPx() }
-    val count = visible.size
-    val contentWidth = itemSize * count + gap * (count - 1).coerceAtLeast(0)
+    val pillPad = 20.dp
+    val pillHeight = 68.dp
+    val trayTop = 88.dp
+    val trayHeight = 56.dp
+    val chipHeight = 40.dp
+    val chipMax = 112.dp
+    val chipGap = 8.dp
+    val trayPad = 12.dp
+
+    val visible = visibleProvider()
+    val hidden = editable.filter { it !in visible }
 
     var dragging by remember { mutableStateOf<Service?>(null) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val onReorderNow by rememberUpdatedState(onReorder)
+    var dragCenter by remember { mutableStateOf(Offset.Zero) }
 
     // Те же цвета, что у настоящей панели: чисто белые или чёрные логотипы по правилам брендов
     val darkTheme = cs.background.luminance() < 0.179f
     val idle = if (darkTheme) Color.White else Color.Black
     val onPrimary = if (cs.primary.luminance() > 0.179f) Color.Black else Color.White
 
-    // Отпустили: иконка плавно садится на своё место, и только потом «перетаскивание» заканчивается
-    fun release() {
-        scope.launch {
-            animate(dragOffset, 0f, animationSpec = spring(0.7f, Spring.StiffnessMediumLow)) { value, _ ->
-                dragOffset = value
-            }
-            dragging = null
-        }
-    }
+    val draggingVisible = dragging?.let { it in visible } == true
+    val draggingHidden = dragging?.let { it in hidden } == true
 
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    val pillWidth by animateDpAsState(
+        itemSize * visible.size + gap * (visible.size - 1).coerceAtLeast(0) + pillPad * 2,
+        spring(0.8f, Spring.StiffnessMediumLow),
+        label = "pillWidth",
+    )
+    val pillColor by animateColorAsState(
+        cs.surfaceVariant.copy(alpha = if (draggingVisible) 0.85f else 0.5f),
+        label = "pillColor",
+    )
+    val trayColor by animateColorAsState(
+        if (draggingHidden) cs.secondaryContainer.copy(alpha = 0.6f) else cs.surfaceContainerLow,
+        label = "trayColor",
+    )
+    val placeholderAlpha by animateFloatAsState(if (hidden.isEmpty()) 1f else 0f, label = "trayHint")
+
+    BoxWithConstraints(Modifier.fillMaxWidth().height(trayTop + trayHeight)) {
+        val geo = with(density) {
+            IslandGeometry(
+                widthPx = maxWidth.toPx(),
+                itemPx = itemSize.toPx(),
+                gapPx = gap.toPx(),
+                pillHeightPx = pillHeight.toPx(),
+                trayTopPx = trayTop.toPx(),
+                trayHeightPx = trayHeight.toPx(),
+                chipMaxPx = chipMax.toPx(),
+                chipGapPx = chipGap.toPx(),
+                trayPadPx = trayPad.toPx(),
+            )
+        }
+        val geoNow by rememberUpdatedState(geo)
+
+        // Зона скрытых сервисов: сюда уводят сервис, чтобы убрать его из островка
         Box(
             Modifier
-                .animateContentSize(spring(0.8f, Spring.StiffnessMediumLow))
-                .clip(RoundedCornerShape(32.dp))
-                .background(cs.surfaceVariant.copy(alpha = 0.5f))
-                .padding(horizontal = 20.dp, vertical = 10.dp),
+                .align(Alignment.TopCenter)
+                .offset(y = trayTop)
+                .fillMaxWidth()
+                .height(trayHeight)
+                .clip(RoundedCornerShape(20.dp))
+                .background(trayColor),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.width(contentWidth).height(itemSize)) {
-                (visible + hidden).forEach { service ->
-                    key(service) {
-                        val index = visible.indexOf(service)
-                        val isVisible = index >= 0
-                        val indexNow by rememberUpdatedState(index)
-                        val countNow by rememberUpdatedState(count)
-                        // Скрытые стоят на последнем месте и гаснут
-                        val slot = if (isVisible) index else (count - 1).coerceAtLeast(0)
-                        val isDragging = dragging == service
-                        val isSelected = isVisible && selected == service
+            Text(
+                tr("Drag here to hide", "Перетягніть сюди, щоб сховати"),
+                style = MaterialTheme.typography.bodySmall,
+                color = cs.onSurfaceVariant,
+                modifier = Modifier.alpha(placeholderAlpha),
+            )
+        }
 
-                        val animX by animateFloatAsState(
-                            slot * stepPx,
-                            spring(0.75f, Spring.StiffnessMedium),
-                            label = "islandX",
-                        )
-                        val x = if (isDragging) {
-                            (slot * stepPx + dragOffset).coerceIn(0f, (count - 1).coerceAtLeast(0) * stepPx)
-                        } else animX
-                        val scaleValue by animateFloatAsState(
-                            when {
-                                isDragging -> 1.18f
-                                !isVisible -> 0.3f
-                                else -> 1f
-                            },
-                            spring(0.55f, Spring.StiffnessMedium),
-                            label = "islandScale",
-                        )
-                        val alphaValue by animateFloatAsState(
-                            if (isVisible) 1f else 0f,
-                            spring(stiffness = Spring.StiffnessMedium),
-                            label = "islandAlpha",
-                        )
-                        val background by animateColorAsState(
-                            if (isSelected) cs.primary else Color.Transparent,
-                            label = "islandBg",
-                        )
-                        val tint by animateColorAsState(if (isSelected) onPrimary else idle, label = "islandTint")
+        // Пилюля островка
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .width(pillWidth)
+                .height(pillHeight)
+                .clip(RoundedCornerShape(32.dp))
+                .background(pillColor),
+        )
 
-                        Box(
-                            Modifier
-                                .offset { IntOffset(x.roundToInt(), 0) }
-                                .zIndex(if (isDragging) 1f else 0f)
-                                .size(itemSize)
-                                .graphicsLayer {
-                                    scaleX = scaleValue
-                                    scaleY = scaleValue
-                                    alpha = alphaValue
-                                    shadowElevation = if (isDragging) 16.dp.toPx() else 0f
-                                    shape = CircleShape
-                                    clip = false
-                                }
-                                .background(background, CircleShape)
-                                .clip(CircleShape)
-                                .pointerInput(service) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            if (dragging == null && indexNow >= 0) {
-                                                dragging = service
-                                                dragOffset = 0f
-                                                onSelect(service)
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            }
-                                        },
-                                        onDrag = { change, amount ->
-                                            change.consume()
-                                            if (dragging == service) {
-                                                dragOffset += amount.x
-                                                val current = indexNow
-                                                val target = ((current * stepPx + dragOffset) / stepPx)
-                                                    .roundToInt()
-                                                    .coerceIn(0, (countNow - 1).coerceAtLeast(0))
-                                                if (target != current) {
-                                                    onReorderNow(current, target)
-                                                    // Иконка продолжает идти за пальцем, а не прыгает на новое место
-                                                    dragOffset -= (target - current) * stepPx
-                                                }
-                                            }
-                                        },
-                                        onDragEnd = { if (dragging == service) release() },
-                                        onDragCancel = { if (dragging == service) release() },
-                                    )
-                                }
-                                .clickable(enabled = isVisible) { onSelect(service) },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            ServiceLogo(service, Modifier.size(24.dp), tint)
+        // Перетаскиваемый сервис переходит между пилюлей и зоной скрытых сразу, как только его центр пересёк границу
+        val handleMove: (Service, Offset) -> Unit = { service, center ->
+            val g = geoNow
+            val list = visibleProvider()
+            val index = list.indexOf(service)
+            if (center.y < g.boundaryY) {
+                if (index >= 0) {
+                    val target = g.indexAt(center.x, list.size)
+                    if (target != index) {
+                        onVisibleChange(list.toMutableList().apply { add(target, removeAt(index)) })
+                    }
+                } else {
+                    val target = g.indexAt(center.x, list.size + 1)
+                    onVisibleChange(list.toMutableList().apply { add(target, service) })
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                }
+            } else if (index >= 0 && list.size > 1) {
+                onVisibleChange(list - service)
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        }
+        val handleMoveNow by rememberUpdatedState(handleMove)
+
+        // Отпустили: сервис плавно садится на своё место, и только потом «перетаскивание» заканчивается
+        val release: (Service) -> Unit = { service ->
+            scope.launch {
+                val g = geoNow
+                val list = visibleProvider()
+                val index = list.indexOf(service)
+                val hiddenList = editable.filter { it !in list }
+                val target = if (index >= 0) {
+                    Offset(g.iconCenterX(index, list.size), g.pillCenterY)
+                } else {
+                    Offset(g.chipCenterX(hiddenList.indexOf(service), hiddenList.size), g.trayCenterY)
+                }
+                val from = dragCenter
+                animate(0f, 1f, animationSpec = spring(0.7f, Spring.StiffnessMediumLow)) { p, _ ->
+                    dragCenter = Offset(from.x + (target.x - from.x) * p, from.y + (target.y - from.y) * p)
+                }
+                dragging = null
+            }
+        }
+        val releaseNow by rememberUpdatedState(release)
+
+        editable.forEach { service ->
+            key(service) {
+                val index = visible.indexOf(service)
+                val isOn = index >= 0
+                val hiddenIndex = hidden.indexOf(service)
+                val isDragging = dragging == service
+
+                val targetCx = if (isOn) geo.iconCenterX(index, visible.size)
+                else geo.chipCenterX(hiddenIndex, hidden.size)
+                val targetCy = if (isOn) geo.pillCenterY else geo.trayCenterY
+                val animCx by animateFloatAsState(targetCx, spring(0.75f, Spring.StiffnessMedium), label = "islandX")
+                val animCy by animateFloatAsState(targetCy, spring(0.75f, Spring.StiffnessMedium), label = "islandY")
+
+                val chipWidthDp = with(density) { geo.chipWidth(hidden.size).toDp() }
+                val width by animateDpAsState(
+                    if (isOn) itemSize else chipWidthDp,
+                    spring(0.8f, Spring.StiffnessMediumLow),
+                    label = "islandW",
+                )
+                val height by animateDpAsState(
+                    if (isOn) itemSize else chipHeight,
+                    spring(0.8f, Spring.StiffnessMediumLow),
+                    label = "islandH",
+                )
+                val corner by animateDpAsState(
+                    if (isOn) 24.dp else 12.dp,
+                    spring(0.8f, Spring.StiffnessMediumLow),
+                    label = "islandCorner",
+                )
+                val chipAlpha by animateFloatAsState(
+                    if (isOn) 0f else 1f,
+                    spring(stiffness = Spring.StiffnessMedium),
+                    label = "islandChip",
+                )
+                val scaleValue by animateFloatAsState(
+                    if (isDragging) 1.15f else 1f,
+                    spring(0.6f, Spring.StiffnessMedium),
+                    label = "islandScale",
+                )
+                val highlighted = isDragging && isOn
+                val background by animateColorAsState(
+                    when {
+                        highlighted -> cs.primary
+                        !isOn -> cs.surface
+                        else -> Color.Transparent
+                    },
+                    label = "islandBg",
+                )
+                val tint by animateColorAsState(if (highlighted) onPrimary else idle, label = "islandTint")
+                val itemShape = RoundedCornerShape(corner)
+
+                Box(
+                    Modifier
+                        .offset {
+                            val cx = if (isDragging) dragCenter.x else animCx
+                            val cy = if (isDragging) dragCenter.y else animCy
+                            IntOffset(
+                                (cx - width.toPx() / 2f).roundToInt(),
+                                (cy - height.toPx() / 2f).roundToInt(),
+                            )
                         }
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .size(width, height)
+                        .graphicsLayer {
+                            scaleX = scaleValue
+                            scaleY = scaleValue
+                            shadowElevation = if (isDragging) 16.dp.toPx() else 0f
+                            shape = itemShape
+                            clip = false
+                        }
+                        .background(background, itemShape)
+                        .border(1.dp, cs.outlineVariant.copy(alpha = chipAlpha), itemShape)
+                        .clip(itemShape)
+                        .pointerInput(service) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    if (dragging == null) {
+                                        dragging = service
+                                        // Сразу берём текущий центр: карточка не прыгает, а идёт от своего места
+                                        dragCenter = Offset(animCx, animCy)
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    if (dragging == service) {
+                                        val g = geoNow
+                                        dragCenter = Offset(
+                                            (dragCenter.x + amount.x).coerceIn(0f, g.widthPx),
+                                            (dragCenter.y + amount.y).coerceIn(0f, g.heightPx),
+                                        )
+                                        handleMoveNow(service, dragCenter)
+                                    }
+                                },
+                                onDragEnd = { if (dragging == service) releaseNow(service) },
+                                onDragCancel = { if (dragging == service) releaseNow(service) },
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // Иконка в пилюле и чип в зоне скрытых перетекают друг в друга по прозрачности
+                    ServiceLogo(service, Modifier.size(24.dp).alpha(1f - chipAlpha), tint)
+                    Row(
+                        Modifier.fillMaxSize().padding(horizontal = 12.dp).alpha(chipAlpha),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ServiceLogo(service, Modifier.size(18.dp), tint)
+                        Text(
+                            service.title,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = cs.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
