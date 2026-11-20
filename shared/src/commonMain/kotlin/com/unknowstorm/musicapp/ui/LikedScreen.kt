@@ -73,7 +73,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class LibraryTab {
-    LIKES, PLAYLISTS, HISTORY, LOCAL, CACHE;
+    LIKES, PLAYLISTS, HISTORY, LOCAL, CACHE, RECOGNIZED;
 
     // Свойство, а не параметр конструктора: название берётся из текущего языка при каждой отрисовке
     val label: String
@@ -83,6 +83,7 @@ private enum class LibraryTab {
             HISTORY -> S.libHistory
             LOCAL -> S.libLocal
             CACHE -> S.libCache
+            RECOGNIZED -> S.libRecognized
         }
 }
 
@@ -203,6 +204,7 @@ fun LibraryContent(
                         LibraryTab.HISTORY -> HistoryTab(likes, history, providers, audio, onOpenAuth)
                         LibraryTab.LOCAL -> if (local != null) LocalFilesContent(local, audio) else Message(S.noLocalFiles)
                         LibraryTab.CACHE -> if (downloads != null) DownloadsContent(downloads, audio) else Message(S.cacheSoon)
+                        LibraryTab.RECOGNIZED -> RecognizedContent()
                     }
                 }
             }

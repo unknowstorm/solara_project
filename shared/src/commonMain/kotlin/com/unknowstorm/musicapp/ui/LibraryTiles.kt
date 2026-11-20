@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -138,6 +139,9 @@ private fun LibraryTilesGrid(
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).staggeredEntrance(4, played),
             ) { DownloadTrayGlyph(Modifier.size(28.dp), it) }
         }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            RecognizedStrip(onClick = { onOpen(5) }, modifier = Modifier.fillMaxWidth().height(80.dp).staggeredEntrance(5, played))
+        }
     }
 }
 
@@ -166,6 +170,9 @@ private fun LibraryTilesRow(likesCount: Int?, onOpen: (Int) -> Unit, played: Mut
         }
         SquareTile(S.libCache, cs.primaryContainer, cs.onPrimaryContainer, { onOpen(4) }, modifier = tile.staggeredEntrance(4, played), compact = true) {
             DownloadTrayGlyph(Modifier.size(24.dp), it)
+        }
+        SquareTile(S.libRecognized, cs.secondaryContainer, cs.onSecondaryContainer, { onOpen(5) }, modifier = tile.staggeredEntrance(5, played), compact = true) {
+            RecognizeGlyph(Modifier.size(24.dp), it)
         }
     }
 }
@@ -329,6 +336,46 @@ private fun DownloadTrayGlyph(modifier: Modifier, tint: Color) {
                 moveTo(4f, 15f); lineTo(4f, 19.5f); lineTo(20f, 19.5f); lineTo(20f, 15f)
             }
             drawPath(tray, tint, style = glyphStroke())
+        }
+    }
+}
+
+/** A wide tile under the square ones: songs found by "What's playing?". */
+@Composable
+private fun RecognizedStrip(onClick: () -> Unit, modifier: Modifier) {
+    val cs = MaterialTheme.colorScheme
+    val found by RecognizedHistory.items.collectAsState()
+    TileSurface(cs.secondaryContainer, cs.onSecondaryContainer, onClick, modifier) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconDisc(48.dp, cs.onSecondaryContainer) { RecognizeGlyph(Modifier.size(26.dp), cs.onSecondaryContainer) }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(S.libRecognized, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (found.isNotEmpty()) {
+                    Text(
+                        S.tracks(found.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = cs.onSecondaryContainer.copy(alpha = 0.75f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Recognition: a sound wave of five bars. */
+@Composable
+internal fun RecognizeGlyph(modifier: Modifier, tint: Color) {
+    Canvas(modifier) {
+        scale(size.width / 24f, pivot = Offset.Zero) {
+            val bars = Path().apply {
+                moveTo(3.5f, 10f); lineTo(3.5f, 14f)
+                moveTo(7.75f, 7f); lineTo(7.75f, 17f)
+                moveTo(12f, 3.5f); lineTo(12f, 20.5f)
+                moveTo(16.25f, 7.5f); lineTo(16.25f, 16.5f)
+                moveTo(20.5f, 10f); lineTo(20.5f, 14f)
+            }
+            drawPath(bars, tint, style = glyphStroke(2.4f))
         }
     }
 }

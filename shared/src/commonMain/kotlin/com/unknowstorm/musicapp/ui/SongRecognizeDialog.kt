@@ -35,7 +35,8 @@ private sealed interface RecState {
 
 /**
  * "What's playing?" dialog: records a short clip, sends it for recognition and shows the result.
- * Nothing is stored: the clip is deleted right after sending, the result lives only while the dialog is open.
+ * The clip is deleted right after sending. A found song (title, artist, album) is added by SongRecognizer to the list
+ * on this phone (RecognizedHistory); links to other services are not saved.
  */
 @Composable
 fun SongRecognizeDialog(onDismiss: () -> Unit, onSearch: (String) -> Unit) {
