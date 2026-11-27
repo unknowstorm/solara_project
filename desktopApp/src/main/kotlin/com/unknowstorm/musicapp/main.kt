@@ -49,8 +49,11 @@ private fun detectSystemScale(): Float {
     // Manual override for odd setups: SOLARA_SCALE=2 /opt/solara/bin/Solara
     System.getenv("SOLARA_SCALE")?.toFloatOrNull()?.let { return it.coerceIn(0.5f, 4f) }
     if (!System.getProperty("os.name").orEmpty().contains("linux", ignoreCase = true)) return 1f
-    // The JVM was already told a scale: do not apply it twice
-    if (!System.getProperty("sun.java2d.uiScale").isNullOrBlank() || !System.getenv("GDK_SCALE").isNullOrBlank()) return 1f
+    // What the JVM itself already applies (sun.java2d.uiScale / GDK_SCALE), so that we never scale twice
+    val jvmScale = runCatching {
+        java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+            .defaultScreenDevice.defaultConfiguration.defaultTransform.scaleX.toFloat()
+    }.getOrNull()?.takeIf { it > 0f } ?: 1f
 
     // 1) The desktop setting that the toolkit reads itself (dpi * 1024)
     var dpi: Float? = runCatching {
@@ -65,8 +68,12 @@ private fun detectSystemScale(): Float {
             Regex("""Xft\.dpi:\s*([0-9.]+)""").find(text)?.groupValues?.get(1)?.toFloatOrNull()
         }.getOrNull()
     }
-    val scale = if (dpi == null) 1f else (Math.round(dpi / 96f * 20f) / 20f).coerceIn(1f, 3f)
-    println("Solara: desktop dpi=$dpi, scale=$scale")
+    val target = if (dpi == null) 1f else (Math.round(dpi / 96f * 20f) / 20f).coerceIn(1f, 3f)
+    val scale = (target / jvmScale).coerceIn(1f, 3f)
+    println(
+        "Solara: desktop dpi=$dpi, target=$target, jvmScale=$jvmScale, scale=$scale " +
+            "(GDK_SCALE=${System.getenv("GDK_SCALE")}, uiScale=${System.getProperty("sun.java2d.uiScale")})"
+    )
     return scale
 }
 
