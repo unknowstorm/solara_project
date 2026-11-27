@@ -46,17 +46,28 @@ private val zoomSteps = listOf(0.75f, 0.9f, 1f, 1.1f, 1.25f, 1.4f, 1.5f, 1.75f, 
  * If the JVM was not already told a scale, read the desktop DPI (Xft.dpi, 96 = 100 %) and use it as the base scale.
  */
 private fun detectSystemScale(): Float {
+    // Manual override for odd setups: SOLARA_SCALE=2 /opt/solara/bin/Solara
+    System.getenv("SOLARA_SCALE")?.toFloatOrNull()?.let { return it.coerceIn(0.5f, 4f) }
     if (!System.getProperty("os.name").orEmpty().contains("linux", ignoreCase = true)) return 1f
-    if (System.getProperty("sun.java2d.uiScale") != null || System.getenv("GDK_SCALE") != null) return 1f
-    return try {
-        val process = ProcessBuilder("xrdb", "-query").redirectErrorStream(true).start()
-        val text = process.inputStream.bufferedReader().readText()
-        process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
-        val dpi = Regex("""Xft\.dpi:\s*([0-9.]+)""").find(text)?.groupValues?.get(1)?.toFloatOrNull()
-        if (dpi == null) 1f else (Math.round(dpi / 96f * 20f) / 20f).coerceIn(1f, 3f)
-    } catch (_: Throwable) {
-        1f
+    // The JVM was already told a scale: do not apply it twice
+    if (!System.getProperty("sun.java2d.uiScale").isNullOrBlank() || !System.getenv("GDK_SCALE").isNullOrBlank()) return 1f
+
+    // 1) The desktop setting that the toolkit reads itself (dpi * 1024)
+    var dpi: Float? = runCatching {
+        (java.awt.Toolkit.getDefaultToolkit().getDesktopProperty("gnome.Xft/DPI") as? Int)?.let { it / 1024f }
+    }.getOrNull()?.takeIf { it > 0f }
+    // 2) Fallback: xrdb
+    if (dpi == null) {
+        dpi = runCatching {
+            val process = ProcessBuilder("xrdb", "-query").redirectErrorStream(true).start()
+            val text = process.inputStream.bufferedReader().readText()
+            process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+            Regex("""Xft\.dpi:\s*([0-9.]+)""").find(text)?.groupValues?.get(1)?.toFloatOrNull()
+        }.getOrNull()
     }
+    val scale = if (dpi == null) 1f else (Math.round(dpi / 96f * 20f) / 20f).coerceIn(1f, 3f)
+    println("Solara: desktop dpi=$dpi, scale=$scale")
+    return scale
 }
 
 /** The user's extra zoom on top of the system scale: Ctrl + / Ctrl - / Ctrl 0, remembered between launches. */
