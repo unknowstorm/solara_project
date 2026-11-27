@@ -28,30 +28,51 @@ import java.util.prefs.Preferences
 private fun setLinuxWindowClass() {
     if (!System.getProperty("os.name").orEmpty().contains("linux", ignoreCase = true)) return
     try {
+        val toolkit = java.awt.Toolkit.getDefaultToolkit()
         val field = Class.forName("sun.awt.X11.XToolkit").getDeclaredField("awtAppClassName")
         field.isAccessible = true
-        field.set(null, "solara-Solara")
+        field.set(toolkit, "solara-Solara")
     } catch (_: Throwable) {
         // Not X11 or no access: the default class name stays, the app still works
     }
 }
 
 private val prefs = Preferences.userRoot().node("com/unknowstorm/solara")
-private const val ZOOM_KEY = "uiZoom"
+private const val ZOOM_KEY = "uiZoomMul"
 private val zoomSteps = listOf(0.75f, 0.9f, 1f, 1.1f, 1.25f, 1.4f, 1.5f, 1.75f, 2f)
 
-/** The interface scale: Ctrl + / Ctrl - / Ctrl 0, remembered between launches. Starts at 1.25 on the first launch. */
-private fun loadZoom(): Float = prefs.getFloat(ZOOM_KEY, 1.25f).coerceIn(zoomSteps.first(), zoomSteps.last())
+/**
+ * Java on X11 / XWayland often does not pick up the desktop scale (for example 125 %), so everything looks tiny.
+ * If the JVM was not already told a scale, read the desktop DPI (Xft.dpi, 96 = 100 %) and use it as the base scale.
+ */
+private fun detectSystemScale(): Float {
+    if (!System.getProperty("os.name").orEmpty().contains("linux", ignoreCase = true)) return 1f
+    if (System.getProperty("sun.java2d.uiScale") != null || System.getenv("GDK_SCALE") != null) return 1f
+    return try {
+        val process = ProcessBuilder("xrdb", "-query").redirectErrorStream(true).start()
+        val text = process.inputStream.bufferedReader().readText()
+        process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)
+        val dpi = Regex("""Xft\.dpi:\s*([0-9.]+)""").find(text)?.groupValues?.get(1)?.toFloatOrNull()
+        if (dpi == null) 1f else (Math.round(dpi / 96f * 20f) / 20f).coerceIn(1f, 3f)
+    } catch (_: Throwable) {
+        1f
+    }
+}
+
+/** The user's extra zoom on top of the system scale: Ctrl + / Ctrl - / Ctrl 0, remembered between launches. */
+private fun loadZoomMul(): Float = prefs.getFloat(ZOOM_KEY, 1f).coerceIn(zoomSteps.first(), zoomSteps.last())
 
 fun main() {
     setLinuxWindowClass()
     application {
-        var zoom by remember { mutableStateOf(loadZoom()) }
+        val systemScale = remember { detectSystemScale() }
+        var zoom by remember { mutableStateOf(loadZoomMul()) }
         fun setZoom(v: Float) {
             zoom = v
             runCatching { prefs.putFloat(ZOOM_KEY, v) }
         }
-        val windowState = rememberWindowState(size = DpSize(1100.dp, 760.dp))
+        // The window size is measured at the system density, so scale it to get a comfortable size on any screen
+        val windowState = rememberWindowState(size = DpSize((1100 * systemScale).dp, (760 * systemScale).dp))
         Window(
             onCloseRequest = ::exitApplication,
             title = "Solara",
@@ -63,14 +84,14 @@ fun main() {
                     when (e.key) {
                         Key.Equals, Key.Plus, Key.NumPadAdd -> { setZoom(zoomSteps[(idx + 1).coerceAtMost(zoomSteps.lastIndex)]); true }
                         Key.Minus, Key.NumPadSubtract -> { setZoom(zoomSteps[(idx - 1).coerceAtLeast(0)]); true }
-                        Key.Zero, Key.NumPad0 -> { setZoom(1.25f); true }
+                        Key.Zero, Key.NumPad0 -> { setZoom(1f); true }
                         else -> false
                     }
                 } else false
             },
         ) {
             val base = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(base.density * zoom, base.fontScale)) {
+            CompositionLocalProvider(LocalDensity provides Density(base.density * systemScale * zoom, base.fontScale)) {
                 App()
             }
         }
