@@ -19,9 +19,13 @@ compose.desktop {
     application {
         mainClass = "com.unknowstorm.musicapp.MainKt"
 
+        // Lets the window class be changed at startup so the desktop shell matches the window to the menu entry
+        jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
+
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "solara"
+            // Shown as the application name; the Debian package name stays lowercase (see linux {} below)
+            packageName = "Solara"
             packageVersion = "1.0.0"
             description = "Solara: one music player for Jamendo, Audius, Deezer, YouTube and Spotify"
             vendor = "unknowstorm"
