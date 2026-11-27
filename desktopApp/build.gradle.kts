@@ -21,8 +21,25 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.unknowstorm.musicapp"
+            packageName = "solara"
             packageVersion = "1.0.0"
+            description = "Solara: one music player for Jamendo, Audius, Deezer, YouTube and Spotify"
+            vendor = "unknowstorm"
+            licenseFile.set(rootProject.file("LICENSE"))
+
+            // The bundled runtime is trimmed by jlink; these modules are needed for HTTPS, JSON and Supabase.
+            modules("java.sql", "java.naming", "java.net.http", "java.management", "jdk.crypto.ec", "jdk.unsupported")
+
+            linux {
+                packageName = "solara"
+                debMaintainer = "artemrimskiy8000@gmail.com"
+                menuGroup = "Sound & Video"
+                appCategory = "AudioVideo"
+                shortcut = true
+                // Optional icon: put a square PNG (512x512) at desktopApp/icon.png
+                val icon = file("icon.png")
+                if (icon.exists()) iconFile.set(icon)
+            }
         }
     }
 }
